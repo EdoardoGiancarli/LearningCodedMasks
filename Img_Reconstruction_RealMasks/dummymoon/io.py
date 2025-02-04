@@ -5,6 +5,7 @@ Opening .fits files...
 from scipy.signal import correlate
 from mbloodmoon import codedmask
 from .display import image_plot
+from astropy.io import fits
 
 
 def import_mask(fits_path: str,
@@ -38,6 +39,10 @@ def import_mask(fits_path: str,
                    cbarcmap=["inferno"]*2)
 
     return wfm
+
+
+def make_fits() -> fits:
+    pass
 
 
 # end

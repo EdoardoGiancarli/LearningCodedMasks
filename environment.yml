@@ -13,3 +13,4 @@ dependencies:
   - sympy=1.13.2
   - pytorch=2.5.1
   - pytorch-cuda=12.4
+  - astropy=7.0.0
