@@ -112,7 +112,7 @@ def show_snr_distr(snr: np.array,
     plt.show()
 
 
-def skyrec_efficiency(dim_pxbox: int,
+def skyrec_efficiency(depth: int,
                       cam: object,
                       transmit: bool = False,
                       ) -> tuple[np.array, np.array]:
@@ -122,7 +122,7 @@ def skyrec_efficiency(dim_pxbox: int,
     #      -> Problems: time consuming since each point of the sky will be reconstructed
     
 
-    n, m = [np.linspace(10, s - 10, dim_pxbox*s//max(cam.sky_shape), dtype=int) for s in cam.sky_shape]
+    n, m = [np.linspace(10, s - 10, depth*s//max(cam.sky_shape), dtype=int) for s in cam.sky_shape]
     y, x = map(len, (n, m))
     counts_map, snr_map = np.zeros((y, x)), np.zeros((y, x))
     print(f"Map resolution (px box dim): {cam.sky_shape[0]//y} x {cam.sky_shape[1]//x}")
@@ -136,7 +136,7 @@ def skyrec_efficiency(dim_pxbox: int,
 
             skyrec, skyvar = sky_reconstruction(detector, cam)
             skysnr = sky_snr(skyrec, skyvar)
-            skyrec = skyrec_norm(skyrec, cam)
+            skyrec, _ = skyrec_norm(skyrec, skyvar, cam)
 
             counts_map[row, col] = skyrec[*(n[row], m[col])]*100/transmitted_photons[*(n[row], m[col])]
             snr_map[row, col] = skysnr[*(n[row], m[col])]

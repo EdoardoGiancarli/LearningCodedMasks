@@ -41,8 +41,4 @@ def import_mask(fits_path: str,
     return wfm
 
 
-def make_fits() -> fits:
-    pass
-
-
 # end

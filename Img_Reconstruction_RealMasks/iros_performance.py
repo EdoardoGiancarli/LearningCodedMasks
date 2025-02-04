@@ -27,9 +27,8 @@ def perform_IROS(simul_data: str,
                  ) -> dict:
     
     def update_reconstruction_catalog(sources: tuple,
-                                      residuals: tuple
+                                      residuals: tuple,
                                       ) -> None:
-        
         for idx, key in enumerate(iros_reconstruction_log.keys()):
             iros_reconstruction_log[key]["sources_log"].append(sources[idx])
             iros_reconstruction_log[key]["residuals_log"].append(residuals[idx])
@@ -91,8 +90,9 @@ if __name__ == '__main__':
     last_res_a = iros_log[cam_a][r][-1]
     last_res_b = iros_log[cam_b][r][-1]
 
-    a = last_res_a.copy(); a[a < 0] = 0; a[a > np.quantile(last_res_a, 1 - 2 * 10 ** -4)] = 0
-    b = last_res_b.copy(); b[b < 0] = 0; b[b > np.quantile(last_res_b, 1 - 2 * 10 ** -4)] = 0
+    q = 1 - 2e-4
+    a = last_res_a.copy(); a[a < 0] = 0; a[a > np.quantile(last_res_a, q)] = 0
+    b = last_res_b.copy(); b[b < 0] = 0; b[b > np.quantile(last_res_b, q)] = 0
     image_plot([a, b], [cam_a.upper(), cam_b.upper()])
 
     composed, _ = compose(
@@ -101,7 +101,7 @@ if __name__ == '__main__':
         strict=False,
         )
     
-    #image_plot([composed], [f"Composed {cam_a.upper()}-{cam_b.upper()}"])
+    image_plot([composed], [f"Composed {cam_a.upper()}-{cam_b.upper()}"])
 
 
 # end

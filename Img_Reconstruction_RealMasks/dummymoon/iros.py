@@ -267,7 +267,4 @@ def iros_log(sources_log: dict) -> None:
     print("#### End IROS Sky Reconstruction Log ####")
 
 
-def compare_sources() -> None:
-    pass
-
 # end
