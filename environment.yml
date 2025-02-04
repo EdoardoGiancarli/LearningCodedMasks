@@ -1,0 +1,15 @@
+name: PhD_env__img_reconstruction_test
+channels:
+  - anaconda
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12.2
+  - numpy=2.0.1
+  - matplotlib=3.9.2
+  - scipy=1.14.1
+  - sympy=1.13.2
+  - pytorch=2.5.1
+  - pytorch-cuda=12.4
