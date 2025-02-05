@@ -224,7 +224,7 @@ def _handle_labels(ax, xlabel, ylabel, title):
 def _handle_ticks(ax):
     """Ticks customization."""
     
-    ax.grid(visible=True, color="lightgray", linestyle="-", linewidth=0.3)
+    ax.grid(visible=True, color="lightgray", linestyle="-", linewidth=0.2, alpha=0.75)
     ax.tick_params(which='both', direction='in', width=2)
     ax.tick_params(which='major', length=7)
     ax.tick_params(which='minor', length=4)

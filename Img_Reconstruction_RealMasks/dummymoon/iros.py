@@ -5,7 +5,6 @@ Iterative Removal of Sources...
 import collections.abc as c
 
 import numpy as np
-from scipy.stats import norm
 
 from .skyrec import sky_encoding, sky_reconstruction, skyrec_norm
 from .skyrec import sky_snr, show_snr_distr
@@ -17,68 +16,62 @@ def argmax(x: np.array) -> tuple[int, int]:
     return int(row), int(col)
 
 
-def snr_over_threshold(y: list,
-                       snr_threshold: int | float,
-                       ) -> None:
-    sequence_plot([y], [f"SkyRec Peaks over SNR $=$ {snr_threshold}"],
-                  [list(range(len(y)))], ["iteration"], ["SNR peaks"], style=["scatter"])
-
-
-def record_source(sources_log: dict,
-                  pos: np.array,
-                  counts: int | float,
-                  var: int | float,
-                  snr: int | float,
-                  ) -> dict:
-    sources_log['sources_pos'].append(pos)
-    sources_log['sources_counts'].append(counts)
-    sources_log['sources_stds'].append(np.sqrt(var))
-    sources_log['sources_snrs'].append(snr)
-    return sources_log
-
-
 def get_shadowgram(pos: tuple[int, int],
                    counts: int | float,
                    cam: object,
                    ) -> np.array:
-        
+    
+    def _source_calibration(pos: tuple[int, int]) -> float:
+        s = np.zeros(cam.sky_shape)
+        s[*pos] = 1e4
+        d = sky_encoding(s, cam)
+        rec, _ = sky_reconstruction(d, cam)
+        return rec[*pos]/1e5
+    
     s = np.zeros(cam.sky_shape)
-    s[*pos] = counts
+    pos_calibr = 1#_source_calibration(pos)
+    s[*pos] = counts/pos_calibr
     det = sky_encoding(s, cam)
-    assert det.shape == cam.detector_shape
+
     return det
 
 
-def select_source(sky: np.array,
-                  var: np.array,
-                  snr: np.array,
+def select_source(skyrec: np.array,
+                  skyvar: np.array,
+                  skysnr: np.array,
                   threshold: int | float,
                   sources_dataset: dict,
                   ) -> tuple[tuple[int, int], int]:
     
-    def _snr_over_thres_pos():
-        snr_peaks = np.argwhere(snr > threshold).T
-        return np.dstack((snr_peaks[0], snr_peaks[1]))[0]
-    
-    loc = argmax(sky)
-    counts = sky[*loc]
+    def _n_snr_peaks():
+        return len(np.argwhere(skysnr > threshold).T[0])
 
-    snr_pos = _snr_over_thres_pos()
-    n_peaks = len(snr_pos)
-    check_snr = tuple(loc) in snr_pos
+    def record_source(pos: np.array,
+                      counts: int | float,
+                      var: int | float,
+                      snr: int | float,
+                      ) -> dict:
+        for key, value in zip(sources_dataset.keys(), [pos, counts, var, snr]):
+            sources_dataset[key].append(value)
+        return sources_dataset
+    
+    loc = argmax(skyrec)
+    counts = skyrec[*loc]
+    snr = skysnr[*loc]
+    check_snr = snr > threshold
+    n = _n_snr_peaks()
 
     if not check_snr:
-        return loc, counts, n_peaks
+        return loc, counts, n
 
     elif loc in sources_dataset['sources_pos']:
         print(f"Source pos ({loc[0]}, {loc[1]}) already recorded...")
-        return loc, counts, n_peaks
+        return loc, counts, n
     
     else:
         print(f"New source found at pos ({loc[0]}, {loc[1]})!")
-        sources_dataset = record_source(sources_dataset, loc, counts,
-                                        var[*loc], snr[*loc])
-        return loc, counts, n_peaks
+        sources_dataset = record_source(loc, counts, skyvar[*loc], snr)
+        return loc, counts, n
 
 
 """
@@ -121,91 +114,73 @@ def select_source(sky: np.array,
 """
 
 
-class LoadData:
-    def __init__(self,
-                 detector: np.array,
-                 norm_skyrec: np.array,
-                 norm_skyvar: np.array,
-                 skysnr: np.array):
-        self.detector = detector
-        self.skyrec = norm_skyrec
-        self.skyvar = norm_skyvar
-        self.skysnr = skysnr
-
-
-def IROS(n_iterations: int,
-         data: LoadData,
-         snr_threshold: np.array,
+def IROS(data: np.array,
+         snr_threshold: int | float,
          cam: object,
+         max_iterations: int = 20,
          snr_distr: bool | tuple[bool, int] = False,
          snr_peaks: bool | tuple[bool, int] = False,
          ) -> c.Iterable:
-    
-    #TODO: implement skyrec correction wrt pos
-    
-    def iteration(
-            detector: np.array,
-            shadowgram: np.array,
-        ) -> tuple[np.array, np.array, np.array, np.array]:
-        
-        det = detector - shadowgram
-        det[det < 0] = 0
-        new_sky, new_var = sky_reconstruction(det, cam)
-        new_snr = sky_snr(new_sky, new_var)
-        new_sky, new_var = skyrec_norm(new_sky, new_var, cam)
+    """
+    Dummy IROS pipeline to test the algorithm.
+    """
 
-        return det, new_sky, new_var, new_snr
+    def _show_snr_peaks(y: list) -> None:
+        sequence_plot([y], [f"SkyRec Peaks over SNR $=$ {snr_threshold}"],
+                      [list(range(len(y)))], ["iteration"],
+                      ["SNR peaks"], style=["scatter"])
     
-    # sky reconstruction
-    detector = data.detector.copy()
-    skyrec = data.skyrec.copy()
-    skyvar = data.skyvar.copy()
-    skysnr = data.skysnr.copy()
+    def _check_bool(v: bool | tuple) -> tuple[bool, int]:
+        if isinstance(v, bool):
+            return v, 5
+        return v
 
-    # init log variables
+    # initialize IROS and log variables
+    detector = data.copy()
+    snr_distr, _every1 = _check_bool(snr_distr)
+    snr_peaks, _every2 = _check_bool(snr_peaks)
     snr_peaks_list = []
     sources_dataset = {'sources_pos': [],
                        'sources_counts': [],
                        'sources_stds': [],
                        'sources_snrs': []}
-    
-    # IROS loop
-    if isinstance(snr_distr, bool): _every1 = 1
-    else: snr_distr, _every1 = snr_distr[0], snr_distr[1]
-    if isinstance(snr_peaks, bool): _every2 = 1
-    else: snr_peaks, _every2 = snr_peaks[0], snr_peaks[1]
 
-    for i in range(n_iterations):
+    # perform IROS
+    for i in range(max_iterations):
 
-        if snr_distr and (i % _every1 == 0 or i == n_iterations - 1):
+        # sky reconstruction
+        skyrec, skyvar = sky_reconstruction(detector, cam)
+        skysnr = sky_snr(skyrec, skyvar)
+        skyrec, skyvar = skyrec_norm(skyrec, skyvar, cam)
+
+        if snr_distr and (i % _every1 == 0 or i == max_iterations - 1):
             show_snr_distr(skysnr, f": iter {i + 1}")
+
+        # check SNR map and select source 
+        source_pos, source_fluence, n_snr_peaks = select_source(skyrec, skyvar, skysnr,
+                                                                snr_threshold, sources_dataset)
         
-        pos, counts, n_peaks = select_source(skyrec, skyvar, skysnr,
-                                             snr_threshold, sources_dataset)
-        print(
-            f"Outliers with SNR(σ) over {snr_threshold} at iter {i + 1}: {n_peaks}"
-            )
-        
-        if n_peaks > 0:
-            snr_peaks_list.append(n_peaks)
-            if snr_peaks and (i % _every2 == 0 or i == n_iterations - 1):
-                snr_over_threshold(snr_peaks_list, snr_threshold)
-        
-            shadowgram = get_shadowgram(pos, counts, cam)
-            detector, skyrec, skyvar, skysnr = iteration(detector, shadowgram)
+        # source removal
+        if n_snr_peaks > 0:
+            
+            snr_peaks_list.append(n_snr_peaks)
+            if snr_peaks and (i % _every2 == 0 or i == max_iterations - 1):
+                _show_snr_peaks(snr_peaks_list)
+
+            shadowgram = get_shadowgram(source_pos, source_fluence, cam)
+            detector = detector - shadowgram
+            detector[detector < 0] = 0           # check for negative counts
+
             yield skyrec, skyvar, skysnr, sources_dataset
         
         else:
             print(f"No sources detected with SNR over {snr_threshold}...")
             return skyrec, skyvar, skysnr, sources_dataset
 
-    return skyrec, skyvar, skysnr, sources_dataset
-
 
 def iros_skyrec(sky_image: np.array,
                 sources_pos: list[tuple],
                 sources_dataset: dict,
-                data: LoadData,
                 cam: object,
                 ) -> tuple[np.array, np.array]:
 
@@ -225,28 +200,23 @@ def iros_skyrec(sky_image: np.array,
 
         print(
             f"Source [{idx}] Reconstruction:\n"
-            f" - simulated source transmitted counts: {sky_image[*pos]:.0f} +/- {np.sqrt(sky_image[*pos]):.0f}\n\n"
-            f" - rec. source counts: {data.skyrec[*pos]:.0f} +/- {np.sqrt(data.skyvar[*pos]):.0f}\n"
-            f" - rec. source SNR: {data.skysnr[*pos]:.0f}\n"
-            f" - source rec. counts wrt simulated: {data.skyrec[*pos]*100/sky_image[*pos]:.2f}%\n\n"
+            f" - simulated source transmitted counts: {sky_image[*pos]:.0f} +/- {np.sqrt(sky_image[*pos]):.0f}\n"
             f" - IROS rec. source counts: {counts:.0f} +/- {std:.0f}\n"
             f" - IROS rec. source SNR: {snr:.0f}\n"
             f" - source rec. counts wrt simulated (with IROS): {counts*100/sky_image[*pos]:.2f}%\n"
         )
+            #f" - rec. source counts: {data.skyrec[*pos]:.0f} +/- {np.sqrt(data.skyvar[*pos]):.0f}\n"
+            #f" - rec. source SNR: {data.skysnr[*pos]:.0f}\n"
+            #f" - source rec. counts wrt simulated: {data.skyrec[*pos]*100/sky_image[*pos]:.2f}%\n\n"
     
     print("#### End IROS Sky Reconstruction Run ####")
     
     residues = sky_image - sky
 
-    image_plot([sky_image, data.skyrec],
-               ["Simulated Sky", "Sky Reconstruction (1st)"],
-               cbarlabel=["counts"]*2, cbarcmap=["viridis"]*2,
-               simulated_sources=[sources_pos, sources_pos])
-    
-    image_plot([sky, residues],
-               ["IROS Sky Reconstruction", "Residues: Sky - IROS"],
-               cbarlabel=["counts"]*2, cbarcmap=["viridis"]*2,
-               simulated_sources=[sources_dataset['sources_pos'], sources_dataset['sources_pos']])
+    image_plot([sky_image, sky, residues],
+               ["Simulated Sky", "IROS Sky Reconstruction", "Residues: Sky - IROS"],
+               cbarlabel=["counts"]*3, cbarcmap=["viridis"]*3,
+               simulated_sources=[sources_pos] + [sources_dataset['sources_pos']]*2)
     
     return sky, residues
 

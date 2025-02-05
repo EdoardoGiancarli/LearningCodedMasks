@@ -29,7 +29,7 @@ from .skyrec import sky_reconstruction, skyrec_norm
 from .skyrec import sky_snr, sky_snr_peaks, show_snr_distr
 from .skyrec import print_skyrec_info, print_snr_info
 
-from .iros import LoadData, IROS, iros_skyrec, iros_log
+from .iros import IROS, iros_skyrec, iros_log
 
 
 # end
