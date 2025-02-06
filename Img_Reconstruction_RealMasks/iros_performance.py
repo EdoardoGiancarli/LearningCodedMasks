@@ -14,6 +14,7 @@ from mbloodmoon.images import compose, upscale
 from dummymoon import image_plot
 
 plt.ion()
+#matplotlib.use('agg')
 
 
 def perform_IROS(simul_data: str,
