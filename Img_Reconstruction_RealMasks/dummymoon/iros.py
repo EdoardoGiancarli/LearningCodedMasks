@@ -6,9 +6,9 @@ import collections.abc as c
 
 import numpy as np
 
-from .skyrec import sky_encoding, sky_reconstruction, skyrec_norm
-from .skyrec import sky_snr, show_snr_distr
-from .display import image_plot, sequence_plot
+from skyrec import sky_encoding, sky_reconstruction, skyrec_norm
+from skyrec import sky_snr, show_snr_distr
+from display import image_plot, sequence_plot
 
 
 def argmax(x: np.array) -> tuple[int, int]:
@@ -21,19 +21,20 @@ def get_shadowgram(pos: tuple[int, int],
                    cam: object,
                    ) -> np.array:
     
-    def _source_calibration(pos: tuple[int, int]) -> float:
-        s = np.zeros(cam.sky_shape)
-        s[*pos] = 1e4
-        d = sky_encoding(s, cam)
-        rec, _ = sky_reconstruction(d, cam)
-        return rec[*pos]/1e5
+    def _source_calibration() -> float:
+        shadow = np.zeros(cam.sky_shape)
+        f = 1e4
+        shadow[*pos] = f
+        d = sky_encoding(shadow, cam)
+        rec, var = sky_reconstruction(d, cam)
+        rec, _ = skyrec_norm(rec, var, cam)
+        return rec[*pos]/f
     
     s = np.zeros(cam.sky_shape)
-    pos_calibr = 1#_source_calibration(pos)
-    s[*pos] = counts/pos_calibr
-    det = sky_encoding(s, cam)
+    pos_calibr = _source_calibration()
+    s[*pos] = counts
 
-    return det
+    return sky_encoding(s, cam)/pos_calibr
 
 
 def select_source(skyrec: np.array,
@@ -205,11 +206,6 @@ def iros_skyrec(sky_image: np.array,
             f" - IROS rec. source SNR: {snr:.0f}\n"
             f" - source rec. counts wrt simulated (with IROS): {counts*100/sky_image[*pos]:.2f}%\n"
         )
-            #f" - rec. source counts: {data.skyrec[*pos]:.0f} +/- {np.sqrt(data.skyvar[*pos]):.0f}\n"
-            #f" - rec. source SNR: {data.skysnr[*pos]:.0f}\n"
-            #f" - source rec. counts wrt simulated: {data.skyrec[*pos]*100/sky_image[*pos]:.2f}%\n\n"
-    
-    print("#### End IROS Sky Reconstruction Run ####")
     
     residues = sky_image - sky
 
@@ -223,18 +219,17 @@ def iros_skyrec(sky_image: np.array,
 
 def iros_log(sources_log: dict) -> None:
 
-    print(f"#### IROS Sky Reconstruction Log ####\n")
+    print("### IROS Sky Reconstruction Log ###")
 
     for idx, pos in enumerate(sources_log['sources_pos']):
+        counts = sources_log['sources_counts'][idx]
+        std = sources_log['sources_stds'][idx]
         print(
-            f"Source [{idx}] Log:\n"
-            f" - pos: {pos}\n"
-            f" - counts: {sources_log['sources_counts'][idx]:.0f}\n"
-            f" - std: {sources_log['sources_stds'][idx]:.0f}\n"
-            f" - SNR: {sources_log['sources_snrs'][idx]:.2f}\n"
+            f"# Source [{idx}] Log:\n"
+            f"  - pos: {pos}\n"
+            f"  - counts: {counts:.0f} +/- {std:.0f}\n"
+            f"  - SNR: {sources_log['sources_snrs'][idx]:.2f}\n"
         )
-
-    print("#### End IROS Sky Reconstruction Log ####")
 
 
 # end

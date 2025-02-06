@@ -4,7 +4,7 @@ Opening .fits files...
 
 from scipy.signal import correlate
 from mbloodmoon import codedmask
-from .display import image_plot
+from display import image_plot
 from astropy.io import fits
 
 
@@ -21,9 +21,9 @@ def import_mask(fits_path: str,
             print(f"{key}: {value}")
             
         print(f"\n### Shapes\n"
-            f"Mask shape: {wfm.mask_shape}\n"
-            f"Detector shape: {wfm.detector_shape}\n"
-            f"Sky shape: {wfm.sky_shape}")
+              f"Mask shape: {wfm.mask_shape}\n"
+              f"Detector shape: {wfm.detector_shape}\n"
+              f"Sky shape: {wfm.sky_shape}")
 
     if show_data:
         image_plot([wfm.mask, wfm.decoder],

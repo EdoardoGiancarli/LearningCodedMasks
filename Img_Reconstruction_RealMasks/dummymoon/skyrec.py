@@ -6,8 +6,8 @@ import warnings
 import numpy as np
 from scipy.signal import correlate
 from scipy.stats import norm
-from .skymap import sky_image_simulation
-from .display import crop, image_plot
+from skymap import sky_image_simulation
+from display import crop, image_plot
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 # from matplotlib.colors import ListedColormap as lc

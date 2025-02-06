@@ -159,8 +159,8 @@ if __name__ == '__main__':
     post_res_b = post_process(last_res_b, np.quantile(last_res_b, q))
     composed, _ = compose(post_res_a, post_res_b, strict=False)
     
-    image_plot([post_res_a, post_res_b], [cam_a.upper(), cam_b.upper()])
-    image_plot([composed], [f"Composed {cam_a.upper()}-{cam_b.upper()}"])
+    # image_plot([post_res_a, post_res_b], [cam_a.upper(), cam_b.upper()])
+    # image_plot([composed], [f"Composed {cam_a.upper()}-{cam_b.upper()}"])
 
 
 # end
