@@ -4,7 +4,7 @@ Opening .fits files...
 
 from scipy.signal import correlate
 from mbloodmoon import codedmask
-from display import image_plot
+from .display import image_plot
 from astropy.io import fits
 
 

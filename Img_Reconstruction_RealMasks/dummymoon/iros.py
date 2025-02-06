@@ -6,9 +6,9 @@ import collections.abc as c
 
 import numpy as np
 
-from skyrec import sky_encoding, sky_reconstruction, skyrec_norm
-from skyrec import sky_snr, show_snr_distr
-from display import image_plot, sequence_plot
+from .skyrec import sky_encoding, sky_reconstruction, skyrec_norm
+from .skyrec import sky_snr, show_snr_distr
+from .display import image_plot, sequence_plot
 
 
 def argmax(x: np.array) -> tuple[int, int]:
@@ -22,16 +22,27 @@ def get_shadowgram(pos: tuple[int, int],
                    ) -> np.array:
     
     def _source_calibration() -> float:
-        shadow = np.zeros(cam.sky_shape)
         f = 1e4
+        shadow = np.zeros(cam.sky_shape)
         shadow[*pos] = f
         d = sky_encoding(shadow, cam)
         rec, var = sky_reconstruction(d, cam)
         rec, _ = skyrec_norm(rec, var, cam)
         return rec[*pos]/f
     
+    def _source_calibration2() -> float:
+        f = 1e4
+        n, m = cam.sky_shape
+        shadow_on = np.zeros((n, m))
+        shadow_off = shadow_on.copy()
+        shadow_on[(n - 1)//2, (m - 1)//2] = f
+        shadow_off[*pos] = f
+        d_on = sky_encoding(shadow_on, cam).sum()
+        d_off = sky_encoding(shadow_off, cam).sum()
+        return d_off/d_on
+    
     s = np.zeros(cam.sky_shape)
-    pos_calibr = _source_calibration()
+    pos_calibr = _source_calibration2()
     s[*pos] = counts
 
     return sky_encoding(s, cam)/pos_calibr
