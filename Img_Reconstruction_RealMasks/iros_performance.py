@@ -47,10 +47,15 @@ def perform_IROS(simul_data: str,
     
     def save_output() -> None:
         # TODO:
-        #   - save coord in RA, DEC (from output sky shifts)
-        #   - convert fluence in flux [ph/cm^2/s] and rate [ph/s]
+        #   - to save:
+        #   - coords in [px, px], [theta_x, theta_y], [RA, DEC] (from output sky shifts, see shift2pos in mask.py)
+        #   - fluence at the peak for source choice
+        #   - effective counts subtracted from the detector
+        #   - estimated counts from the source (before the mask)
+        #   - fluence in flux [ph/cm^2/s] and rate [ph/s]
+        #   - SNR, value for the goodness of the fit for pos/fluence
+        #
         #   - save BINTABLE with comparison between IROS and catalog
-        #   - save recovered source SNR? 
 
         hdu_list = fits.HDUList([])
 
@@ -72,20 +77,18 @@ def perform_IROS(simul_data: str,
             pass
         
         hdu_list.writeto(root_path + save_to)
-
-    filepaths = simulation_files(root_path + simul_data)
+    
 
     # load mask and data
+    filepaths = simulation_files(root_path + simul_data)
     wfm = codedmask(root_path + mask_file, upscale_x=5)
     sdl_a = simulation(filepaths[camera_a][dataset])
     sdl_b = simulation(filepaths[camera_b][dataset])
 
     # init
     iros_reconstruction_log = {
-        camera_a: {"sources_log": [],
-                   "residuals_log": []},
-        camera_b: {"sources_log": [],
-                   "residuals_log": []},
+        cam: {"sources_log": [], "residuals_log": []}
+        for cam in [camera_a, camera_b]
     }
 
     # IROS

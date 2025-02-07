@@ -137,15 +137,15 @@ def IROS(data: np.array,
     Dummy IROS pipeline to test the algorithm.
     """
 
-    def _show_snr_peaks(y: list) -> None:
-        sequence_plot([y], [f"SkyRec Peaks over SNR $=$ {snr_threshold}"],
-                      [list(range(len(y)))], ["iteration"],
-                      ["SNR peaks"], style=["scatter"])
-    
     def _check_bool(v: bool | tuple) -> tuple[bool, int]:
         if isinstance(v, bool):
             return v, 5
         return v
+    
+    def show_snr_peaks(y: list) -> None:
+        sequence_plot([y], [f"SkyRec Peaks over SNR $=$ {snr_threshold}"],
+                      [list(range(len(y)))], ["iteration"],
+                      ["SNR peaks"], style=["scatter"])
 
     # initialize IROS and log variables
     detector = data.copy()
@@ -165,7 +165,7 @@ def IROS(data: np.array,
         skysnr = sky_snr(skyrec, skyvar)
         skyrec, skyvar = skyrec_norm(skyrec, skyvar, cam)
 
-        if snr_distr and (i % _every1 == 0 or i == max_iterations - 1):
+        if (snr_distr and i % _every1 == 0) or (i == max_iterations - 1):
             show_snr_distr(skysnr, f": iter {i + 1}")
 
         # check SNR map and select source 
@@ -176,8 +176,8 @@ def IROS(data: np.array,
         if n_snr_peaks > 0:
             
             snr_peaks_list.append(n_snr_peaks)
-            if snr_peaks and (i % _every2 == 0 or i == max_iterations - 1):
-                _show_snr_peaks(snr_peaks_list)
+            if (snr_peaks and i % _every2 == 0) or (i == max_iterations - 1):
+                show_snr_peaks(snr_peaks_list)
 
             shadowgram = get_shadowgram(source_pos, source_fluence, cam)
             detector = detector - shadowgram
@@ -187,6 +187,8 @@ def IROS(data: np.array,
         
         else:
             print(f"No sources detected with SNR over {snr_threshold}...")
+            show_snr_distr(skysnr, f": iter {i + 1}")
+            show_snr_peaks(snr_peaks_list)
             return skyrec, skyvar, skysnr, sources_dataset
 
 
@@ -211,11 +213,11 @@ def iros_skyrec(sky_image: np.array,
         snr = sources_dataset['sources_snrs'][idx]
 
         print(
-            f"Source [{idx}] Reconstruction:\n"
-            f" - simulated source transmitted counts: {sky_image[*pos]:.0f} +/- {np.sqrt(sky_image[*pos]):.0f}\n"
-            f" - IROS rec. source counts: {counts:.0f} +/- {std:.0f}\n"
-            f" - IROS rec. source SNR: {snr:.0f}\n"
-            f" - source rec. counts wrt simulated (with IROS): {counts*100/sky_image[*pos]:.2f}%\n"
+            f"# Source [{idx}] Reconstruction:\n"
+            f"  - simulated source transmitted counts: {sky_image[*pos]:.0f} +/- {np.sqrt(sky_image[*pos]):.0f}\n"
+            f"  - IROS rec. source counts: {counts:.0f} +/- {std:.0f}\n"
+            f"  - IROS rec. source SNR: {snr:.0f}\n"
+            f"  - source rec. counts wrt simulated: {counts*100/sky_image[*pos]:.2f}%\n"
         )
     
     residues = sky_image - sky

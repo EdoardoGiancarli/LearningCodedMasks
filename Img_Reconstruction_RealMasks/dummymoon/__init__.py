@@ -22,7 +22,7 @@ from .io import import_mask
 from .display import sequence_plot, image_plot
 from .display import enhance_skyrec_slices, crop
 
-from .skymap import sky_image_simulation, sky_significance
+from .skymap import sky_image_simulation, sky_significance, skymap_simulation
 
 from .skyrec import transmitted_sky_image, sky_encoding
 from .skyrec import sky_reconstruction, skyrec_norm
