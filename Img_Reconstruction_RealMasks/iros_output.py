@@ -15,22 +15,7 @@ import mbloodmoon as bm
 matplotlib.use('agg')
 root_path = "/mnt/d/PhD_AASS/Coding/Images_fits/"
 
-def plot_skyrec(skyrecs, source_indices, source_names, title, upsc_y=8, dpi=300):
-    composed, _ = compose(*skyrecs, strict=False)
-    fig, ax = plt.subplots(1, 1, figsize=(12, 12.8), dpi=dpi)
-    for ((i, j), name) in zip(source_indices, source_names):
-        ax.scatter(j, i * upsc_y + 53, s=30, facecolors="none", edgecolors="white", alpha=1., linewidth=.5)
-        ax.text(j + 50 , i * upsc_y + 100, name, color="white", fontsize=4)
-    im = ax.imshow(composed, vmax=np.quantile(composed, 0.9995), vmin=0., cmap="viridis")
-    plt.colorbar(im, ax=ax, label='SNR', fraction=0.025, aspect=35, pad=0.02, shrink=0.33, location="bottom")
-    plt.axis("off")
-    plt.tight_layout()
-    ax.set_title(title, fontsize=14, pad=8, fontweight='bold')
-    plt.savefig(root_path + title.replace(' ', '_').lower() + ".png")
-    plt.close()
-
-def plot_cameras(skyrecs,
-                 name) -> None:
+def plot_cameras(skyrecs, name) -> None:
     sky_a, sky_b = skyrecs
     fig, axs = plt.subplots(1, 2, figsize=(12, 6), dpi=150)
     plt.tight_layout()
@@ -46,18 +31,28 @@ def plot_cameras(skyrecs,
     plt.savefig(root_path + name + '.png')
     plt.close()
 
-def plot_composed_cam(skyrecs,
-                      title,
-                      dpi=150,
-                      ) -> None:
+def plot_composed_cam(skyrecs, title) -> None:
     composed, _ = compose(*skyrecs, strict=False)
-    fig, ax = plt.subplots(1, 1, figsize=(8, 8), dpi=dpi)
+    fig, ax = plt.subplots(1, 1, figsize=(8, 8), dpi=150)
     ax.imshow(composed, vmax=np.quantile(composed, 0.9995), vmin=0.)
     plt.tight_layout()
     ax.set_title(title, fontsize=14, pad=8, fontweight='bold')
     plt.savefig(root_path + title.replace(' ', '_').lower() + ".png")
     plt.close()
 
+def plot_skyrec(skyrecs, source_indices, source_names, title, upsc_y=8, dpi=300):
+    composed, _ = compose(*skyrecs, strict=False)
+    fig, ax = plt.subplots(1, 1, figsize=(12, 14), dpi=dpi)
+    for ((i, j), name) in zip(source_indices, source_names):
+        ax.scatter(j, i * upsc_y + 53, s=30, facecolors="none", edgecolors="white", alpha=1., linewidth=.5)
+        ax.text(j + 50 , i * upsc_y + 100, name, color="white", fontsize=4)
+    im = ax.imshow(composed, vmax=np.quantile(composed, 0.9995), vmin=0., cmap="viridis")
+    plt.colorbar(im, ax=ax, label='SNR', fraction=0.025, aspect=35, pad=0.02, shrink=0.33, location="bottom")
+    plt.axis("off")
+    plt.tight_layout()
+    ax.set_title(title, fontsize=14, pad=8, fontweight='bold')
+    plt.savefig(root_path + title.replace(' ', '_').lower() + ".png")
+    plt.close()
 
 
 

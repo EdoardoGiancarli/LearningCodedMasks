@@ -32,13 +32,21 @@ def plot_cameras(skyrecs, name) -> None:
     plt.savefig(root_path + name + '.png')
     plt.close()
 
-def plot_skyrec(skyrecs, title, source_indices=None, source_names=None, dpi=200, upsc_y=8):
+def plot_composed_cam(skyrecs, title) -> None:
     composed, _ = compose(*skyrecs, strict=False)
-    fig, ax = plt.subplots(1, 1, figsize=(8, 10), dpi=dpi)
-    if source_indices is not None and source_names is not None:
-        for ((i, j), name) in zip(source_indices, source_names):
-            ax.scatter(j, i * upsc_y + 53, s=30, facecolors="none", edgecolors="white", alpha=1., linewidth=.5)
-            ax.text(j + 50 , i * upsc_y + 100, name, color="white", fontsize=4)
+    fig, ax = plt.subplots(1, 1, figsize=(8, 8), dpi=150)
+    ax.imshow(composed, vmax=np.quantile(composed, 0.9995), vmin=0.)
+    plt.tight_layout()
+    ax.set_title(title, fontsize=14, pad=8, fontweight='bold')
+    plt.savefig(root_path + title.replace(' ', '_').lower() + ".png")
+    plt.close()
+
+def plot_skyrec(skyrecs, source_indices, source_names, title, upsc_y=8):
+    composed, _ = compose(*skyrecs, strict=False)
+    fig, ax = plt.subplots(1, 1, figsize=(8, 10), dpi=250)
+    for ((i, j), name) in zip(source_indices, source_names):
+        ax.scatter(j, i * upsc_y + 53, s=30, facecolors="none", edgecolors="white", alpha=1., linewidth=.5)
+        ax.text(j + 50 , i * upsc_y + 100, name, color="white", fontsize=4)
     im = ax.imshow(composed, vmax=np.quantile(composed, 0.9995), vmin=0., cmap="viridis")
     plt.colorbar(im, ax=ax, label='SNR', fraction=0.025, aspect=35, pad=0.02, shrink=0.33, location="bottom")
     ax.set_title(title, fontsize=12, pad=8, fontweight='bold')
@@ -53,8 +61,10 @@ def perform_IROS(sdlA: object,
                  sdlB: object,
                  cam: object,
                  dataset: str = "reconstructed",
+                 save_to: str = None,
                  max_iterations: int = 10,
                  snr_threshold: int | float = 5,
+                 catalog_name: str = None,
                  ):
 
     def _init_log():
