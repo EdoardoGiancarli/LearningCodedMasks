@@ -113,7 +113,7 @@ def perform_IROS(simul_data: str | Path,
             def shift(x, y):
                 I_bulk = np.zeros(wfm.detector_shape)
                 I_bulk[wfm.bulk > 0] = 1
-                return _shift(wfm.bulk, (x, y))*I_bulk
+                return _shift(wfm.bulk, (-x, -y))*I_bulk
 
             shift_x_px = int(shift_x/wfm.specs["mask_deltax"])
             shift_y_px = int(shift_y/wfm.specs["mask_deltay"])
