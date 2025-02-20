@@ -113,11 +113,11 @@ def perform_IROS(simul_data: str | Path,
             def shift(x, y):
                 I_bulk = np.zeros(wfm.detector_shape)
                 I_bulk[wfm.bulk > 0] = 1
-                return _shift(wfm.bulk, (-x, -y))*I_bulk
+                return _shift(wfm.bulk, (x, y))*I_bulk
 
             shift_x_px = int(shift_x/wfm.specs["mask_deltax"])
             shift_y_px = int(shift_y/wfm.specs["mask_deltay"])
-            shifted_bulk = shift(shift_x_px, shift_y_px)
+            shifted_bulk = shift(-shift_x_px, -shift_y_px)
             eff_area = px_area*shifted_bulk.sum()                       # effective detector area seen by the source [cm^2]
             return eff_area
 
