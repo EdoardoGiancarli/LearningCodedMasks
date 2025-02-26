@@ -33,6 +33,8 @@ def sequence_plot(input_sequence: list[c.Sequence],
                   color: list[(str, str)] = None,
                   style: list[str] = ["bar"],
                   simulated_sources: list[tuple[int, int, int, float]] = None,
+                  offsetx: list[float] | list[tuple[float]] = None,
+                  offsety: list[float] | list[tuple[float]] = None,
                   ) -> None:
     """Plot(s) of the input 1D array(s)."""
 
@@ -44,6 +46,8 @@ def sequence_plot(input_sequence: list[c.Sequence],
     xlabel, ylabel = xlabel or [None]*n, ylabel or [None]*n
     color, style = color or [('OrangeRed', 'r')]*n, style or [None]*n
     simulated_sources = simulated_sources or [None]*n
+    offsetx = offsetx or [(1, 1)]*n
+    offsety = offsety or [(1, 1)]*n
 
     # create subplots
     fig, axes = _handle_subplots(n, 0.27)
@@ -73,9 +77,10 @@ def sequence_plot(input_sequence: list[c.Sequence],
         if simulated_sources[i] is not None:
             _show_sources_pos(ax, input_sequence[i], simulated_sources[i])
         
-        offsetx = 1
-        ax.set_xlim(phase[0] - offsetx, phase[-1] + offsetx)
-        ax.set_ylim(np.min(input_sequence[i]) - 1, np.max(input_sequence[i]) + 1)
+        offsetx_i = offsetx[i] if isinstance(offsetx[i], tuple) else [offsetx[i]]
+        offsety_i = offsety[i] if isinstance(offsety[i], tuple) else [offsety[i]]
+        ax.set_xlim(phase[0] - offsetx_i[0], phase[-1] + offsetx_i[-1])
+        ax.set_ylim(np.min(input_sequence[i]) - offsety_i[0], np.max(input_sequence[i]) + offsety_i[-1])
 
         # styling
         _handle_labels(ax, xlabel[i], ylabel[i], title[i])

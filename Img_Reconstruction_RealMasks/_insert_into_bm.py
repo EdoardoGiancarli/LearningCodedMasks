@@ -10,20 +10,22 @@ import pickle
 from mbloodmoon.coords import shift2equatorial
 from mbloodmoon.io import _validate_fits
 from mbloodmoon.images import _shift
+from mbloodmoon.images import argmax
 import mbloodmoon as bm
 
 
 
-def perform_IROS(simul_data: str | Path,
-                 mask_file: str | Path,
-                 camA: str,
-                 camB: str,
-                 dataset: str = "reconstructed",
-                 max_iterations: int = 10,
-                 snr_threshold: int | float = 5,
-                 upscale_y: int = 1,
-                 upscale_x: int = 5,
-                 ) -> dict:
+def perform_IROS(
+    simul_data: str | Path,
+    mask_file: str | Path,
+    camA: str,
+    camB: str,
+    dataset: str = "reconstructed",
+    max_iterations: int = 10,
+    snr_threshold: int | float = 5,
+    upscale_y: int = 1,
+    upscale_x: int = 5,
+) -> dict:
     """
     Stand-alone method that initializes the IROS algorithm and returns a log
     with all the useful info.
@@ -42,11 +44,11 @@ def perform_IROS(simul_data: str | Path,
         Maximum number of source removal iterations to perform.
         - snr_threshold: float, default = 5
         SNR threshold for stopping IROS.
-        - upscale_x: int, default = 5 
+        - upscale_x: int, default = 5
         Upscaling factor over the x direction.
         - upscale_y: int, default = 1
         Upscaling factor over the y direction.
-    
+
     Returns:
         - iros_log: dict
         Dictionary containing useful info about the IROS reconstruction.
@@ -58,12 +60,12 @@ def perform_IROS(simul_data: str | Path,
             4. source detected fluence [ph]
             5. source detected flux [ph/cm^{2}/s]
             6. source detected rate [ph/s]
-            7. effective counts subtracted from the detector [ph] TODO
-            8. estimated counts before the mask [ph] TODO
-            9. reconstructed source SNR TODO
+            7. observed counts from the source [ph]
+            8. effective counts subtracted from the detector [ph]
+            9. reconstructed source SNR
             10. source pos fit parameter TODO
             11. Header of the FITS for the simulated data
-    
+
     Notes:
         - This is just an auxiliary method to run IROS.
         - We can also extract the `init_log()` and `update_log()` inner
@@ -74,33 +76,41 @@ def perform_IROS(simul_data: str | Path,
         """Initializes the log dict structure."""
 
         def template(fmt: str, unit: str) -> dict:
-            return {"data": [], "format": fmt, "unit": unit}     #TODO: insert errors?
+            return {"data": [], "format": fmt, "unit": unit}  # TODO: insert errors
 
         print("## Initializing Log...")
         init_keys = {
             "y": template("J", "px"),
             "x": template("J", "px"),
             "theta_y": template("D", "rad"),
+            "dtheta_y": template("D", "rad"),
             "theta_x": template("D", "rad"),
+            "dtheta_x": template("D", "rad"),
             "ra": template("D", "rad"),
+            "dra": template("D", "rad"),
             "dec": template("D", "rad"),
+            "ddec": template("D", "rad"),
             "fluence": template("D", "ph"),
+            "dfluence": template("D", "ph"),
             "flux": template("D", "ph/cm2/s"),
+            "dflux": template("D", "ph/cm2/s"),
             "rate": template("D", "ph/s"),
+            "drate": template("D", "ph/s"),
+            "obs_fluence": template("D", "ph"),
+            "dobs_fluence": template("D", "ph"),
             "sub_fluence": template("D", "ph"),
-            "est_fluence": template("D", "ph"),
+            "dsub_fluence": template("D", "ph"),
             "SNR": template("D", ""),
             "chisquare": template("D", ""),
         }
 
         return {camera: deepcopy(init_keys) for camera in [camA, camB]}
-    
-    def update_log(rec_source: tuple[tuple, tuple],
-                   source_snr: tuple[float, float],
-                   chisquare: tuple[float, float],
-                   ) -> None:
+
+    def update_log(
+        rec_source: tuple[tuple, tuple],
+    ) -> None:
         """Updates log with the IROS output."""
-        
+
         def _get_eff_area(shift_x, shift_y):
             """
             Computes the effective area seen by the source on the
@@ -110,35 +120,52 @@ def perform_IROS(simul_data: str | Path,
                 - This should be done inside IROS while finding the source
                   counts, to overcome the inner pos-depending reconstruction.
             """
+
             def shift(x, y):
                 I_bulk = np.zeros(wfm.detector_shape)
                 I_bulk[wfm.bulk > 0] = 1
-                return _shift(wfm.bulk, (x, y))*I_bulk
+                return _shift(wfm.bulk, (x, y)) * I_bulk
 
-            shift_x_px = int(shift_x/wfm.specs["mask_deltax"])
-            shift_y_px = int(shift_y/wfm.specs["mask_deltay"])
-            shifted_bulk = shift(-shift_x_px, -shift_y_px)              # shift is opposed wrt source pos
-            eff_area = px_area*shifted_bulk.sum()                       # effective detector area seen by the source [cm^2]
+            shift_x_px = int(shift_x / wfm.specs["mask_deltax"])
+            shift_y_px = int(shift_y / wfm.specs["mask_deltay"])
+            shifted_bulk = shift(-shift_x_px, -shift_y_px)        # shift is opposed wrt source pos
+            eff_area = px_area * shifted_bulk.sum()               # effective detector area seen by the source [cm^2]
             return eff_area
+        
+        def _get_theta_errs(shifty, shiftx, dshifty, dshiftx):
+            def propagation(s, ds):
+                return 1 / (1 + np.square(s/l)) * np.sqrt(np.square(ds / l) + np.square(s * dl / np.square(l)))
+            
+            return propagation(shifty, dshifty), propagation(shiftx, dshiftx)
+
+        def _get_coord_errs(shifty, shiftx, dshifty, dshiftx, sdl):
+            up_ra, up_dec = shift2equatorial(sdl, wfm, shiftx + dshiftx, shifty + dshifty)
+            down_ra, down_dec = shift2equatorial(sdl, wfm, shiftx - dshiftx, shifty - dshifty)
+            return np.abs(up_ra - down_ra)/2, np.abs(up_dec - down_dec)/2
 
         keys = iros_log[camA].keys()
         for idx, camera in enumerate(iros_log.keys()):
-            shiftx, shifty, counts = rec_source[idx]                    # shifts [mm], counts
-            y, x = bm.shift2pos(wfm, shiftx, shifty)                    # pos in px
-            thetay, thetax = np.arctan(shifty/l), np.arctan(shiftx/l)   # pos in angles wrt axis [rad] (TODO: from IROS)
-            ra, dec = shift2equatorial(sdls[idx], wfm, shiftx, shifty)  # RA, DEC [rad]
-            rate = counts/exposure[idx]                                 # rate [ph/s]
-            flux = rate/_get_eff_area(shiftx, shifty)                   # flux [ph/cm^2/s] (TODO: correct counts for eff area inside IROS)
-            sub_counts = -100                                           # effective counts subtracted from the detector (TODO: from IROS)
-            est_counts = -100                                           # estimated counts from the source (before the mask)  (TODO: from IROS)
-            snr = source_snr[idx]                                       # snr source (TODO: from IROS)
-            chi = chisquare[idx]                                        # chi-square fit source (TODO: from IROS)
+            shiftx, shifty, counts, signf = rec_source[idx]                 # shifts [mm], counts, source SNR, observed counts, subtracted counts
+            y, x = bm.shift2pos(wfm, shiftx, shifty)                        # pos in px (from optimized shifts)
+            thetay, thetax = np.arctan(shifty / l), np.arctan(shiftx / l)   # pos in angles wrt axis [rad]
+            dthetay, dthetax = _get_theta_errs(shifty, shiftx, dshifty, dshiftx)
+            ra, dec = shift2equatorial(sdls[idx], wfm, shiftx, shifty)      # RA, DEC [rad]
+            dra, ddec = _get_coord_errs(shifty, shiftx, dshifty, dshiftx, sdls[idx])
+            dcounts = np.sqrt(counts)
+            rate = counts / exposure[idx]                                   # rate [ph/s]
+            drate = dcounts / exposure[idx]
+            flux = rate / _get_eff_area(shiftx, shifty)                     # flux [ph/cm^2/s]
+            dflux = dcounts / exposure[idx]
+            chi = -100
 
-            q = [y, x, thetay, thetax, ra, dec, counts, flux,
-                 rate, sub_counts, est_counts, snr, chi]
+            q = [y, x, thetay, dthetay, thetax, dthetax, ra, dra,
+                 dec, ddec, counts, dcounts, flux, dflux, rate, drate,
+                 obs_counts[idx], np.sqrt(obs_counts[idx]), sub_counts[idx],
+                 np.sqrt(sub_counts[idx]), signf, chi]
+            
             for key, i in zip(keys, q):
                 iros_log[camera][key]["data"].append(i)
-    
+
     def data_to_array(log) -> dict:
         """Converts the lists in the log in arrays."""
         keys = log[camA].keys()
@@ -146,7 +173,6 @@ def perform_IROS(simul_data: str | Path,
             for key in keys:
                 log[camera][key]["data"] = np.asarray(log[camera][key]["data"])
         return log
-    
 
     # get obs data and init log
     filepaths = bm.simulation_files(simul_data)
@@ -155,9 +181,14 @@ def perform_IROS(simul_data: str | Path,
     sdlB = bm.simulation(filepaths[camB][dataset])
     sdls = [sdlA, sdlB]
 
-    px_area = 1e-2*wfm.specs["mask_deltax"]*wfm.specs["mask_deltay"]/(upscale_x*upscale_y)  # px area [cm^2] TODO: units with astropy
-    exposure = [data.header["EXPOSURE"] for data in sdls]                                   # camera exposure [s]
-    l = wfm.specs["mask_detector_distance"]                                                 # mask-detector distance [mm]
+    # px area [cm^2] TODO: units with astropy
+    px_area = (
+        1e-2 * wfm.specs["mask_deltax"] * wfm.specs["mask_deltay"] / (upscale_x * upscale_y)
+    )
+    exposure = [data.header["EXPOSURE"] for data in sdls]      # camera exposure [s]
+    l, dl = wfm.specs["mask_detector_distance"], 0.1           # mask-detector distance, error [mm]
+    dshifty = np.abs(wfm.bins_sky.y[0] - wfm.bins_sky.y[1])/2  # shift error along y [mm] 
+    dshiftx = np.abs(wfm.bins_sky.x[0] - wfm.bins_sky.x[1])/2  # shift error along x [mm]
     iros_log = init_log()
 
     # IROS
@@ -169,16 +200,30 @@ def perform_IROS(simul_data: str | Path,
         max_iterations=max_iterations,
         snr_threshold=snr_threshold,
         dataset=dataset,
-        )
+    )
 
-    #TODO: extract other info from IROS loop
-    # - SNR in bm.optim.iros() -> subtract() or out
-    # - chi^2 in bm.optim.iros() -> subtract() -> optimize() (IDEA: computed by hand from errors in the minimized function)
-    # - could be also inserted into sources tuples
-    for sources, residuals in tqdm(loop):
-        snrs, chis = (-100, -100), (-100, -100)
-        update_log(sources, snrs, chis)
+    detectors = tuple(bm.count(wfm, sdl.data)[0] for sdl in sdls)
+    variances = tuple(bm.variance(wfm, d) for d in detectors)
+    skies = tuple(bm.decode(wfm, d) for d in detectors)
     
+    skies_max = [tuple(np.max(sky) for sky in skies)]
+    snrs_source = [tuple(np.max(sky)/np.sqrt(var_[*argmax(sky)]) for sky, var_ in zip(skies, variances))]
+    skies = [skies]
+
+    # TODO: extract other info from IROS loop
+    # - chi^2 in bm.optim.iros() -> subtract() -> optimize() (IDEA: computed by hand from errors in the minimized function)
+    for sources, residuals in tqdm(loop):
+        skies.append(residuals)
+        skies_max.append(tuple(np.max(r) for r in residuals))
+        snrs_source.append(tuple(np.max(sky)/np.sqrt(var_[*argmax(sky)]) for sky, var_ in zip(residuals, variances)))
+
+        obs_counts = skies_max[0]
+        source_snrs = snrs_source[0]
+        sub_counts = tuple(s.max() - r[*argmax(s)] for s, r in zip(skies[0], skies[1]))
+        
+        update_log(sources)
+        skies.pop(0); skies_max.pop(0); snrs_source.pop(0)
+
     iros_log = data_to_array(iros_log)
     for camera, sdl in zip([camA, camB], sdls):
         iros_log[camera]["info"] = sdl.header
@@ -186,10 +231,11 @@ def perform_IROS(simul_data: str | Path,
     return iros_log
 
 
-def save_iros_output(data: dict,
-                     mask_file: str | Path,
-                     save_to: str | Path,
-                     ) -> None:
+def save_iros_output(
+    data: dict,
+    mask_file: str | Path,
+    save_to: str | Path,
+) -> None:
     """
     Saves the IROS output data into a FITS file.
 
@@ -201,18 +247,22 @@ def save_iros_output(data: dict,
         - save_to: str | Path
         Path to the directory for saving the FITS file.
     """
-    def make_column(name: str,
-                    col_data: Sequence,
-                    data_format: str,
-                    unit: str,
-                    ) -> fits.Column:
-        return fits.Column(name=f"{name.upper()}", array=col_data,
-                           format=data_format, unit=unit)
 
-    def make_bintable(name: str,
-                      tab_data: list,
-                      sdl_header: fits.Header,
-                      ) -> fits.BinTableHDU:
+    def make_column(
+        name: str,
+        col_data: Sequence,
+        data_format: str,
+        unit: str,
+    ) -> fits.Column:
+
+        return fits.Column(name=f"{name.upper()}", array=col_data, format=data_format, unit=unit)
+
+    def make_bintable(
+        name: str,
+        tab_data: list,
+        sdl_header: fits.Header,
+    ) -> fits.BinTableHDU:
+
         table_hdu = fits.BinTableHDU.from_columns(
             columns=tab_data,
             header=sdl_header,
@@ -224,7 +274,7 @@ def save_iros_output(data: dict,
     # HDU list and Primary Header
     hdu_list = fits.HDUList([])
     primary_header = fits.getheader(mask_file, ext=2)
-    primary_header['EXTNAME'] = 'PRIMARY'
+    primary_header["EXTNAME"] = "PRIMARY"
     primary_hdu = fits.PrimaryHDU(header=primary_header)
     hdu_list.append(primary_hdu)
 
@@ -237,28 +287,10 @@ def save_iros_output(data: dict,
         ]
         table_hdu = make_bintable(camera, columns, cam["info"])
         hdu_list.append(table_hdu)
-    
+
     # save data
     hdu_list.writeto(save_to)
     print("# Saving completed!")
-
-
-
-def save_pickle(data: object, save_to: str | Path) -> None:
-    """
-    Saves data in pickle format.
-
-    Args:
-        - data: object
-        Data to save.
-        - save_to: str | Path
-        Path to the directory for saving the pickle file.
-    """
-    print("# Saving data...")
-    with open(save_to + ".pickle", "wb") as handle:
-        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    print("# Saving completed!")
-
 
 
 def load_iros_output(filepath: str | Path) -> dict:
@@ -269,17 +301,17 @@ def load_iros_output(filepath: str | Path) -> dict:
     Args:
         - filepath: str | Path
         Path to the FITS file.
-    
+
     Returns:
         - data: dict
         Dictionary with info for the sources observed by the WFM
         and reconstructed with IROS.
-    
+
     Raises:
         - FileNotFoundError: if FITS file does not exists.
         - ValueError: if file not in valid FITS format.
     """
-    
+
     def check_fits(filepath: Path) -> bool:
         """Check presence and validity of the FITS file."""
         if not filepath.is_file():
@@ -295,7 +327,7 @@ def load_iros_output(filepath: str | Path) -> dict:
             hdus_data = [hdul[1].data, hdul[2].data]
 
         data = {
-            hdu['EXTNAME'].lower(): {
+            hdu["EXTNAME"].lower(): {
                 hdu["TTYPE" + str(idx)].lower(): {
                     "data": hdu_data.field(idx - 1),
                     "format": hdu["TFORM" + str(idx)],
@@ -310,7 +342,7 @@ def load_iros_output(filepath: str | Path) -> dict:
             data[camera]["info"] = hdu
 
         return data
-    
+
     print("# Loading data...")
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
@@ -319,28 +351,13 @@ def load_iros_output(filepath: str | Path) -> dict:
         return load_data(filepath)
 
 
-def load_pickle(filepath: str | Path) -> object:
-    """
-    Loads data from pickle file.
-    
-    Args:
-        - filepath: str | Path
-        Path to the pickle file.
-    """
-    print("# Loading data...")
-    with open(filepath + ".pickle", "rb") as handle:
-        data = pickle.load(handle)
-    print("# Loading completed!")
-    return data
-
-
-
-def compare_w_catalog(simul_data: str | Path,
-                      data: dict,
-                      camA: str = "cam1a",
-                      camB: str = "cam1b",
-                      min_flux: float = 0.0,
-                      ) -> dict:
+def compare_w_catalog(
+    simul_data: str | Path,
+    data: dict,
+    camA: str = "cam1a",
+    camB: str = "cam1b",
+    min_flux: float = 0.0,
+) -> dict:
     """
     Compares the reconstructed IROS sources data with the catalog
     containing the simulated sources.
@@ -370,7 +387,7 @@ def compare_w_catalog(simul_data: str | Path,
         - FileNotFoundError: if FITS files do not exist.
         - ValueError: if files not in valid FITS format.
     """
-    
+
     def get_catalogs(filepath: Path) -> tuple:
         """Returns the catalogs data."""
 
@@ -381,7 +398,7 @@ def compare_w_catalog(simul_data: str | Path,
             elif not _validate_fits(pattern):
                 raise ValueError("File not in valid FITS format.")
             return True
-        
+
         paths = bm.simulation_files(filepath)
         pA = Path(paths[camA]["sources"])
         pB = Path(paths[camB]["sources"])
@@ -389,22 +406,21 @@ def compare_w_catalog(simul_data: str | Path,
             catA = fits.getdata(pA)
             catB = fits.getdata(pB)
             return catA, catB
-    
+
     def single_cam_comparison(catalogs: list) -> None:
         """
         Compares respective catalogs for the two cameras and
         updates the input data dictionary.
         """
 
-        def optimized_pos(catalog: dict,
-                          pos: tuple[float, float],
-                          ) -> int:
+        def optimized_pos(
+            catalog: dict,
+            pos: tuple[float, float],
+        ) -> int:
             """Source association from catalog."""
-            arg = np.argmin(
-                np.square(catalog["RA"] - pos[0]) + np.square(catalog["DEC"] - pos[1])
-            )
+            arg = np.argmin(np.square(catalog["RA"] - pos[0]) + np.square(catalog["DEC"] - pos[1]))
             return arg
-        
+
         for catalog, camera in zip(catalogs, [camA, camB]):
             catalog = catalog[catalog["FLUX"] > min_flux]
             data[camera]["catalog_name"] = []
@@ -426,12 +442,7 @@ def compare_w_catalog(simul_data: str | Path,
         #     and so the data from single CAM is "aligned" in the input dict (still checked, though)
 
         max_len = min(len(data[camA]["catalog_name"]), len(data[camB]["catalog_name"]))
-        double_cam = {
-            "source": [],
-            **{f"{key}_{cam}": []
-               for cam in [camA, camB]
-               for key in ["ra", "dec", "flux"]}
-            }
+        double_cam = {"source": [], **{f"{key}_{cam}": [] for cam in [camA, camB] for key in ["ra", "dec", "flux"]}}
 
         for idx in range(max_len):
             name = data[camA]["catalog_name"][idx]
@@ -440,19 +451,52 @@ def compare_w_catalog(simul_data: str | Path,
                 for cam in [camA, camB]:
                     for key in ["ra", "dec", "flux"]:
                         double_cam[f"{key}_{cam}"].append(data[cam][key]["data"][idx])
-        
+
         return double_cam
 
     print("## Comparing with Catalog...")
     if not isinstance(simul_data, Path):
         simul_data = Path(simul_data)
-    
+
     catA, catB = get_catalogs(simul_data)
     single_cam_comparison([catA, catB])
     double_cam = double_cam_comparison()
     print("## Successful comparison!")
-    
+
     return data, double_cam
+
+
+
+
+def save_pickle(data: object, save_to: str | Path) -> None:
+    """
+    Saves data in pickle format.
+
+    Args:
+        - data: object
+        Data to save.
+        - save_to: str | Path
+        Path to the directory for saving the pickle file.
+    """
+    print("# Saving data...")
+    with open(save_to + ".pickle", "wb") as handle:
+        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    print("# Saving completed!")
+
+
+def load_pickle(filepath: str | Path) -> object:
+    """
+    Loads data from pickle file.
+
+    Args:
+        - filepath: str | Path
+        Path to the pickle file.
+    """
+    print("# Loading data...")
+    with open(filepath + ".pickle", "rb") as handle:
+        data = pickle.load(handle)
+    print("# Loading completed!")
+    return data
 
 
 # end
