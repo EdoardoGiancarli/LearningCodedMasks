@@ -82,6 +82,10 @@ def perform_IROS(
         init_keys = {
             "y": template("J", "px"),
             "x": template("J", "px"),
+            "shift_y": template("D", "mm"),
+            "dshift_y": template("D", "mm"),
+            "shift_x": template("D", "mm"),
+            "dshift_x": template("D", "mm"),
             "theta_y": template("D", "rad"),
             "dtheta_y": template("D", "rad"),
             "theta_x": template("D", "rad"),
@@ -158,9 +162,9 @@ def perform_IROS(
             dflux = dcounts / exposure[idx]
             chi = -100
 
-            q = [y, x, thetay, dthetay, thetax, dthetax, ra, dra,
-                 dec, ddec, counts, dcounts, flux, dflux, rate, drate,
-                 obs_counts[idx], np.sqrt(obs_counts[idx]), sub_counts[idx],
+            q = [y, x, shifty, dshifty, shiftx, dshiftx, thetay, dthetay, thetax,
+                 dthetax, ra, dra, dec, ddec, counts, dcounts, flux, dflux, rate,
+                 drate, obs_counts[idx], np.sqrt(obs_counts[idx]), sub_counts[idx],
                  np.sqrt(sub_counts[idx]), signf, chi]
             
             for key, i in zip(keys, q):
