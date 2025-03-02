@@ -100,11 +100,6 @@ class IrosLog:
             self._log[camera][key]["data"].append(p)
 
 
-def gen_log(cams: tuple[str]) -> IrosLog:
-    """Initializes an IrosLog instance."""
-    return IrosLog(cams)
-
-
 def perform_iros(
     wfm: object,
     sdlA: object,
@@ -164,11 +159,16 @@ def perform_iros(
         skies.append(residuals)
         skies_max.append(tuple(np.max(r) for r in residuals))
         obs_counts = skies_max[0]
-        sub_counts = tuple(s.max() - r[*argmax(s)] for s, r in zip(skies[0], skies[1]))
+        sub_counts = tuple(np.abs(s.max() - r[*argmax(s)]) for s, r in zip(skies[0], skies[1]))
         skies.pop(0); skies_max.pop(0)
         store_output(sources, obs_counts, sub_counts)
 
     return data_to_array(log_output)
+
+
+def gen_log(cams: tuple[str]) -> IrosLog:
+    """Initializes an IrosLog instance."""
+    return IrosLog(cams)
 
 
 def computes_params(
@@ -201,8 +201,11 @@ def computes_params(
                     I_bulk[wfm.bulk > 0] = 1
                     return _shift(wfm.bulk, (x, y)) * I_bulk
 
-                shiftx_px = int(shiftx / wfm.specs["mask_deltax"])
-                shifty_px = int(shifty / wfm.specs["mask_deltay"])
+                scalingy, scalingx = tuple(
+                    d / s for d, s in zip(wfm.detector_shape, wfm.sky_shape)
+                )
+                shiftx_px = int(shiftx * scalingx / wfm.specs["mask_deltax"])
+                shifty_px = int(shifty * scalingy / wfm.specs["mask_deltay"])
                 shifted_bulk = shift(-shiftx_px, -shifty_px)        # shift is opposed wrt source pos
                 eff_area = px_area * shifted_bulk.sum()             # effective detector area seen by the source [cm^2]
                 return eff_area
@@ -243,7 +246,7 @@ def computes_params(
 
 
             params = [
-                y, x, shifty, dshifty, shiftx, dshiftx, thetay, dthetay, thetax, dthetax,
+                y, x, shiftx, dshiftx, shifty, dshifty, thetax, dthetax, thetay, dthetay,
                 ra, dra, dec, ddec, counts, dcounts, rate, drate, flux, dflux, obs_counts,
                 np.sqrt(obs_counts), sub_counts, np.sqrt(sub_counts), simulphotons, snr, chi,
             ]
