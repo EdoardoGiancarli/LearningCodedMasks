@@ -392,7 +392,23 @@ def counts_stats():
     pass
 
 
-def iros_sky():
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def check_sources_residues():
     pass
 
 
@@ -404,8 +420,8 @@ def iros_sky():
 
 
 
-
-
+def iros_sky():
+    pass
 
 
 def plot_cameras(skyrecs, name) -> None:
