@@ -7,10 +7,11 @@ Contents:
     - gen_log(): initializes an IrosLog instance.
     - perform_iros(): perform the IROS loop and stores output.
     - computes_params(): takes IROS output and compute parameters.
-
     - compare_w_catalog(): compares IROS reconstruction with given catalog.
 
     - counts_stats(): 
+
+    - plot():
 
     - iros_sky(): creates sky image from reconstructed sources.
     
@@ -176,7 +177,6 @@ def computes_params(
     sdlA: object,
     sdlB: object,
     log: IrosLog,
-    store_headers: bool = True,
 ) -> dict:
     """Computes useful parameters for IROS reconstructed sources."""
 
@@ -244,7 +244,7 @@ def computes_params(
 
             params = [
                 y, x, shifty, dshifty, shiftx, dshiftx, thetay, dthetay, thetax, dthetax,
-                ra, dra, dec, ddec, counts, dcounts, flux, dflux, rate, drate, obs_counts,
+                ra, dra, dec, ddec, counts, dcounts, rate, drate, flux, dflux, obs_counts,
                 np.sqrt(obs_counts), sub_counts, np.sqrt(sub_counts), simulphotons, snr, chi,
             ]
 
@@ -258,11 +258,6 @@ def computes_params(
         """Converts the lists in the log to arrays."""
         for key in iros_data[camera].keys():
             iros_data[camera][key]["data"] = np.asarray(iros_data[camera][key]["data"])
-
-    def store_data_headers():
-        """Stores sdls header into the data log."""
-        for camera, sdl in zip(iros_data.keys(), sdls):
-            iros_data[camera]["info"] = sdl.header
 
     # mask physical params
     sdls = [sdlA, sdlB]
@@ -280,12 +275,94 @@ def computes_params(
     for idx, cam in enumerate(iros_output.keys()):
         update_log(cam)
         data_to_array(cam)
-    
-    if store_headers: store_data_headers()
 
     return iros_data
 
 
+def compare_w_catalog(
+    data: dict,
+    catalogA: str | Path,
+    catalogB: str | Path,
+    cameras: tuple[str, str],
+    min_flux: float = 0.0,
+) -> dict:
+    """
+    Compares the reconstructed IROS sources data with the catalog
+    containing the simulated sources.
+
+    Args:
+        - data: dict
+        IROS data output from `compute_params()`.
+        - catalogA: str | Path
+        Path to the catalog for camera A.
+        - catalogB: str | Path
+        Path to the catalog for camera B.
+        - cameras: tuple(str)
+        Camera A and B of the WFM.
+        - min_flux: float, default = 0.0
+        Threshold for the minimum flux to be extracted from the
+        given catalogs (to associate the IROS sources).
+
+    Returns:
+        - data: dict
+        Updated input data with source name matched from the
+        catalog and source flux recovered from the catalog.
+
+    Raises:
+        - FileNotFoundError: if FITS files do not exist.
+        - ValueError: if files not in valid FITS format.
+    """
+
+    def get_catalogs() -> tuple:
+        """Returns the catalogs data."""
+
+        def check_fits(pattern: Path) -> bool:
+            """Check presence and validity of the FITS file."""
+            if not pattern.is_file():
+                raise FileNotFoundError("FITS file does not exists.")
+            elif not _validate_fits(pattern):
+                raise ValueError("File not in valid FITS format.")
+            return True
+
+        if check_fits(catalogA) and check_fits(catalogB):
+            catA = fits.getdata(catalogA)
+            catB = fits.getdata(catalogB)
+            return catA, catB
+    
+    def camera_comparison(catalogs: list) -> None:
+        """
+        Compares respective catalogs for the two cameras and
+        updates the input data dictionary.
+        """
+
+        def optimized_pos(
+            catalog: dict,
+            pos: tuple[float, float],
+        ) -> int:
+            """Source association from catalog."""
+            arg = np.argmin(np.square(catalog["RA"] - pos[0]) + np.square(catalog["DEC"] - pos[1]))
+            return arg
+
+        for catalog, camera in zip(catalogs, cameras):
+            catalog = catalog[catalog["FLUX"] > min_flux]
+            data[camera]["catalog_name"] = {"data": [], "format": "20A", "unit": ""}
+            data[camera]["catalog_flux"] = {"data": [], "format": "D", "unit": "ph/cm2/s"}
+
+            for ra, dec in zip(data[camera]["ra"]["data"], data[camera]["dec"]["data"]):
+                argsource = optimized_pos(catalog, (ra, dec))
+                data[camera]["catalog_name"]["data"].append(catalog["NAME"][argsource])
+                data[camera]["catalog_flux"]["data"].append(catalog["FLUX"][argsource])
+    
+    for c in [catalogA, catalogB]:
+        if not isinstance(c, Path):
+            c = Path(c)
+
+    print("## Comparing with Catalogs...")
+    catA, catB = get_catalogs()
+    camera_comparison([catA, catB])
+    print("## Successful comparison!")
+
+    return data
 
 
 
@@ -295,8 +372,8 @@ def computes_params(
 
 
 
-def compare_w_catalog() -> dict:
-    pass
+
+
 
 
 def counts_stats():
@@ -317,6 +394,11 @@ def counts_stats():
 
 def iros_sky():
     pass
+
+
+
+
+
 
 
 
@@ -356,6 +438,15 @@ def plot_skyrec(skyrecs, title, source_indices=None, source_names=None, dpi=200,
     plt.tight_layout()
     plt.savefig(title.replace(' ', '_').lower() + ".png")
     plt.close()
+
+
+
+
+
+
+
+
+
 
 
 
@@ -475,6 +566,7 @@ def load_iros_output(
 def save_iros_data(
     data: dict,
     mask_file: str | Path,
+    sdls: tuple[object],
     save_to: str | Path,
 ) -> None:
     """
@@ -485,13 +577,11 @@ def save_iros_data(
         IROS data output from `computes_params()`.
         - mask_file: str | Path
         Path to the FITS file for the WFM mask.
+        - sdls: tuple(SimulationDataLoader)
+        SDL instances for the cameras of the WFM.
         - save_to: str | Path
         Path to the directory for saving the FITS file.
     """
-
-    for camera in data.keys():
-        if "info" not in data[camera].keys():
-            raise AttributeError(f"Camera '{camera}' header is missing within info.")
 
     def make_column(
         name: str,
@@ -522,13 +612,13 @@ def save_iros_data(
     hdu_list.append(primary_hdu)
 
     # BinTables
-    for camera in data.keys():
+    for camera, sdl in zip(data.keys(), sdls):
         cam = data[camera]
         columns = [
             make_column(key, cam[key]["data"], cam[key]["format"], cam[key]["unit"])
-            for key in list(cam.keys()) if key != "info"
+            for key in list(cam.keys())
         ]
-        table_hdu = make_bintable(camera, columns, cam["info"])
+        table_hdu = make_bintable(camera, columns, sdl.header)
         hdu_list.append(table_hdu)
 
     # save data
@@ -538,7 +628,6 @@ def save_iros_data(
 
 def load_iros_data(
         filepath: str | Path,
-        insert_header_info: bool = False,
 ) -> dict:
     """
     Loads the IROS computed parameters FITS file and converts it to
@@ -582,9 +671,6 @@ def load_iros_data(
             }
             for hdu, hdu_data in zip(hdus, hdus_data)
         }
-        if insert_header_info:
-            for camera, hdu in zip(data.keys(), hdus):
-                data[camera]["info"] = hdu
         return data
 
     if not isinstance(filepath, Path):
@@ -628,3 +714,29 @@ def load_pickle(filepath: str | Path) -> object:
 
 
 # end
+
+
+
+
+#def double_cam_comparison() -> dict:
+#    """Identifies common sources observed by the WFM cameras."""
+#    # TODO:
+#    #   - maybe for the whole comparison is better to transform the input data dict
+#    #     in a Pandas/Polaris dataframe, for a better management of the data itself
+#    #   - could be also helpful for this CAM comparison (if there are sources detected
+#    #     only by one of the two camera pair)
+#    #   - as of now, I assume that IROS reconstructs only the same source for both cameras
+#    #     and so the data from single CAM is "aligned" in the input dict (still checked, though)
+#
+#    max_len = min(len(data[camA]["catalog_name"]), len(data[camB]["catalog_name"]))
+#    double_cam = {"source": [], **{f"{key}_{cam}": [] for cam in [camA, camB] for key in ["ra", "dec", "flux"]}}
+#
+#    for idx in range(max_len):
+#        name = data[camA]["catalog_name"][idx]
+#        if name == data[camB]["catalog_name"][idx]:
+#            double_cam["source"].append(name)
+#            for cam in [camA, camB]:
+#                for key in ["ra", "dec", "flux"]:
+#                    double_cam[f"{key}_{cam}"].append(data[cam][key]["data"][idx])
+#
+#    return double_cam
