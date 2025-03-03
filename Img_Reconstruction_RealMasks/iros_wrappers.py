@@ -81,9 +81,8 @@ class IrosLog:
             "obs_fluence": template("D", "ph"),
             "dobs_fluence": template("D", "ph"),
             "sub_fluence": template("D", "ph"),
-            "dsub_fluence": template("D", "ph"),
             "simulphotons": template("D", "ph"),
-            "SNR": template("D", ""),
+            "snr": template("D", ""),
             "chisquare": template("D", ""),
         }
 
@@ -115,7 +114,7 @@ def perform_iros(
         """Initializes the log dict structure."""
         init_keys = {
             "shiftx": [], "shifty": [], "fluence": [],
-            "SNR": [], "obs_counts": [], "sub_counts": [],
+            "snr": [], "obs_counts": [], "sub_counts": [],
         }
         return {camera: deepcopy(init_keys) for camera in cameras}
     
@@ -159,7 +158,7 @@ def perform_iros(
         skies.append(residuals)
         skies_max.append(tuple(np.max(r) for r in residuals))
         obs_counts = skies_max[0]
-        sub_counts = tuple(np.abs(s.max() - r[*argmax(s)]) for s, r in zip(skies[0], skies[1]))
+        sub_counts = tuple(s.max() - r[*argmax(s)] for s, r in zip(skies[0], skies[1]))
         skies.pop(0); skies_max.pop(0)
         store_output(sources, obs_counts, sub_counts)
 
@@ -248,7 +247,7 @@ def computes_params(
             params = [
                 y, x, shiftx, dshiftx, shifty, dshifty, thetax, dthetax, thetay, dthetay,
                 ra, dra, dec, ddec, counts, dcounts, rate, drate, flux, dflux, obs_counts,
-                np.sqrt(obs_counts), sub_counts, np.sqrt(sub_counts), simulphotons, snr, chi,
+                np.sqrt(obs_counts), sub_counts, simulphotons, snr, chi,
             ]
 
             return params
