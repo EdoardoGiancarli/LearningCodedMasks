@@ -252,7 +252,7 @@ def computes_params(
 
             return params
 
-        for sx, sy, f, snr, oc, sc in zip(*iros_output[camera].values()):
+        for sx, sy, f, snr, oc, sc, _ in zip(*iros_output[camera].values()):
             params = _get_params(sx, sy, f, snr, oc, sc)
             log.update(camera, params)
 
