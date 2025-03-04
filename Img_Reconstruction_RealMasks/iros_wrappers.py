@@ -40,10 +40,6 @@ import mbloodmoon as bm
 import matplotlib.pyplot as plt
 
 
-
-# TODO: maybe we can structure the logs as record arrays
-
-
 class IrosLog:
     """IROS parameters log management."""
 
@@ -133,9 +129,10 @@ def perform_iros(
     def data_to_array(log) -> dict:
         """Converts the log lists in arrays."""
         keys = log[cameras[0]].keys()
-        for camera in log.keys():
+        for camera in list(log.keys()):
             for key in keys:
-                log[camera][key] = np.asarray(log[camera][key])
+                if not isinstance(log[camera][key], np.ndarray):
+                    log[camera][key] = np.asarray(log[camera][key])
         return log
     
     log_output = init_log()
@@ -161,6 +158,9 @@ def perform_iros(
         sub_counts = tuple(s.max() - r[*argmax(s)] for s, r in zip(skies[0], skies[1]))
         skies.pop(0); skies_max.pop(0)
         store_output(sources, obs_counts, sub_counts)
+    
+    for camera, sky in zip(log_output.keys(), skies[0]):
+        log_output[camera]["sky_residues"] = sky
 
     return data_to_array(log_output)
 
@@ -315,7 +315,7 @@ def compare_w_catalog(
         - ValueError: if files not in valid FITS format.
     """
 
-    def get_catalogs() -> tuple:
+    def get_catalogs() -> tuple[np.recarray]:
         """Returns the catalogs data."""
 
         def check_fits(pattern: Path) -> bool:
@@ -338,13 +338,27 @@ def compare_w_catalog(
         """
 
         def optimized_pos(
-            catalog: dict,
+            catalog: np.recarray,
             pos: tuple[float, float],
         ) -> int:
             """Source association from catalog."""
             arg = np.argmin(np.square(catalog["RA"] - pos[0]) + np.square(catalog["DEC"] - pos[1]))
             return arg
+        
+        def source_in_db(camera: str, name: str) -> bool:
+            """Checks database to avoid sources repetition."""
+            if name in data[camera]["catalog_name"]["data"]:
+                return True
+            return False
 
+        def remove_source(arg: int) -> None:
+            """Removes repeting source in database."""
+            # TODO: implement source removal by SNR comparison
+            cam = data[camera]
+            for key in list(cam.keys())[:-2]:
+                cam[key]["data"] = np.delete(cam[key]["data"], arg)
+
+        fake_sources = ["gctr_diffuse"]
         for catalog, camera in zip(catalogs, cameras):
             catalog = catalog[catalog["FLUX"] > min_flux]
             data[camera]["catalog_name"] = {"data": [], "format": "20A", "unit": ""}
@@ -352,8 +366,13 @@ def compare_w_catalog(
 
             for ra, dec in zip(data[camera]["ra"]["data"], data[camera]["dec"]["data"]):
                 argsource = optimized_pos(catalog, (ra, dec))
-                data[camera]["catalog_name"]["data"].append(catalog["NAME"][argsource])
-                data[camera]["catalog_flux"]["data"].append(catalog["FLUX"][argsource])
+                source_id = catalog["NAME"][argsource] 
+                if not source_in_db(camera, source_id) and (source_id not in fake_sources):
+                    data[camera]["catalog_name"]["data"].append(source_id)
+                    data[camera]["catalog_flux"]["data"].append(catalog["FLUX"][argsource])
+                else:
+                    arg = len(data[camera]["catalog_name"]["data"])
+                    remove_source(arg)
     
     for c in [catalogA, catalogB]:
         if not isinstance(c, Path):
@@ -378,84 +397,6 @@ def compare_w_catalog(
 
 
 
-def counts_stats():
-
-    def counts_table():
-        def retrieve_simcounts():
-            pass
-        pass
-
-    def rec_perc():
-        pass
-
-    def plot_rec_perc():
-        pass
-
-    pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def check_sources_residues():
-    pass
-
-
-
-
-
-
-
-
-
-
-def iros_sky():
-    pass
-
-
-def plot_cameras(skyrecs, name) -> None:
-    sky_a, sky_b = skyrecs
-    fig, axs = plt.subplots(1, 2, figsize=(12, 6), dpi=150)
-    plt.tight_layout()
-    for ax, b, bmax, title in zip(
-            axs,
-            [sky_a, sky_b],
-            [argmax(sky_a), argmax(sky_b)],
-            ["SkyRec CamA", "SkyRec CamB"],
-    ):
-        ax.imshow(b, vmin=0, vmax=-b.min())
-        ax.scatter(bmax[1], bmax[0], facecolors='none', edgecolors='white', alpha=0.5)
-        ax.set_title(title, fontsize=14, pad=8, fontweight='bold')
-    plt.savefig(name + '.png')
-    plt.close()
-
-def plot_skyrec(skyrecs, title, source_indices=None, source_names=None, dpi=200, upsc_y=8):
-    composed, _ = bm.compose(*skyrecs, strict=False)
-    fig, ax = plt.subplots(1, 1, figsize=(8, 10), dpi=dpi)
-    if source_indices is not None and source_names is not None:
-        for ((i, j), name) in zip(source_indices, source_names):
-            ax.scatter(j, i * upsc_y + 53, s=30, facecolors="none", edgecolors="white", alpha=1., linewidth=.5)
-            ax.text(j + 50 , i * upsc_y + 100, name, color="white", fontsize=4)
-    im = ax.imshow(composed, vmax=np.quantile(composed, 0.9995), vmin=0., cmap="viridis")
-    plt.colorbar(im, ax=ax, label='SNR', fraction=0.025, aspect=35, pad=0.02, shrink=0.33, location="bottom")
-    ax.set_title(title, fontsize=12, pad=8, fontweight='bold')
-    plt.axis("off")
-    plt.tight_layout()
-    plt.savefig(title.replace(' ', '_').lower() + ".png")
-    plt.close()
 
 
 
@@ -493,12 +434,13 @@ def save_iros_output(
     def make_column(
         name: str,
         col_data: np.array,
+        frmt: str,
     ) -> fits.Column:
-        return fits.Column(name=f"{name.upper()}", array=col_data, format="D")
+        return fits.Column(name=f"{name.upper()}", array=col_data, format=frmt)
 
     def make_bintable(
         name: str,
-        tab_data: list
+        tab_data: list,
     ) -> fits.BinTableHDU:
         table_hdu = fits.BinTableHDU.from_columns(
             columns=tab_data,
@@ -514,13 +456,29 @@ def save_iros_output(
     primary_hdu = fits.PrimaryHDU(header=primary_header)
     hdu_list.append(primary_hdu)
 
-    # BinTables
+    # BinTables for data
     for camera in data.keys():
         cam = data[camera]
         columns = [
-            make_column(key, cam[key]) for key in list(cam.keys())
+            make_column(key, cam[key], "D") for key in list(cam.keys())
+            if key != "sky_residues"
         ]
         table_hdu = make_bintable(camera, columns)
+        hdu_list.append(table_hdu)
+    
+    # BinTables for sky residues
+    for camera in data.keys():
+        skyres = data[camera]["sky_residues"]
+        values = skyres.ravel()
+        y, x = np.unravel_index(np.arange(skyres.size), skyres.shape)
+        columns = [
+            make_column(key, col, frmt) for key, col, frmt in zip(
+                ["value", "y", "x"], [values, y, x], ["D", "J", "J"],
+            )
+        ]
+        table_hdu = make_bintable(camera + "_skyres", columns)
+        table_hdu.header["ZEROEL"] = "Top-left (C-ordering, Row-major from Python)"
+        table_hdu.header["ROWS"], table_hdu.header["COLS"] = skyres.shape
         hdu_list.append(table_hdu)
 
     # save data
@@ -559,9 +517,20 @@ def load_iros_output(
 
     def load_data(filepath: Path) -> dict:
         """Open FITS and store info in a dictionary."""
+        def get_sky(
+            hdu_data: fits.FITS_rec,
+            sky_shape: tuple,
+        ) -> np.array:
+            values = hdu_data.field(0)
+            y, x = hdu_data.field(1), hdu_data.field(2)
+            sky = np.zeros(sky_shape); sky[y, x] = values
+            return sky
+
         with fits.open(filepath) as hdul:
             hdus = [dict(hdul[1].header), dict(hdul[2].header)]
             hdus_data = [hdul[1].data, hdul[2].data]
+            hdus_skies = [dict(hdul[3].header), dict(hdul[4].header)]
+            hdus_dataskies = [hdul[3].data, hdul[4].data]
 
         data = {
             hdu["EXTNAME"].lower(): {
@@ -570,6 +539,10 @@ def load_iros_output(
             }
             for hdu, hdu_data in zip(hdus, hdus_data)
         }
+
+        for idx, camera in enumerate(data.keys()):
+            sky_shape = (hdus_skies[idx]["ROWS"], hdus_skies[idx]["COLS"])
+            data[camera]["sky_residues"] = get_sky(hdus_dataskies[idx], sky_shape)
         return data
 
     if not isinstance(filepath, Path):
