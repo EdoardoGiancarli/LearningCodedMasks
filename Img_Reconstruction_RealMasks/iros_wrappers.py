@@ -28,10 +28,14 @@ from astropy.io import fits
 from tqdm import tqdm
 import pickle
 
+from astropy.coordinates import SkyCoord
+from astropy.wcs.utils import fit_wcs_from_points
+from astropy.wcs import WCS
+from mbloodmoon.coords import pos2equatorial
+
 from mbloodmoon.coords import shift2equatorial
 from mbloodmoon.io import _validate_fits
-from mbloodmoon.images import _shift
-from mbloodmoon.images import argmax
+from mbloodmoon.images import _shift, argmax
 import mbloodmoon as bm
 
 import matplotlib.pyplot as plt
@@ -155,12 +159,8 @@ def perform_iros(
         sub_counts = tuple(s.max() - r[*argmax(s)] for s, r in zip(skies[0], skies[1]))
         skies.pop(0); skies_max.pop(0)
         store_output(sources, obs_counts, sub_counts)
-    
-    for camera, sky in zip(log_output.keys(), skies[0]):
-        log_output[camera]["sky_residues"] = sky
 
-    return data_to_array(log_output)
-# TODO: don't save residues in iros_output, but return them -> save_sky()   (also modify save_iros_output() and load)
+    return data_to_array(log_output), residuals
 
 
 def gen_log(cams: tuple[str]) -> IrosLog:
@@ -428,13 +428,11 @@ def save_iros_output(
         - save_to: str | Path
         Path to the directory for saving the FITS file.
     """
-
     def make_column(
         name: str,
         col_data: np.array,
-        frmt: str,
     ) -> fits.Column:
-        return fits.Column(name=f"{name.upper()}", array=col_data, format=frmt)
+        return fits.Column(name=f"{name.upper()}", array=col_data, format="D")
 
     def make_bintable(
         name: str,
@@ -458,31 +456,17 @@ def save_iros_output(
     for camera in data.keys():
         cam = data[camera]
         columns = [
-            make_column(key, cam[key], "D") for key in list(cam.keys())
-            if key != "sky_residues"
+            make_column(key, cam[key]) for key in list(cam.keys())
         ]
         table_hdu = make_bintable(camera, columns)
-        hdu_list.append(table_hdu)
-    
-    # BinTables for sky residues
-    for camera in data.keys():
-        skyres = data[camera]["sky_residues"]
-        values = skyres.ravel()
-        y, x = np.unravel_index(np.arange(skyres.size), skyres.shape)
-        columns = [
-            make_column(key, col, frmt) for key, col, frmt in zip(
-                ["value", "y", "x"], [values, y, x], ["D", "J", "J"],
-            )
-        ]
-        table_hdu = make_bintable(camera + "_skyres", columns)
-        table_hdu.header["ZEROEL"] = "Top-left (C-ordering, Row-major from Python)"
-        table_hdu.header["ROWS"], table_hdu.header["COLS"] = skyres.shape
         hdu_list.append(table_hdu)
 
     # save data
     hdu_list.writeto(save_to, output_verify="fix+ignore")
     hdu_list.close()
     print("# Saving completed!")
+
+
 
 
 def load_iros_output(
@@ -505,7 +489,6 @@ def load_iros_output(
         - FileNotFoundError: if FITS file does not exists.
         - ValueError: if file not in valid FITS format.
     """
-
     def check_fits(filepath: Path) -> bool:
         """Check presence and validity of the FITS file."""
         if not filepath.is_file():
@@ -516,20 +499,9 @@ def load_iros_output(
 
     def load_data(filepath: Path) -> dict:
         """Open FITS and store info in a dictionary."""
-        def get_sky(
-            hdu_data: fits.FITS_rec,
-            sky_shape: tuple,
-        ) -> np.array:
-            values = hdu_data.field(0)
-            y, x = hdu_data.field(1), hdu_data.field(2)
-            sky = np.zeros(sky_shape); sky[y, x] = values
-            return sky
-
         with fits.open(filepath) as hdul:
             hdus = [dict(hdul[1].header), dict(hdul[2].header)]
             hdus_data = [hdul[1].data, hdul[2].data]
-            hdus_skies = [dict(hdul[3].header), dict(hdul[4].header)]
-            hdus_dataskies = [hdul[3].data, hdul[4].data]
 
         data = {
             hdu["EXTNAME"].lower(): {
@@ -538,10 +510,6 @@ def load_iros_output(
             }
             for hdu, hdu_data in zip(hdus, hdus_data)
         }
-
-        for idx, camera in enumerate(data.keys()):
-            sky_shape = (hdus_skies[idx]["ROWS"], hdus_skies[idx]["COLS"])
-            data[camera]["sky_residues"] = get_sky(hdus_dataskies[idx], sky_shape)
         return data
 
     if not isinstance(filepath, Path):
@@ -673,6 +641,90 @@ def load_iros_data(
         return data
 
 
+def save_sky(
+    sky: np.array,
+    snr: np.array,
+    sdl: object,
+    wfm: object,
+    save_to: str | Path,
+) -> None:
+    """Saves sky array to FITS Image."""
+
+    sky = np.int16(sky)
+    snr = np.float32(snr)
+
+    def fit_WCS() -> WCS:
+        """Fit the WCS."""
+        n, m = wfm.sky_shape
+        pxs = [
+            (n - 1, 0), (n - 1, m - 1), (0, m - 1),
+            (0, 0), (-n//4, m//4), (-n//4, -m//4),
+            (n//4, -m//4), (n//4, m//4), (n//2, m//2),
+        ]
+        coords = [pos2equatorial(sdl, wfm, *pos) for pos in pxs]
+        
+        coord_pxs = tuple(np.array([px[idx] for px in pxs]) for idx in (1, 0))
+        coord_radec = SkyCoord(
+            ra=np.array([c.ra for c in coords]),
+            dec=np.array([c.dec for c in coords]),
+            frame="icrs", unit="deg",
+        )
+        wcs = fit_wcs_from_points(
+            xy=coord_pxs, world_coords=coord_radec,
+            projection="TAN", sip_degree=0,
+        )
+        return wcs
+
+    wcs = fit_WCS()
+    print("# Saving Sky...")
+    # HDU list and Primary Header
+    hdu_list = fits.HDUList([])
+    primary_hdu = fits.PrimaryHDU()
+    hdu_list.append(primary_hdu)
+
+    # Images for data
+    for img, name in zip([sky, snr], ["sky", "snr"]):
+        image_hdu = fits.ImageHDU(
+            data=img,
+            header=sdl.header,
+            name=name.upper(),
+        )
+        image_hdu.header.update(wcs.to_header())
+        hdu_list.append(image_hdu)
+    
+    hdu_list.writeto(save_to, output_verify="fix+ignore")
+    hdu_list.close()
+    print("# Saving completed!")
+
+
+def load_sky(
+    filepath: str | Path,
+) -> tuple[np.array, np.array]:
+    """Loads sky and its SNR from FITS."""
+    def check_fits(filepath: Path) -> bool:
+        """Check presence and validity of the FITS file."""
+        if not filepath.is_file():
+            raise FileNotFoundError("FITS file does not exists.")
+        elif not _validate_fits(filepath):
+            raise ValueError("File not in valid FITS format.")
+        return True
+
+    def load_data(filepath: Path) -> dict:
+        """Open FITS and store Images in 2D-array."""
+        with fits.open(filepath) as hdu:
+            sky = hdu[1].data
+            snr = hdu[2].data
+        return sky, snr
+    
+    if not isinstance(filepath, Path):
+        filepath = Path(filepath)
+    if check_fits(filepath):
+        print("# Loading data...")
+        sky, snr = load_data(filepath)
+        print("# Loading completed!")
+        return sky, snr
+
+
 def save_pickle(data: object, save_to: str | Path) -> None:
     """
     Saves data in pickle format.
@@ -731,3 +783,38 @@ def load_pickle(filepath: str | Path) -> object:
 #                    double_cam[f"{key}_{cam}"].append(data[cam][key]["data"][idx])
 #
 #    return double_cam
+
+
+
+
+
+
+
+
+
+
+
+## BinTables for sky residues
+#for camera in data.keys():
+#    skyres = data[camera]["sky_residues"]
+#    values = skyres.ravel()
+#    y, x = np.unravel_index(np.arange(skyres.size), skyres.shape)
+#    columns = [
+#        make_column(key, col, frmt) for key, col, frmt in zip(
+#            ["value", "y", "x"], [values, y, x], ["D", "J", "J"],
+#        )
+#    ]
+#    table_hdu = make_bintable(camera + "_skyres", columns)
+#    table_hdu.header["ZEROEL"] = "Top-left (C-ordering, Row-major from Python)"
+#    table_hdu.header["ROWS"], table_hdu.header["COLS"] = skyres.shape
+#    hdu_list.append(table_hdu)
+#
+#
+#def get_sky(
+#    hdu_data: fits.FITS_rec,
+#    sky_shape: tuple,
+#) -> np.array:
+#    values = hdu_data.field(0)
+#    y, x = hdu_data.field(1), hdu_data.field(2)
+#    sky = np.zeros(sky_shape); sky[y, x] = values
+#    return sky
