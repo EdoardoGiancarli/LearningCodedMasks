@@ -8,13 +8,6 @@ Initialize dummymoon package...
 | |_| | |_| | | | | | | | | | | | |_| | |  | | (_) | (_) | | | |
 |____/ \__,_|_| |_| |_|_| |_| |_|\__, |_|  |_|\___/ \___/|_| |_|
                                  |___/                          
-
-
-# Notes:
-    1. The detector image is normalized by the aperture
-    2. The balanced variance is normalized by the aperture
-    3. The reconstructed sky is scaled with the factor (1 - f)/f,
-       where f is the open fraction of the mask
 """
 
 from .io import import_mask

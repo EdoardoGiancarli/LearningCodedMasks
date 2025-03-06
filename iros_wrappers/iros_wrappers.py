@@ -9,9 +9,6 @@ Contents:
     - computes_params(): takes IROS output and compute parameters.
     - compare_w_catalog(): compares IROS reconstruction with given catalog.
 
-    - counts_stats(): 
-
-    - plot():
 
     - iros_sky(): creates sky image from reconstructed sources.
     
@@ -163,6 +160,7 @@ def perform_iros(
         log_output[camera]["sky_residues"] = sky
 
     return data_to_array(log_output)
+# TODO: don't save residues in iros_output, but return them -> save_sky()   (also modify save_iros_output() and load)
 
 
 def gen_log(cams: tuple[str]) -> IrosLog:
@@ -170,7 +168,7 @@ def gen_log(cams: tuple[str]) -> IrosLog:
     return IrosLog(cams)
 
 
-def computes_params(
+def compute_params(
     iros_output: dict,
     wfm: object,
     sdlA: object,
@@ -483,6 +481,7 @@ def save_iros_output(
 
     # save data
     hdu_list.writeto(save_to, output_verify="fix+ignore")
+    hdu_list.close()
     print("# Saving completed!")
 
 
@@ -565,7 +564,7 @@ def save_iros_data(
 
     Args:
         - data: dict
-        IROS data output from `computes_params()`.
+        IROS data output from `compute_params()`.
         - mask_file: str | Path
         Path to the FITS file for the WFM mask.
         - sdls: tuple(SimulationDataLoader)
@@ -614,6 +613,7 @@ def save_iros_data(
 
     # save data
     hdu_list.writeto(save_to, output_verify="fix+ignore")
+    hdu_list.close()
     print("# Saving completed!")
 
 

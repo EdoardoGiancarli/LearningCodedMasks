@@ -19,6 +19,42 @@ from .types import BinsRectangular
 from .types import CoordEquatorial
 
 
+def pos2equatorial(
+    sdl: SimulationDataLoader,
+    camera: CodedMaskCamera,
+    y: int,
+    x: int,
+) -> CoordEquatorial:
+    """
+    Convert sky pixel position to corresponding sky-shift coordinates.
+
+    Args:
+        sdl (SimulationDataLoader): instance containing camera pointings
+        camera (CodedMaskCamera): instance containing binning information
+        y (int): pixel row
+        x (int): pixel column
+    
+    Returns:
+        CoordEquatorial containing:
+            - ra: Right ascension in degrees [0, 360]
+            - dec: Declination in degrees [-90, 90]
+    
+    Notes:
+        - the sky-coord shifts are in [mm] wrt optical axis
+        - RA is normalized to [0, 360) degree range
+        - resulting RA/Dec refers to the center of the pixel
+    """
+    def pos2shift(
+        x: int,
+        y: int,
+    ) -> tuple[float, float]:
+        dbinx = camera.bins_sky.x[1] - camera.bins_sky.x[0]
+        dbiny = camera.bins_sky.y[1] - camera.bins_sky.y[0]
+        return camera.bins_sky.x[x] + dbinx/2, camera.bins_sky.y[y] + dbiny/2
+
+    return shift2equatorial(sdl, camera, *pos2shift(x, y))
+
+
 def shift2equatorial(
     sdl: SimulationDataLoader,
     camera: CodedMaskCamera,
