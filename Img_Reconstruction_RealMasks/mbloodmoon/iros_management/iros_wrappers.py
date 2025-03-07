@@ -104,7 +104,7 @@ def perform_iros(
     max_iterations: int = 10,
     snr_threshold: int | float = 5,
     dataset: str = "reconstructed",
-) -> dict:
+) -> tuple[dict, tuple[np.array, np.array]]:
     """Runs IROS loop and stores output."""
 
     def init_log() -> dict:

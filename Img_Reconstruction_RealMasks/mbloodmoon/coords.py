@@ -19,6 +19,40 @@ from .types import BinsRectangular
 from .types import CoordEquatorial
 
 
+def pos2shift(
+    camera: CodedMaskCamera,
+    x: int | float,
+    y: int | float,
+) -> tuple[float, float]:
+    """
+    Convert pixel indexes (x, y) to sky-coordinate shifts.
+
+    Args:
+        camera (CodedMaskCamera): The camera object containing sky shape and binning information.
+        x (int): Pixel index along the x-axis.
+        y (int): Pixel index along the y-axis.
+
+    Returns:
+        A tuple containing:
+            shift_x (float): sky-coordinate in [mm] along the x-direction.
+            shift_y (float): sky-coordinate in [mm] along the y-direction.
+    
+    Raises:
+        IndexError: if indexes are out of bound for given sky.
+    
+    Notes:
+        - resulting shifts refer to the center of the pixel.
+    """
+    n, m = camera.sky_shape
+    if not (-n <= y < n) or not (-m <= x < m):
+        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}.")
+
+    # bins resemble sky shape
+    binsx = camera.bins_sky.x[:-1]; binsy = camera.bins_sky.y[:-1]
+    dbinx = binsx[1] - binsx[0]; dbiny = binsy[1] - binsy[0]
+    return binsx[x] + dbinx/2, binsy[y] + dbiny/2
+
+
 def pos2equatorial(
     sdl: SimulationDataLoader,
     camera: CodedMaskCamera,
@@ -29,30 +63,23 @@ def pos2equatorial(
     Convert sky pixel position to corresponding sky-shift coordinates.
 
     Args:
-        sdl (SimulationDataLoader): instance containing camera pointings
-        camera (CodedMaskCamera): instance containing binning information
-        y (int): pixel row
-        x (int): pixel column
+        sdl (SimulationDataLoader): instance containing camera pointings.
+        camera (CodedMaskCamera): instance containing binning information.
+        y (int): sky pixel row.
+        x (int): sky pixel column.
     
     Returns:
         CoordEquatorial containing:
-            - ra: Right ascension in degrees [0, 360]
-            - dec: Declination in degrees [-90, 90]
+            - ra: Right ascension in degrees [0, 360].
+            - dec: Declination in degrees [-90, 90].
     
     Notes:
-        - the sky-coord shifts are in [mm] wrt optical axis
-        - RA is normalized to [0, 360) degree range
-        - resulting RA/Dec refers to the center of the pixel
-    """
-    def pos2shift(
-        x: int,
-        y: int,
-    ) -> tuple[float, float]:
-        dbinx = camera.bins_sky.x[1] - camera.bins_sky.x[0]
-        dbiny = camera.bins_sky.y[1] - camera.bins_sky.y[0]
-        return camera.bins_sky.x[x] + dbinx/2, camera.bins_sky.y[y] + dbiny/2
-
-    return shift2equatorial(sdl, camera, *pos2shift(x, y))
+        - the sky-coord shifts are in [mm] wrt optical axis.
+        - RA is normalized to [0, 360) degree range.
+        - resulting RA/Dec refers to the center of the pixel.
+        - negative indexes are allowed.
+    """    
+    return shift2equatorial(sdl, camera, *pos2shift(camera, x, y))
 
 
 def shift2equatorial(
