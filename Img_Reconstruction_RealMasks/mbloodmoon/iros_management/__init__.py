@@ -14,7 +14,13 @@
 This package contains useful methods for handling IROS-based analyses.
 """
 
+from .analyze import *
 
+from .handle import *
+
+from .show import *
+
+from .stats import *
 
 
 # end

@@ -21,8 +21,8 @@ from .types import CoordEquatorial
 
 def pos2shift(
     camera: CodedMaskCamera,
-    x: int | float,
-    y: int | float,
+    x: int,
+    y: int,
 ) -> tuple[float, float]:
     """
     Convert pixel indexes (x, y) to sky-coordinate shifts.

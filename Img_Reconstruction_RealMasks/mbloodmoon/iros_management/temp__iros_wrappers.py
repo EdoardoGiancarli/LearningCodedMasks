@@ -33,6 +33,9 @@ from astropy.wcs.utils import fit_wcs_from_points
 from astropy.wcs import WCS
 from mbloodmoon.coords import pos2equatorial
 
+from mbloodmoon.io import SimulationDataLoader
+from mbloodmoon.mask import CodedMaskCamera
+
 from mbloodmoon.coords import shift2equatorial
 from mbloodmoon.io import _validate_fits
 from mbloodmoon.images import _shift, argmax
@@ -644,38 +647,13 @@ def load_iros_data(
 def save_sky(
     sky: np.array,
     snr: np.array,
-    sdl: object,
-    wfm: object,
+    sdl: SimulationDataLoader,
     save_to: str | Path,
+    wcs: WCS = None,
 ) -> None:
     """Saves sky array to FITS Image."""
 
-    sky = np.int16(sky)
-    snr = np.float32(snr)
-
-    def fit_WCS() -> WCS:
-        """Fit the WCS."""
-        n, m = wfm.sky_shape
-        pxs = [
-            (n - 1, 0), (n - 1, m - 1), (0, m - 1),
-            (0, 0), (-n//4, m//4), (-n//4, -m//4),
-            (n//4, -m//4), (n//4, m//4), (n//2, m//2),
-        ]
-        coords = [pos2equatorial(sdl, wfm, *pos) for pos in pxs]
-        
-        coord_pxs = tuple(np.array([px[idx] for px in pxs]) for idx in (1, 0))
-        coord_radec = SkyCoord(
-            ra=np.array([c.ra for c in coords]),
-            dec=np.array([c.dec for c in coords]),
-            frame="icrs", unit="deg",
-        )
-        wcs = fit_wcs_from_points(
-            xy=coord_pxs, world_coords=coord_radec,
-            projection="TAN", sip_degree=0,
-        )
-        return wcs
-
-    wcs = fit_WCS()
+    sky, snr = np.int16(sky), np.float32(snr)
     print("# Saving Sky...")
     # HDU list and Primary Header
     hdu_list = fits.HDUList([])
@@ -689,7 +667,7 @@ def save_sky(
             header=sdl.header,
             name=name.upper(),
         )
-        image_hdu.header.update(wcs.to_header())
+        if wcs: image_hdu.header.update(wcs.to_header())
         hdu_list.append(image_hdu)
     
     hdu_list.writeto(save_to, output_verify="fix+ignore")
