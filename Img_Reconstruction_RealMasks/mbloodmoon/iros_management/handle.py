@@ -161,6 +161,10 @@ def save_iros_data(
     print("# Saving completed!")
 
 
+def fit_WCS():
+    pass
+
+
 def save_sky(
     sky: np.array,
     snr: np.array,
