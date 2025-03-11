@@ -7,15 +7,15 @@ from pathlib import Path
 import numpy as np
 import pickle
 from astropy.io import fits
-#from astropy.coordinates import SkyCoord
-#from astropy.wcs.utils import fit_wcs_from_points
+from astropy.coordinates import SkyCoord
+from astropy.wcs.utils import fit_wcs_from_points
 from astropy.wcs import WCS
 
 from mbloodmoon.io import SimulationDataLoader
-#from mbloodmoon.mask import CodedMaskCamera
+from mbloodmoon.mask import CodedMaskCamera
 
 from mbloodmoon.io import _validate_fits
-#from mbloodmoon.coords import pos2equatorial
+from mbloodmoon.coords import pos2equatorial
 #from mbloodmoon.coords import shift2equatorial
 
 
@@ -161,8 +161,49 @@ def save_iros_data(
     print("# Saving completed!")
 
 
-def fit_WCS():
-    pass
+def fit_WCS(
+    camera: CodedMaskCamera,
+    sdl: SimulationDataLoader,
+    pixels: list[tuple[int]] = None,
+) -> WCS:
+    """
+    Fit the WCS for a camera of the WCS fitting given RA/DEC
+    and sky pixels.
+
+    Args:
+        camera (CodedMaskCamera):
+            CodedMaskCamera instance used for imaging and reconstruction.
+        sdl (SimulationDataLoader):
+            SimulationDataLoader instance for the given camera.
+        pixels (list[tuple[int]], optional (default=None)):
+            List of pxs position for the WCS fit.
+    
+    Returns:
+        output (WCS): WCS instance with info on the coords fit.
+    """
+    n, m = camera.sky_shape
+    step = 10
+    pxs = pixels if pixels else [
+        (0, 0), (n - 1, 0), (n - 1, m - 1), (0, m - 1),
+        (n//4, m//4), (-n//4, m//4), (-n//4, -m//4),
+        (n//4, -m//4), (n//2, m//2),
+    ] + [(step*y, step*x) for y in range(1, n//step) for x in range(1, m//step)]
+
+    coords = [pos2equatorial(sdl, camera, *pos) for pos in pxs]
+    coord_pxs = tuple(np.array([px[idx] for px in pxs]) for idx in (0, 1))
+    coord_radec = SkyCoord(
+        ra=np.array([c.ra for c in coords]),
+        dec=np.array([c.dec for c in coords]),
+        frame="icrs", unit="deg",
+    )
+    wcs = fit_wcs_from_points(
+        xy=coord_pxs,
+        world_coords=coord_radec,
+        projection="TAN",
+        sip_degree=1,
+        proj_point=SkyCoord(*sdl.pointings["z"], frame="icrs", unit="deg"),
+    )
+    return wcs
 
 
 def save_sky(
@@ -190,7 +231,7 @@ def save_sky(
             include coordinate information in the FITS header.
     """
 
-    sky, snr = np.int16(sky), np.float32(snr)
+    sky, snr = np.int32(sky), np.float32(snr)
     print("# Saving Sky...")
     # HDU list and Primary Header
     hdu_list = fits.HDUList([])

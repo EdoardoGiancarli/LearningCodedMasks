@@ -200,7 +200,7 @@ def compute_params(
         iros_output (dict):
             IROS data output from `perform_iros()`.
         camera (CodedMaskCamera):
-            Coded mask camera instance used for imaging and reconstruction.
+            CodedMaskCamera instance used for imaging and reconstruction.
         sdl_camA (SimulationDataLoader):
             SimulationDataLoader instance for camera A.
         sdl_camB (SimulationDataLoader):
@@ -445,7 +445,7 @@ def dict2df(data: dict) -> DataFrame:
         df (DataFrame): output dataframe
     """
     df = DataFrame({
-        (cam, param): values 
+        (cam, param): values
         for cam, cam_data in data.items() 
         for param, values in cam_data.items()
     })
