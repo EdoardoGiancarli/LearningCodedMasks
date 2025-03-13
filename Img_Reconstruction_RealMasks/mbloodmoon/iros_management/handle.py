@@ -165,6 +165,7 @@ def fit_WCS(
     camera: CodedMaskCamera,
     sdl: SimulationDataLoader,
     pixels: list[tuple[int]] = None,
+    grid_step: int = 200,
 ) -> WCS:
     """
     Fit the WCS for a camera of the WCS fitting given RA/DEC
@@ -177,20 +178,21 @@ def fit_WCS(
             SimulationDataLoader instance for the given camera.
         pixels (list[tuple[int]], optional (default=None)):
             List of pxs position for the WCS fit.
+        grid_step (int, optional (default=200)):
+            Step for the points in a sky grid for computing the fit.
     
     Returns:
-        output (WCS): WCS instance with info on the coords fit.
+        output (WCS):
+            WCS instance with info on the coords fit.
     """
     n, m = camera.sky_shape
-    step = 10
     pxs = pixels if pixels else [
-        (0, 0), (n - 1, 0), (n - 1, m - 1), (0, m - 1),
-        (n//4, m//4), (-n//4, m//4), (-n//4, -m//4),
-        (n//4, -m//4), (n//2, m//2),
-    ] + [(step*y, step*x) for y in range(1, n//step) for x in range(1, m//step)]
+        (grid_step*y, grid_step*x) for y in range(1, n//grid_step) for x in range(1, m//grid_step)
+    ]
 
     coords = [pos2equatorial(sdl, camera, *pos) for pos in pxs]
-    coord_pxs = tuple(np.array([px[idx] for px in pxs]) for idx in (0, 1))
+    # WARNING: the next is not a typo, WCS wants the px indexes as (x, y)
+    coord_pxs = tuple(np.array([px[idx] for px in pxs]) for idx in (1, 0))
     coord_radec = SkyCoord(
         ra=np.array([c.ra for c in coords]),
         dec=np.array([c.dec for c in coords]),

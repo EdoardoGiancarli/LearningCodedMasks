@@ -62,12 +62,174 @@ def crop(
     return image[y1 : y2, x1 : x2]
 
 
-def snrdistr():
-    pass
+def plot_distr(
+    arr: np.array,
+    title: str,
+    bins: int | Sequence = 50,
+    xlabel: str = None,
+    pdf_distr: tuple[np.array, str] = None,
+) -> None:
+    """
+    Plots the histogram of the values inside the input array.
+    Array can be N-dim, it will be flattened for the plot.
+
+    Args:
+        arr (np.array):
+            Input array, could be N-dim.
+        title (str):
+            Plot title.
+        bins (int, Sequence, optional (default=50)):
+            Histogram bins.
+        xlabel (str):
+            Label for x-axis and for legend.
+        pdf_distr (np.array, tuple[np.array, str], optional (default=None)):
+            Input PDF distribution for comparison.
+
+    Notes:
+        - `pdf_distr` could be used as:
+        >>> pdf_distr = array                # y
+        >>> pdf_distr = (array, array)       # (x, y)
+        >>> pdf_distr = (array, array, str)  # (x, y, distr. name)
+
+        - for specific info, refer to matplotlib.pyplot docs
+    """
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    fig.tight_layout()
+    ax.hist(
+        arr.reshape(-1), bins=bins, density=True, color='SkyBlue', edgecolor='b',
+        alpha=0.7, label=f"{xlabel} distr." if xlabel else None,
+    )
+    if pdf_distr is not None:
+        x = pdf_distr[0] if isinstance(pdf_distr, tuple) else np.arange(len(pdf_distr))
+        y = pdf_distr[1] if isinstance(pdf_distr, tuple) else pdf_distr
+        distr = pdf_distr[2] if pdf_distr[2] else "th."
+        ax.plot(x, y, color="OrangeRed", label=f"{distr} distr.")
+    ax.set_xlabel(xlabel, fontsize=12, fontweight='bold')
+    ax.set_ylabel("density", fontsize=12, fontweight='bold')
+    ax.set_title(title, fontsize=14, pad=8, fontweight='bold')
+    ax.grid(visible=True, color="lightgray", linestyle="-", linewidth=0.3)
+    ax.tick_params(which='both', direction='in', width=2, length=7 if 'major' else 4)
+    ax.xaxis.set_ticks_position('both')
+    ax.yaxis.set_ticks_position('both')
+    ax.legend(loc='best')
+    plt.show()
 
 
-def plot_sequence():
-    pass
+def plot_sequence(
+    input_sequence: list[Sequence],
+    title: list[str],
+    x: list[Sequence] = None,
+    xlabel: list[str] = None,
+    ylabel: list[str] = None,
+    color: list[tuple[str, str]] = None,
+    style: list[str] = None,
+    offsetx: list[tuple[float, float]] = None,
+    offsety: list[tuple[float, float]] = None,
+) -> None:
+    """
+    Plots multiple sequences as subplots.
+
+    Args:
+        input_sequence (list[Sequence]):
+            List of sequences to plot.
+        title (list[str]):
+            Titles for each subplot.
+        x (list[Sequence], optional (default=None)):
+            X-axis values for each sequence.
+        xlabel (list[str], optional (default=None)):
+            Labels for x-axes.
+        ylabel (list[str], optional (default=None)):
+            Labels for y-axes.
+        color (list[tuple[str, str]], optional (default=None)):
+            Colors (fill, edge) for each plot.
+        style (list[str], optional (default=None)):
+            Plot styles ('bar' or 'scatter').
+        offsetx (list[tuple[float, float]], optional (default=None)):
+            X-axis offset adjustments.
+        offsety (list[tuple[float, float]], optional (default=None)):
+            Y-axis offset adjustments.
+    
+    Notes: TODO
+        - It is possible to have multiple plots in the same subplots:
+        >>> input_sequence = [(y11, y12, ...), (y21, y22), ...]
+    """
+    def _handle_subplots(nplots, spacing=0.27):
+        """Creates and configures subplots."""
+        size = 6
+        fig_size = (size * nplots + 1, size) if nplots > 1 else (size, size)
+        fig, axes = plt.subplots(1, nplots, figsize=fig_size)
+        fig.tight_layout()
+        fig.subplots_adjust(wspace=spacing * 5 / size)
+        return fig, (axes if nplots > 1 else [axes])
+
+    def _set_labels(ax, xlabel, ylabel, title):
+        """Configures labels and titles."""
+        ax.set_xlabel(xlabel or "", fontsize=12, fontweight='bold')
+        ax.set_ylabel(ylabel or "", fontsize=12, fontweight='bold')
+        ax.set_title(title, fontsize=14, pad=8, fontweight='bold')
+
+    def _set_ticks(ax):
+        """Configures grid and tick properties."""
+        ax.grid(visible=True, color="lightgray", linestyle="-", linewidth=0.2, alpha=0.70)
+        ax.tick_params(which='both', direction='in', width=2, length=7 if 'major' else 4)
+        ax.xaxis.set_ticks_position('both')
+        ax.yaxis.set_ticks_position('both')
+
+    nplots = len(input_sequence)
+    x = x or [None] * nplots
+    xlabel = xlabel or [None] * nplots
+    ylabel = ylabel or [None] * nplots
+    color = color or [('OrangeRed', 'r')] * nplots
+    style = style or ['bar'] * nplots
+    offsetx = offsetx or [(-1, 1)] * nplots
+    offsety = offsety or [(-1, 1)] * nplots
+
+    fig, axes = _handle_subplots(nplots)
+    for i, ax in enumerate(axes):
+        x_values = x[i] if x[i] is not None else np.arange(len(input_sequence[i]))
+        fcolor, ecolor = color[i] or ('OrangeRed', 'r')
+      
+        if style[i] == 'scatter':
+            ax.scatter(x_values, input_sequence[i], c=fcolor, edgecolors=ecolor, 
+                       s=70, alpha=0.8, linewidths=2)
+        else:
+            ax.bar(x_values, input_sequence[i], width=1, color=fcolor, 
+                   edgecolor=ecolor, linewidth=3, alpha=0.70)
+
+        ax.set_xlim(x_values[0] + offsetx[i][0], x_values[-1] + offsetx[i][1])
+        ax.set_ylim(offsety[i][0], offsety[i][1])
+        _set_labels(ax, xlabel[i], ylabel[i], title[i])
+        _set_ticks(ax)
+    plt.show()
+
+
+def enhance_slices(
+    sky: np.array,
+    pos: tuple[int],
+    cr: int = 100,
+) -> None:
+    """
+    Displays the counts distribution along the y-dim and the x-dim
+    for a given sky and position.
+
+    Args:
+        sky (np.array): 2D array of the sky.
+        pos (tuple[int]): Indexes of the source.
+        cr (int, optional (default=100)): Half-size of the cropping.
+    
+    Notes:
+        - `sky` is cropped to enhance the source counts distribution.
+    """
+    cropped = crop(sky, pos, (cr, cr))
+    xslice, yslice = cropped[cr//2, :], cropped[:, cr//2]
+    plot_sequence(
+        input_sequence=[xslice, yslice],
+        title=["Source X-axis Slice", "Source Y-axis Slice"],
+        xlabel=["x", "y"],
+        ylabel=["counts", "counts"],
+        offsety=[(np.min(s) - 10, np.max(s) + 10) for s in zip(xslice, yslice)]
+    )
+
 
 
 """
