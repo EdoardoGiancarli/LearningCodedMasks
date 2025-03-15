@@ -19,7 +19,7 @@ print(shape_out)
 
 
 #Updating the header
-hduA.header.update(wcs_out.to_header()) 
+hduA[1].header.update(wcs_out.to_header()) 
 fits.writeto(root_path + "sky_SIMUL_COMPOSED.fits", array, wcs_out.to_header())
 
 plt.figure(figsize=(7, 7))
