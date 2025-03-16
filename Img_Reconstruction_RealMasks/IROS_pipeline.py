@@ -18,6 +18,7 @@ def _upscale(arr, upsy):
 
 
 N_TEST = 2
+UPSX_0, UPSY_FINAL = 3, 5
 
 
 """
@@ -32,8 +33,7 @@ cam_a = "cam1a"
 cam_b = "cam1b"
 dataset = "reconstructed"
 
-upsx_0, upsy_0 = 3, 1
-wfm = codedmask(mask_file, upscale_x=upsx_0, upscale_y=upsy_0)     # for IROS the skies are upscaled only along the x-dim
+wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=1)     # for IROS the skies are upscaled only along the x-dim
 
 filepaths = simulation_files(simul_data)
 sdlA = simulation(filepaths[cam_a][dataset])
@@ -46,7 +46,7 @@ sdls = (sdlA, sdlB)
 detectors = tuple(count(wfm, sdl.data)[0] for sdl in sdls)
 variances = tuple(variance(wfm, d) for d in detectors)
 
-wfm_WCS = codedmask(mask_file, upscale_x=3, upscale_y=5)           # WCS fit (here the camera is upscaled with the final upscaling)
+wfm_WCS = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_FINAL)     # WCS fit (here the camera is upscaled with the final upscaling)
 wcs_fit = tuple(iros.handle.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
 
 
@@ -60,8 +60,8 @@ comp_name = root_path + f"composed_sky_SIMUL_{cam_a.upper()}_{cam_b.upper()}_TES
 skies = tuple(decode(wfm, d) for d in detectors)
 snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-ups_skies = tuple(_upscale(sky, upsy=5) for sky in skies)
-ups_snrs = tuple(_upscale(snr, upsy=5) for snr in snrs)
+ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
+ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
 
 for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
     iros.save_sky(res, snr, sdl, name, wcs)

@@ -58,4 +58,17 @@ if __name__ == '__main__':
     print("### End IROS...")
 
 
+from dummymoon import sequence_plot
+import numpy as np
+
+n = 20
+t_tot = "9:20" + "min"
+its = np.arange(n)
+t = np.array([
+    
+])
+
+sequence_plot([t], ["(Sim 11/10) IROS Output $t_{tot}$ = " + t_tot], [its],
+              ["iteration"], ["time [s/it]"], style=['scatter'])
+
 # end
