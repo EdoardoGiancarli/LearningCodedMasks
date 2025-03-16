@@ -8,7 +8,7 @@ import mbloodmoon.iros_management as iros
 
 from mbloodmoon.io import simulation_files, simulation
 from mbloodmoon.mask import codedmask, decode, count, variance, snratio
-from mbloodmoon.images import upscale, compose
+from mbloodmoon.images import upscale
 
 
 # TODO [1:-1, :] because of problems with `upscale()` and wfm upscaling
@@ -66,14 +66,6 @@ ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
 for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
     iros.save_sky(res, snr, sdl, name, wcs)
 
-iros.save_sky(
-    sky=compose(*ups_skies, strict=False)[0],
-    snr=compose(*ups_snrs, strict=False)[0],
-    sdl=sdlA,
-    save_to=comp_name,
-    wcs=wcs_fit[0],
-)
-
 
 """
 #### RUN IROS AND SAVE OUTPUT + RESIDUES.
@@ -96,19 +88,11 @@ comp_name = root_path + f"composed_skyRES_IROS_{cam_a.upper()}_{cam_b.upper()}_T
 
 snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-ups_skies = tuple(_upscale(sky, upsy=5) for sky in skies)
-ups_snrs = tuple(_upscale(snr, upsy=5) for snr in snrs)
+ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
+ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
 
 for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
     iros.save_sky(res, snr, sdl, name)
-
-iros.save_sky(
-    sky=compose(*ups_skies, strict=False)[0],
-    snr=compose(*ups_snrs, strict=False)[0],
-    sdl=sdlA,
-    save_to=comp_name,
-    wcs=wcs_fit[0],
-)
 
 
 """
@@ -165,19 +149,11 @@ comp_name = root_path + f"composed_OUTsky_IROS_{cam_a.upper()}_{cam_b.upper()}_T
 skies = tuple(iros.make_sky(dataset, camID, wfm) for camID in (cam_a, cam_b))
 snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-ups_skies = tuple(_upscale(sky, upsy=5) + res for sky, res in zip(skies, ups_skies))
-ups_snrs = tuple(_upscale(snr, upsy=5) + res for snr, res in zip(snrs, ups_snrs))
+ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) + res for sky, res in zip(skies, ups_skies))
+ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) + res for snr, res in zip(snrs, ups_snrs))
 
 for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
     iros.save_sky(res, snr, sdl, name)
-
-iros.save_sky(
-    sky=compose(*ups_skies, strict=False)[0],
-    snr=compose(*ups_snrs, strict=False)[0],
-    sdl=sdlA,
-    save_to=comp_name,
-    wcs=wcs_fit[0],
-)
 
 
 # end

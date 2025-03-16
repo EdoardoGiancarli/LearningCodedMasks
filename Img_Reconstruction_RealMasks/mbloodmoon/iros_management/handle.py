@@ -234,7 +234,7 @@ def save_sky(
     """
 
     sky, snr = np.int32(sky), np.float32(snr)
-    print("# Saving Sky...")
+    print("# Saving sky...")
     # HDU list and Primary Header
     hdu_list = fits.HDUList([])
     primary_hdu = fits.PrimaryHDU()
