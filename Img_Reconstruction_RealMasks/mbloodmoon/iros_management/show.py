@@ -320,7 +320,7 @@ def make_sky(
     ) -> np.array:
         model = model_sky(camera, shiftx, shifty, fluence)
         canva = np.zeros_like(model)
-        cy, cx = 40, 18
+        cy, cx = 32, 10
         canva[y - cy: y + cy, x - cx: x + cx] = crop(model, (y, x), (cy, cx))
         return canva
 

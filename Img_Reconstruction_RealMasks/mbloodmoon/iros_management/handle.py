@@ -10,6 +10,9 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.wcs.utils import fit_wcs_from_points
 from astropy.wcs import WCS
+from reproject import reproject_interp
+from reproject.mosaicking import find_optimal_celestial_wcs
+from reproject.mosaicking import reproject_and_coadd
 
 from mbloodmoon.io import SimulationDataLoader
 from mbloodmoon.mask import CodedMaskCamera
@@ -159,53 +162,6 @@ def save_iros_data(
     hdu_list.writeto(save_to, output_verify="fix+ignore")
     hdu_list.close()
     print("# Saving completed!")
-
-
-def fit_WCS(
-    camera: CodedMaskCamera,
-    sdl: SimulationDataLoader,
-    pixels: list[tuple[int]] = None,
-    grid_step: int = 200,
-) -> WCS:
-    """
-    Fit the WCS for a camera of the WCS fitting given RA/DEC
-    and sky pixels.
-
-    Args:
-        camera (CodedMaskCamera):
-            CodedMaskCamera instance used for imaging and reconstruction.
-        sdl (SimulationDataLoader):
-            SimulationDataLoader instance for the given camera.
-        pixels (list[tuple[int]], optional (default=None)):
-            List of pxs position for the WCS fit.
-        grid_step (int, optional (default=200)):
-            Step for the points in a sky grid for computing the fit.
-    
-    Returns:
-        output (WCS):
-            WCS instance with info on the coords fit.
-    """
-    n, m = camera.sky_shape
-    pxs = pixels if pixels else [
-        (grid_step*y, grid_step*x) for y in range(1, n//grid_step) for x in range(1, m//grid_step)
-    ]
-
-    coords = [pos2equatorial(sdl, camera, *pos) for pos in pxs]
-    # WARNING: the next is not a typo, WCS wants the px indexes as (x, y)
-    coord_pxs = tuple(np.array([px[idx] for px in pxs]) for idx in (1, 0))
-    coord_radec = SkyCoord(
-        ra=np.array([c.ra for c in coords]),
-        dec=np.array([c.dec for c in coords]),
-        frame="icrs", unit="deg",
-    )
-    wcs = fit_wcs_from_points(
-        xy=coord_pxs,
-        world_coords=coord_radec,
-        projection="TAN",
-        sip_degree=1,
-        proj_point=SkyCoord(*sdl.pointings["z"], frame="icrs", unit="deg"),
-    )
-    return wcs
 
 
 def save_sky(
@@ -431,6 +387,148 @@ def load_pickle(filepath: str | Path) -> object:
         data = pickle.load(handle)
     print("# Loading completed!")
     return data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def fit_WCS(
+    camera: CodedMaskCamera,
+    sdl: SimulationDataLoader,
+    pixels: list[tuple[int]] = None,
+    grid_step: int = 200,
+) -> WCS:
+    """
+    Fit the WCS for a camera of the WCS fitting given RA/DEC
+    and sky pixels.
+
+    Args:
+        camera (CodedMaskCamera):
+            CodedMaskCamera instance used for imaging and reconstruction.
+        sdl (SimulationDataLoader):
+            SimulationDataLoader instance for the given camera.
+        pixels (list[tuple[int]], optional (default=None)):
+            List of pxs position for the WCS fit.
+        grid_step (int, optional (default=200)):
+            Step for the points in a sky grid for computing the fit.
+    
+    Returns:
+        output (WCS):
+            WCS instance with info on the coords fit.
+    """
+    n, m = camera.sky_shape
+    pxs = pixels if pixels else [
+        (grid_step*y, grid_step*x) for y in range(1, n//grid_step) for x in range(1, m//grid_step)
+    ]
+
+    coords = [pos2equatorial(sdl, camera, *pos) for pos in pxs]
+    # WARNING: the next is not a typo, WCS wants the px indexes as (x, y)
+    coord_pxs = tuple(np.array([px[idx] for px in pxs]) for idx in (1, 0))
+    coord_radec = SkyCoord(
+        ra=np.array([c.ra for c in coords]),
+        dec=np.array([c.dec for c in coords]),
+        frame="icrs", unit="deg",
+    )
+    wcs = fit_wcs_from_points(
+        xy=coord_pxs,
+        world_coords=coord_radec,
+        projection="TAN",
+        sip_degree=1,
+        proj_point=SkyCoord(*sdl.pointings["z"], frame="icrs", unit="deg"),
+    )
+    return wcs
+
+
+def camera_composition(
+    skyA_path: str | Path,
+    skyB_path: str | Path,
+    save_to: str | Path,
+) -> None:
+    """
+    Performs the composition of the WFM cameras skies and significances,
+    including the reprojection of the World Coordinates System for RA/Dec.
+
+    Specifically, it:
+        - Opens the skies FITS file
+        - Finds the optimal WCS fit and sky shape for the composition
+        - Reprojects and sums the two skies making the composition
+        - Reprojects and averages the two SNRs making the composition
+        - Saves the composition FITS file
+
+    Args:
+        skyA_path (str, Path):
+            File path for the camera A sky.
+        skyB_path (str, Path):
+            File path for the camera B sky.
+        save_to (str, Path):
+            File path or directory where the FITS image will be saved.
+
+    Notes:
+        - If the WCS fit keys are not present in the camera skies headers,
+          a TypeError will be raised from `find_optimal_celestial_wcs()`:
+        >>> TypeError: "WCS does not have celestial components."
+    """
+    with fits.open(skyA_path) as hduA, fits.open(skyB_path) as hduB:
+        print("# Composing WFM skies...")
+        skies, snrs = (hduA[1], hduB[1]), (hduA[2], hduB[2])
+        wcs_out, shape_out = find_optimal_celestial_wcs(input_data=skies)
+
+        sky_comp, _ = reproject_and_coadd(
+            input_data=skies,
+            output_projection=wcs_out,
+            shape_out=shape_out,
+            reproject_function=reproject_interp,
+            combine_function="sum",
+        )
+        snr_comp, _ = reproject_and_coadd(
+            input_data=snrs,
+            output_projection=wcs_out,
+            shape_out=shape_out,
+            reproject_function=reproject_interp,
+            combine_function="mean",
+        )
+
+        #hduA[1].header.update(wcs_out.to_header())  # updating the header of CAMERA A
+        hdu_list = fits.HDUList([fits.PrimaryHDU()])
+
+        for img, name in zip([np.int32(sky_comp), np.float32(snr_comp)], ["sky", "snr"]):
+            image_hdu = fits.ImageHDU(
+                data=img,
+                header=wcs_out.to_header(),
+                name=name.upper(),
+            )
+            hdu_list.append(image_hdu)
+        
+        hdu_list.writeto(save_to, output_verify="fix+ignore")
+        hdu_list.close()
+        print("# WFM composition completed!")
 
 
 # end
