@@ -315,19 +315,19 @@ def make_sky(
         shiftx: float,
         shifty: float,
         fluence: float,
-        x: int,
-        y: int,
+        pos: tuple[int],
+        cropping: tuple[int],
     ) -> np.array:
+        """Generates a source shadowgram and returns a crop of the source."""
         model = model_sky(camera, shiftx, shifty, fluence)
-        canva = np.zeros_like(model)
-        cy, cx = 32, 10
-        canva[y - cy: y + cy, x - cx: x + cx] = crop(model, (y, x), (cy, cx))
-        return canva
+        return crop(model, pos, cropping)
 
     if background is None:
         sky = np.zeros(camera.sky_shape)
     elif valid_BG():
         sky = background
+    
+    cropy, cropx = 32, 10
     
     for shiftx, shifty, fluence, x, y in zip(
         data[cameraID]["shift_x"]["data"],
@@ -336,9 +336,10 @@ def make_sky(
         data[cameraID]["x"]["data"],
         data[cameraID]["y"]["data"],
     ):
-        sky = sky + make_source(shiftx, shifty, fluence, x, y)
+        sky[y - cropy: y + cropy, x - cropx: x + cropx] = make_source(
+            shiftx, shifty, fluence, (y, x), (cropy, cropx),
+        )
     
-    sky[sky < 0] = 0
     return sky
 
 

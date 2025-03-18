@@ -264,7 +264,7 @@ def compute_params(
                     sigma: float = 5.0,
                 ) -> None:
                 """
-                Sums simulated photons contained in the SDLs taking into
+                Sums simulated photons contained in the SDLs, taking into
                 account the IROS reconstructed RA/DEC and their error box.
                 """
                 up_ra, up_dec = ra + sigma*dra, dec + sigma*ddec

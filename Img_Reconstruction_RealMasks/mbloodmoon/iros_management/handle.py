@@ -514,6 +514,21 @@ def camera_composition(
             reproject_function=reproject_interp,
             combine_function="mean",
         )
+        #snr_compA, _ = reproject_and_coadd(
+        #    input_data=snrs,
+        #    output_projection=wcs_out,
+        #    shape_out=shape_out,
+        #    reproject_function=reproject_interp,
+        #    combine_function="first",
+        #)
+        #snr_compB, _ = reproject_and_coadd(
+        #    input_data=snrs,
+        #    output_projection=wcs_out,
+        #    shape_out=shape_out,
+        #    reproject_function=reproject_interp,
+        #    combine_function="last",
+        #)
+        #snr_comp = np.sqrt(np.square(snr_compA) + np.square(snr_compB))
 
         #hduA[1].header.update(wcs_out.to_header())  # updating the header of CAMERA A
         hdu_list = fits.HDUList([fits.PrimaryHDU()])

@@ -1,5 +1,28 @@
 """
-Pipeline for running IROS
+Pipeline for running IROS, with checkpoints.
+
+Layout:
+    1. IROS params set up
+    2. Saving simulated skies and composition (with significance)
+    3. Run IROS, saving output and residues (with significance + composition)
+    4. Computing and saving candidates parameters for post-IROS analysis
+    5. Candidates comparison with given catalogs, saving updated database
+    6. Generating and saving output skies (IROS sources + IROS residues, with significance + composition)
+
+Notes:
+    - Variables are re-assigned to reduce memory cost
+    - For each step there is a checkpoint, so that if saved FITS are already in the base directory, those
+      step are ignored (to handle compiler crashes).
+      To repeat the step, just delete the output files of that step.
+
+Dependencies for running the pipeline:
+    - Change paths for data in:
+        a. `root_path`
+        b. `mask_file`
+        c. `simul_data`
+
+TODO:
+    - insert possibility to load residuals of proper shapes to act as BKG for output IROS skies (not oversampled)
 """
 
 from pathlib import Path
@@ -17,8 +40,8 @@ def _upscale(arr, upsy):
     return upscale(arr, upscale_y=upsy)#[1:-1, :]
 
 
-N_TEST = 4
-UPSX_0, UPSY_FINAL = 3, 5
+N_TEST = 5
+UPSX_0, UPSY_FINAL = 1, 1
 
 
 """
@@ -57,7 +80,7 @@ print("#### Saving simulated skies...\n")
 names = tuple(root_path + f"sky_SIMUL_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
 comp_name = root_path + f"COMPOSED_sky_SIMUL_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
 
-if not Path(names[0]).is_file and not Path(names[1]).is_file:
+if not Path(names[0]).is_file() and not Path(names[1]).is_file():
     skies = tuple(decode(wfm, d) for d in detectors)
     snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
@@ -67,7 +90,7 @@ if not Path(names[0]).is_file and not Path(names[1]).is_file:
     for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
         iros.save_sky(res, snr, sdl, name, wcs)
 
-if not Path(comp_name).is_file:
+if not Path(comp_name).is_file():
     iros.camera_composition(
         skyA_path=names[0],
         skyB_path=names[1],
@@ -79,83 +102,96 @@ if not Path(comp_name).is_file:
 #### RUN IROS AND SAVE OUTPUT + RESIDUES.
 """
 print("#### Running IROS...\n")
+iros_output_name = root_path + f"IROS_output_TEST{N_TEST}.fits"
 names = tuple(root_path + f"skyRES_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
 comp_name = root_path + f"COMPOSED_skyRES_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
 
-#if not Path(names[0]).is_file and not Path(names[1]).is_file:
-iros_output, skies = iros.perform_iros(
-    camerasID=(cam_a, cam_b),
-    camera=wfm,
-    sdl_camA=sdlA,
-    sdl_camB=sdlB,
-    max_iterations=max_iterations,
-    snr_threshold=snr_threshold,
-    dataset=dataset,
-)
+if not (Path(names[0]).is_file() and Path(names[1]).is_file()) or not Path(iros_output_name).is_file():
+    iros_output, skies = iros.perform_iros(
+        camerasID=(cam_a, cam_b),
+        camera=wfm,
+        sdl_camA=sdlA,
+        sdl_camB=sdlB,
+        max_iterations=max_iterations,
+        snr_threshold=snr_threshold,
+        dataset=dataset,
+    )
 
-iros.save_iros_output(iros_output, mask_file, root_path + f"IROS_output_TEST{N_TEST}.fits")
+    iros.save_iros_output(iros_output, mask_file, iros_output_name)
 
-snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
+    snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
-ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
+    ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
+    ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
 
-for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
-    iros.save_sky(res, snr, sdl, name, wcs)
+    for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
+        iros.save_sky(res, snr, sdl, name, wcs)
 
-#if not Path(comp_name).is_file:
-iros.camera_composition(
-    skyA_path=names[0],
-    skyB_path=names[1],
-    save_to=comp_name,
-)
+else:
+    iros_output = iros.load_iros_output(iros_output_name)
 
 
-#iros_output = iros.load_iros_output(root_path + f"IROS_output_TEST{N_TEST}.fits")
+if not Path(comp_name).is_file():
+    iros.camera_composition(
+        skyA_path=names[0],
+        skyB_path=names[1],
+        save_to=comp_name,
+    )
 
 
 """
 #### COMPUTE SOURCES PARAMS WITH IROS OUTPUT.
 """
 print("#### Computing sources parameters...\n")
-log = iros.gen_params_log((cam_a, cam_b))
+iros_data_name = root_path + f"iros_data_TEST{N_TEST}.fits"
 
-iros_data = iros.compute_params(
-    iros_output=iros_output,
-    camera=wfm,
-    sdl_camA=sdlA,
-    sdl_camB=sdlB,
-    log=log,
-)
+if not Path(iros_data_name).is_file():
+    log = iros.gen_params_log((cam_a, cam_b))
 
-# WARNING: the px position in this DB might not match with upscaled skies
-iros.save_iros_data(
-    data=iros_data,
-    mask_file=mask_file,
-    sdls=(sdlA, sdlB),
-    save_to=root_path + f"iros_data_TEST{N_TEST}.fits",
-)
+    iros_data = iros.compute_params(
+        iros_output=iros_output,
+        camera=wfm,
+        sdl_camA=sdlA,
+        sdl_camB=sdlB,
+        log=log,
+    )
+
+    # WARNING: the px position in this DB might not match with upscaled skies
+    iros.save_iros_data(
+        data=iros_data,
+        mask_file=mask_file,
+        sdls=(sdlA, sdlB),
+        save_to=iros_data_name,
+    )
+
+else:
+    iros_data = iros.load_iros_data(iros_data_name)
 
 
 """
 #### CATALOG COMPARISON AND DATABASE UPDATE.
 """
 print("#### Performing catalog comparison...\n")
+DB_name = root_path + f"IROS_sources_database_TEST{N_TEST}.fits"
 # WARNING: source assignment relies only on catalog sources
-dataset = iros.compare_w_catalog(
-    data=iros_data,
-    catalogA=filepaths[cam_a]["sources"],
-    catalogB=filepaths[cam_b]["sources"],
-    camerasID=(cam_a, cam_b),
-    min_flux=0.01,
-)
+if not Path(DB_name).is_file():
+    dataset = iros.compare_w_catalog(
+        data=iros_data,
+        catalogA=filepaths[cam_a]["sources"],
+        catalogB=filepaths[cam_b]["sources"],
+        camerasID=(cam_a, cam_b),
+        min_flux=0.01,
+    )
 
-iros.save_iros_data(
-    data=dataset,
-    mask_file=mask_file,
-    sdls=(sdlA, sdlB),
-    save_to=root_path + f"IROS_sources_database_TEST{N_TEST}.fits",
-)
+    iros.save_iros_data(
+        data=dataset,
+        mask_file=mask_file,
+        sdls=(sdlA, sdlB),
+        save_to=DB_name,
+    )
+
+else:
+    dataset = iros.load_iros_data(DB_name)
 
 
 """
@@ -165,22 +201,22 @@ print("#### Generating and saving IROS output skies...\n")
 names = tuple(root_path + f"OUTsky_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
 comp_name = root_path + f"COMPOSED_OUTsky_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
 
-#if not Path(names[0]).is_file and not Path(names[1]).is_file:
-skies = tuple(iros.make_sky(dataset, camID, wfm) for camID in (cam_a, cam_b))
-snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
+if not Path(names[0]).is_file() and not Path(names[1]).is_file():
+    skies = tuple(iros.make_sky(dataset, camID, wfm, res) for camID, res in zip((cam_a, cam_b), skies))
+    snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) + res for sky, res in zip(skies, ups_skies))
-ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) + res for snr, res in zip(snrs, ups_snrs))
+    ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
+    ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
 
-for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
-    iros.save_sky(res, snr, sdl, name, wcs)
+    for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
+        iros.save_sky(res, snr, sdl, name, wcs)
 
-#if not Path(comp_name).is_file:
-iros.camera_composition(
-    skyA_path=names[0],
-    skyB_path=names[1],
-    save_to=comp_name,
-)
+if not Path(comp_name).is_file():
+    iros.camera_composition(
+        skyA_path=names[0],
+        skyB_path=names[1],
+        save_to=comp_name,
+    )
 
 
 # end
