@@ -34,14 +34,29 @@ from mbloodmoon.io import simulation_files, simulation
 from mbloodmoon.mask import codedmask, decode, count, variance, snratio
 from mbloodmoon.images import upscale
 
-
 # TODO [1:-1, :] because of problems with `upscale()` and wfm upscaling
 def _upscale(arr, upsy):
     return upscale(arr, upscale_y=upsy)#[1:-1, :]
 
 
-N_TEST = 5
-UPSX_0, UPSY_FINAL = 1, 1
+def handle_simulation(
+    ideal_mask: bool,
+    dataset: str,
+) -> tuple[bool, bool]:
+    """Handles vignetting and psf correction along y for IROS."""
+
+    if dataset not in ["detected", "reconstructed"]:
+        raise ValueError("dataset must be either 'detected' or  'reconstructed'.")
+    
+    psfy = False if dataset == "detected" else True
+    vignetting = False if ideal_mask else True
+    return vignetting, psfy
+
+
+N_TEST = "6_NORMALMASK"
+UPSX_0, UPSY_FINAL = 3, 5
+
+IDEAL_MASK = False         # infinitely opaque and thin mask
 
 
 """
@@ -55,6 +70,7 @@ simul_data = root_path + "iros_simulation_GC_LMC/20241011_galctr_rxte_sax_2-30ke
 cam_a = "cam1a"
 cam_b = "cam1b"
 dataset = "reconstructed"
+vignetting, psfy = handle_simulation(IDEAL_MASK, dataset)
 
 wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=1)     # for IROS the skies are upscaled only along the x-dim
 
@@ -62,7 +78,7 @@ filepaths = simulation_files(simul_data)
 sdlA = simulation(filepaths[cam_a][dataset])
 sdlB = simulation(filepaths[cam_b][dataset])
 
-max_iterations = 18
+max_iterations = 15
 snr_threshold = 5
 
 sdls = (sdlA, sdlB)
@@ -114,7 +130,8 @@ if not (Path(names[0]).is_file() and Path(names[1]).is_file()) or not Path(iros_
         sdl_camB=sdlB,
         max_iterations=max_iterations,
         snr_threshold=snr_threshold,
-        dataset=dataset,
+        vignetting=vignetting,
+        psfy=psfy,
     )
 
     iros.save_iros_output(iros_output, mask_file, iros_output_name)
@@ -175,7 +192,7 @@ print("#### Performing catalog comparison...\n")
 DB_name = root_path + f"IROS_sources_database_TEST{N_TEST}.fits"
 # WARNING: source assignment relies only on catalog sources
 if not Path(DB_name).is_file():
-    dataset = iros.compare_w_catalog(
+    database = iros.compare_w_catalog(
         data=iros_data,
         catalogA=filepaths[cam_a]["sources"],
         catalogB=filepaths[cam_b]["sources"],
@@ -184,14 +201,14 @@ if not Path(DB_name).is_file():
     )
 
     iros.save_iros_data(
-        data=dataset,
+        data=database,
         mask_file=mask_file,
         sdls=(sdlA, sdlB),
         save_to=DB_name,
     )
 
 else:
-    dataset = iros.load_iros_data(DB_name)
+    database = iros.load_iros_data(DB_name)
 
 
 """
@@ -202,7 +219,7 @@ names = tuple(root_path + f"OUTsky_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam
 comp_name = root_path + f"COMPOSED_OUTsky_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
 
 if not Path(names[0]).is_file() and not Path(names[1]).is_file():
-    skies = tuple(iros.make_sky(dataset, camID, wfm, res) for camID, res in zip((cam_a, cam_b), skies))
+    skies = tuple(iros.make_sky(database, camID, wfm, res) for camID, res in zip((cam_a, cam_b), skies))
     snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
     ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)

@@ -93,10 +93,12 @@ def plot_distr(
 
         - for specific info, refer to matplotlib.pyplot docs
     """
+    if np.ndim(arr) > 1: arr = arr.reshape(-1)
+
     fig, ax = plt.subplots(1, 1, figsize=(6, 6))
     fig.tight_layout()
     ax.hist(
-        arr.reshape(-1), bins=bins, density=True, color='SkyBlue', edgecolor='b',
+        arr, bins=bins, density=True, color='SkyBlue', edgecolor='b',
         alpha=0.7, label=f"{xlabel} distr." if xlabel else None,
     )
     if pdf_distr is not None:
@@ -111,7 +113,7 @@ def plot_distr(
     ax.tick_params(which='both', direction='in', width=2, length=7 if 'major' else 4)
     ax.xaxis.set_ticks_position('both')
     ax.yaxis.set_ticks_position('both')
-    ax.legend(loc='best')
+    if pdf_distr is not None: ax.legend(loc='best')
     plt.show()
 
 
@@ -181,8 +183,8 @@ def plot_sequence(
     ylabel = ylabel or [None] * nplots
     color = color or [('OrangeRed', 'r')] * nplots
     style = style or ['bar'] * nplots
-    offsetx = offsetx or [(-1, 1)] * nplots
-    offsety = offsety or [(-1, 1)] * nplots
+    offsetx = offsetx or [(None, None)] * nplots
+    offsety = offsety or [(None, None)] * nplots
 
     fig, axes = _handle_subplots(nplots)
     for i, ax in enumerate(axes):
@@ -196,7 +198,7 @@ def plot_sequence(
             ax.bar(x_values, input_sequence[i], width=1, color=fcolor, 
                    edgecolor=ecolor, linewidth=3, alpha=0.70)
 
-        ax.set_xlim(x_values[0] + offsetx[i][0], x_values[-1] + offsetx[i][1])
+        ax.set_xlim(offsetx[i][0], offsetx[i][1])
         ax.set_ylim(offsety[i][0], offsety[i][1])
         _set_labels(ax, xlabel[i], ylabel[i], title[i])
         _set_ticks(ax)

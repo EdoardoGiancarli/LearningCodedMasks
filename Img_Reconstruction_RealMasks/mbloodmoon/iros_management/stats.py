@@ -2,11 +2,11 @@
 IROS sources reconstruction analysis for fluence and positions.
 """
 
+from copy import deepcopy
 import numpy as np
 from pandas import DataFrame
 
 from .analyze import dict2df
-from .show import plot_sequence
 from mbloodmoon.io import SimulationDataLoader
 
 
@@ -122,13 +122,13 @@ def iros_fluence(
     Checks fluences.
     """
     db = {
-        cameraID: {
+        cameraID: deepcopy({
             "sources": [],
             "optm_wrt_fits": [],
             "obs_wrt_fits": [],
             "sub_wrt_fits": [],
             "retrv_wrt_fits": [],
-        }
+        })
         for cameraID in data.keys()
     }
 
@@ -196,15 +196,6 @@ def check_sources_res(
         ):
             rra, rdec = source_res(cat, name, ra, dec)
             ra_res[idx].append(rra); dec_res[idx].append(rdec)
-        plot_sequence(
-            input_sequence=[ra_res[idx], dec_res[idx]],
-            title=[e + f" Residues Distr. {cameraID.upper()}" for e in ["RA", "DEC"]],
-            xlabel=["source"]*2,
-            ylabel=["residues"]*2,
-            style=["scatter"]*2,
-            offsetx=[(-1, 1)]*2,
-            offsety=[(-0.4, 0.2)]*2,
-        )
     
     df = dict2df(
         {cameraID: {
