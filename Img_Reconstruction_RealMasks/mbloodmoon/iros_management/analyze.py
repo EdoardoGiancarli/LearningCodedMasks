@@ -31,7 +31,8 @@ def perform_iros(
     sdl_camB: SimulationDataLoader,
     max_iterations: int = 25,
     snr_threshold: int | float = 5,
-    dataset: Literal["detected", "reconstructed"] = "reconstructed",
+    vignetting: bool = True,
+    psfy: bool = True,
 ) -> tuple[dict, tuple[np.array, np.array]]:
     """
     Runs the IROS (Iterative Removal of Sources) loop and stores the output.
@@ -52,14 +53,15 @@ def perform_iros(
             Maximum number of iterations for the IROS loop.
         snr_threshold (int | float, optional (default=5)):
             Minimum SNR value required to continue the iterative source removal process.
-        dataset (Literal["detected", "reconstructed"], optional (default="reconstructed")):
-            Specifies which dataset to use. 
-            - "detected": Dataset with the simulated photons prior to reconstruction.
-            - "reconstructed": Dataset with the position-reconstructed photons.
+        vignetting (bool, optional (default=`True`)):
+            If `True`, the model used for optimization will simulate vignetting.
+        psfy (bool, optional (default=`True`)):
+            If `True`, the model used for optimization will simulate detector
+            position reconstruction effects.
 
     Returns:
         output (tuple):
-            - log (dict): Log with metadata and results from IROS.
+            - log_output (dict): Log with metadata and results from IROS.
             - residuals (tuple[np.array, np.array]): Sky residuals after IROS.
     """
     def init_log() -> dict:
@@ -102,7 +104,8 @@ def perform_iros(
         sdl_cam1b=sdl_camB,
         max_iterations=max_iterations,
         snr_threshold=snr_threshold,
-        dataset=dataset,
+        vignetting=vignetting,
+        psfy=psfy,
     )
 
     print("## Looping around the FOV...")
@@ -115,7 +118,7 @@ def perform_iros(
         store_output(sources, obs_counts, sub_counts)
 
     data2array()
-    return deepcopy(log_output), residuals
+    return log_output, residuals
 
 
 class IrosParams:
