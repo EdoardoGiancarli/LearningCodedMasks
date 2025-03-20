@@ -53,10 +53,9 @@ def handle_simulation(
     return vignetting, psfy
 
 
-N_TEST = "6_NORMALMASK"
+IDEAL_MASK = False                     # infinitely opaque and thin mask
+N_TEST = "6_NORMALMASK_detected"
 UPSX_0, UPSY_FINAL = 3, 5
-
-IDEAL_MASK = False         # infinitely opaque and thin mask
 
 
 """
@@ -65,11 +64,11 @@ IDEAL_MASK = False         # infinitely opaque and thin mask
 print("#### IROS Setup...\n")
 root_path = "/mnt/d/PhD_AASS/Coding/Images_fits/"                                                           # directory with files
 mask_file = root_path + "wfm_mask.fits"                                                                     # WFM mask
-simul_data = root_path + "iros_simulation_GC_LMC/20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb/"   # Simulated photons
+simul_data = root_path + "iros_simulation_GC_LMC/galctr_rxte_sax_2-30keV_10ks_2cams_sources_cxb/"   # Simulated photons
 
 cam_a = "cam1a"
 cam_b = "cam1b"
-dataset = "reconstructed"
+dataset = "detected"
 vignetting, psfy = handle_simulation(IDEAL_MASK, dataset)
 
 wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=1)     # for IROS the skies are upscaled only along the x-dim
@@ -78,7 +77,7 @@ filepaths = simulation_files(simul_data)
 sdlA = simulation(filepaths[cam_a][dataset])
 sdlB = simulation(filepaths[cam_b][dataset])
 
-max_iterations = 15
+max_iterations = 25
 snr_threshold = 5
 
 sdls = (sdlA, sdlB)
@@ -122,7 +121,7 @@ iros_output_name = root_path + f"IROS_output_TEST{N_TEST}.fits"
 names = tuple(root_path + f"skyRES_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
 comp_name = root_path + f"COMPOSED_skyRES_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
 
-if not (Path(names[0]).is_file() and Path(names[1]).is_file()) or not Path(iros_output_name).is_file():
+if not Path(iros_output_name).is_file():
     iros_output, skies = iros.perform_iros(
         camerasID=(cam_a, cam_b),
         camera=wfm,
@@ -135,7 +134,11 @@ if not (Path(names[0]).is_file() and Path(names[1]).is_file()) or not Path(iros_
     )
 
     iros.save_iros_output(iros_output, mask_file, iros_output_name)
+else:
+    iros_output = iros.load_iros_output(iros_output_name)
 
+
+if not (Path(names[0]).is_file() and Path(names[1]).is_file()):
     snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
     ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
@@ -143,9 +146,6 @@ if not (Path(names[0]).is_file() and Path(names[1]).is_file()) or not Path(iros_
 
     for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
         iros.save_sky(res, snr, sdl, name, wcs)
-
-else:
-    iros_output = iros.load_iros_output(iros_output_name)
 
 
 if not Path(comp_name).is_file():
