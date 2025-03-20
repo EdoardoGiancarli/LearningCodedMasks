@@ -140,14 +140,14 @@ class IrosParams:
             "dshift_x": template("D", "mm"),
             "shift_y": template("D", "mm"),
             "dshift_y": template("D", "mm"),
-            "theta_x": template("D", "rad"),
-            "dtheta_x": template("D", "rad"),
-            "theta_y": template("D", "rad"),
-            "dtheta_y": template("D", "rad"),
-            "ra": template("D", "rad"),
-            "dra": template("D", "rad"),
-            "dec": template("D", "rad"),
-            "ddec": template("D", "rad"),
+            "theta_x": template("D", "deg"),
+            "dtheta_x": template("D", "deg"),
+            "theta_y": template("D", "deg"),
+            "dtheta_y": template("D", "deg"),
+            "ra": template("D", "deg"),
+            "dra": template("D", "deg"),
+            "dec": template("D", "deg"),
+            "ddec": template("D", "deg"),
             "fluence": template("D", "ph"),
             "dfluence": template("D", "ph"),
             "rate": template("D", "ph/s"),
@@ -253,7 +253,7 @@ def compute_params(
             def _get_theta_errs():
                 """Computes angular sky coords errors."""
                 def propagation(s, ds) -> tuple[float]:
-                    return 1 / (1 + np.square(s/l)) * np.sqrt(np.square(ds / l) + np.square(s * dl / np.square(l)))
+                    return np.rad2deg(1 / (1 + np.square(s/l)) * np.sqrt(np.square(ds / l) + np.square(s * dl / np.square(l))))
                 return propagation(shifty, dshifty), propagation(shiftx, dshiftx)
             
             def _get_coord_errs(sdl: SimulationDataLoader) -> tuple[float]:
@@ -277,10 +277,11 @@ def compute_params(
                 return len(phs)
         
             y, x = shift2pos(camera, shiftx, shifty)                        # pos in px (from optimized shifts)
-            thetay, thetax = np.arctan(shifty / l), np.arctan(shiftx / l)   # pos in angles wrt axis [rad]
-            dthetay, dthetax = _get_theta_errs()                            # theta errs [rad]
-            ra, dec = shift2equatorial(sdls[idx], camera, shiftx, shifty)   # RA, DEC [rad]
-            dra, ddec = _get_coord_errs(sdls[idx])                          # RA, DEC errs [rad]
+            thetax = np.rad2deg(np.arctan(shiftx / l))                      # pos in angles wrt axis [deg]
+            thetay = np.rad2deg(np.arctan(shifty / l))
+            dthetay, dthetax = _get_theta_errs()                            # theta errs [deg]
+            ra, dec = shift2equatorial(sdls[idx], camera, shiftx, shifty)   # RA, DEC [deg]
+            dra, ddec = _get_coord_errs(sdls[idx])                          # RA, DEC errs [deg]
             dcounts = np.sqrt(counts)                                       # fluence err (Poissonian) [ph]
             rate = counts / exposure[idx]                                   # rate [ph/s]
             drate = dcounts / exposure[idx]                                 # rate err [ph/s]
