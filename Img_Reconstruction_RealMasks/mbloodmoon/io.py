@@ -73,12 +73,12 @@ def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
     return {
         "cam1a": {
             "detected": check_and_pick(dirpath, "cam1a/*detected*.fits"),
-            "reconstructed": check_and_pick(dirpath, "cam1a/*reconstructed.fits"),
+            "reconstructed": check_and_pick(dirpath, "cam1a/*reconstructed*.fits"),
             "sources": check_and_pick(dirpath, "cam1a/*sources.fits"),
         },
         "cam1b": {
             "detected": check_and_pick(dirpath, "cam1b/*detected*.fits"),
-            "reconstructed": check_and_pick(dirpath, "cam1b/*reconstructed.fits"),
+            "reconstructed": check_and_pick(dirpath, "cam1b/*reconstructed*.fits"),
             "sources": check_and_pick(dirpath, "cam1b/*sources.fits"),
         },
     }

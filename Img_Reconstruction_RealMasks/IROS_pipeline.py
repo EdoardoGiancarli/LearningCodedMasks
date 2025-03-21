@@ -54,7 +54,7 @@ def handle_simulation(
 
 
 IDEAL_MASK = False                     # infinitely opaque and thin mask
-N_TEST = "6_NORMALMASK_detected"
+N_TEST = "6_NORMALMASK"
 UPSX_0, UPSY_FINAL = 3, 5
 
 
@@ -64,11 +64,11 @@ UPSX_0, UPSY_FINAL = 3, 5
 print("#### IROS Setup...\n")
 root_path = "/mnt/d/PhD_AASS/Coding/Images_fits/"                                                           # directory with files
 mask_file = root_path + "wfm_mask.fits"                                                                     # WFM mask
-simul_data = root_path + "iros_simulation_GC_LMC/galctr_rxte_sax_2-30keV_10ks_2cams_sources_cxb/"   # Simulated photons
+simul_data = root_path + "iros_simulation_GC_LMC/galctr_rxte_sax_2-30keV_10ks_sources_cxb/"   # Simulated photons
 
 cam_a = "cam1a"
 cam_b = "cam1b"
-dataset = "detected"
+dataset = "reconstructed"
 vignetting, psfy = handle_simulation(IDEAL_MASK, dataset)
 
 wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=1)     # for IROS the skies are upscaled only along the x-dim
@@ -77,7 +77,7 @@ filepaths = simulation_files(simul_data)
 sdlA = simulation(filepaths[cam_a][dataset])
 sdlB = simulation(filepaths[cam_b][dataset])
 
-max_iterations = 25
+max_iterations = 20
 snr_threshold = 5
 
 sdls = (sdlA, sdlB)
