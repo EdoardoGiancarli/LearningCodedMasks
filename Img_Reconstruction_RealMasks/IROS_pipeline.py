@@ -64,7 +64,7 @@ UPSX_0, UPSY_FINAL = 3, 5
 print("#### IROS Setup...\n")
 root_path = "/mnt/d/PhD_AASS/Coding/Images_fits/"                                                           # directory with files
 mask_file = root_path + "wfm_mask.fits"                                                                     # WFM mask
-simul_data = root_path + "iros_simulation_GC_LMC/galctr_rxte_sax_2-30keV_10ks_sources_cxb/"   # Simulated photons
+simul_data = root_path + "iros_simulation_GC_LMC/20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb/"   # Simulated photons
 
 cam_a = "cam1a"
 cam_b = "cam1b"
@@ -121,7 +121,7 @@ iros_output_name = root_path + f"IROS_output_TEST{N_TEST}.fits"
 names = tuple(root_path + f"skyRES_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
 comp_name = root_path + f"COMPOSED_skyRES_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
 
-if not Path(iros_output_name).is_file():
+if not Path(iros_output_name).is_file() or not (Path(names[0]).is_file() and Path(names[1]).is_file()):
     iros_output, skies = iros.perform_iros(
         camerasID=(cam_a, cam_b),
         camera=wfm,
@@ -134,11 +134,7 @@ if not Path(iros_output_name).is_file():
     )
 
     iros.save_iros_output(iros_output, mask_file, iros_output_name)
-else:
-    iros_output = iros.load_iros_output(iros_output_name)
 
-
-if not (Path(names[0]).is_file() and Path(names[1]).is_file()):
     snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
     ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
@@ -146,6 +142,9 @@ if not (Path(names[0]).is_file() and Path(names[1]).is_file()):
 
     for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
         iros.save_sky(res, snr, sdl, name, wcs)
+
+else:
+    iros_output = iros.load_iros_output(iros_output_name)
 
 
 if not Path(comp_name).is_file():
@@ -160,7 +159,7 @@ if not Path(comp_name).is_file():
 #### COMPUTE SOURCES PARAMS WITH IROS OUTPUT.
 """
 print("#### Computing sources parameters...\n")
-iros_data_name = root_path + f"iros_data_TEST{N_TEST}.fits"
+iros_data_name = root_path + f"IROS_data_TEST{N_TEST}.fits"
 
 if not Path(iros_data_name).is_file():
     log = iros.gen_params_log((cam_a, cam_b))
@@ -189,7 +188,7 @@ else:
 #### CATALOG COMPARISON AND DATABASE UPDATE.
 """
 print("#### Performing catalog comparison...\n")
-DB_name = root_path + f"IROS_sources_database_TEST{N_TEST}.fits"
+DB_name = root_path + "Images_tests/" + f"IROS_sources_database_TEST{N_TEST}.fits"
 # WARNING: source assignment relies only on catalog sources
 if not Path(DB_name).is_file():
     database = iros.compare_w_catalog(
@@ -197,7 +196,7 @@ if not Path(DB_name).is_file():
         catalogA=filepaths[cam_a]["sources"],
         catalogB=filepaths[cam_b]["sources"],
         camerasID=(cam_a, cam_b),
-        min_flux=0.01,
+        min_flux=1e-1,
     )
 
     iros.save_iros_data(

@@ -122,7 +122,12 @@ def perform_iros(
 
 
 class IrosParams:
-    """IROS parameters log management."""
+    """
+    IROS parameters log management.
+
+    Attributes:
+        camerasID (tuple[str]): WFM cameras IDs.
+    """
     def __init__(self, camerasID: tuple[str]):
         self.cams = camerasID
         self.log = self.make_log()

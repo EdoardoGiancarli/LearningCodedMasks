@@ -199,6 +199,7 @@ def check_sources_res(
     
     df = dict2df(
         {cameraID: {
+                "sources": data[cameraID]["catalog_name"]["data"],
                 "ra_res": np.array(ra_res[idx]),
                 "dec_res": np.array(dec_res[idx]),
             }
