@@ -34,9 +34,24 @@ from mbloodmoon.io import simulation_files, simulation
 from mbloodmoon.mask import codedmask, decode, count, variance, snratio
 from mbloodmoon.images import upscale
 
-# TODO [1:-1, :] because of problems with `upscale()` and wfm upscaling
-def _upscale(arr, upsy):
-    return upscale(arr, upscale_y=upsy)#[1:-1, :]
+
+def _choose_OS(op_sys: str = "deb") -> tuple[str]:
+    """Handles paths depending on the OS."""
+    if op_sys not in ["deb", "win"]:
+        raise ValueError(f"Where/when did you install this {op_sys} OS??")
+    elif op_sys == "deb":
+        base_path = "/media/egiancarli/Data/Edos_Magnificent_Manor/PhD_AASS/Coding/Data/"  # base dirpath
+        data_path = base_path + "Simulations/"                                             # dirpath with simul files
+        save_path = base_path + "Outputs/"                                                 # dirpath to save output data
+    else:
+        data_path = "/mnt/d/PhD_AASS/Coding/Images_fits/"
+        save_path = data_path
+    return data_path, save_path
+
+
+## TODO [1:-1, :] because of problems with `upscale()` and wfm upscaling
+#def _upscale(arr, upsy):
+#    return upscale(arr, upscale_y=upsy)#[1:-1, :]
 
 
 def handle_simulation(
@@ -53,10 +68,18 @@ def handle_simulation(
     return vignetting, psfy
 
 
+
+
 IDEAL_MASK = False                     # infinitely opaque and thin mask
 N_TEST = "6_NORMALMASK"
 UPSX_0, UPSY_FINAL = 3, 5
+current_OS = "deb"
+data_path, save_path = _choose_OS(current_OS)
 
+
+
+
+if __name__ == "__main__":
 
 """
 #### IROS SETUP.
