@@ -90,7 +90,7 @@ def perform_iros(
                 if not isinstance(log_output[camera][key], np.ndarray):
                     log_output[camera][key] = np.asarray(log_output[camera][key])
     
-    print("## Computing stuff...")
+    print("# Computing stuff...")
     log_output = init_log()
     log_keys = list(log_output[camerasID[0]].keys())
     detectors = tuple(count(camera, sdl.data)[0] for sdl in [sdl_camA, sdl_camB])
@@ -108,7 +108,7 @@ def perform_iros(
         psfy=psfy,
     )
 
-    print("## Looping around the FOV...")
+    print("# Looping around the FOV...")
     for sources, residuals in tqdm(loop):
         skies.append(residuals)
         skies_max.append(tuple(np.max(r) for r in residuals))
@@ -436,10 +436,10 @@ def compare_w_catalog(
         if not isinstance(c, Path):
             c = Path(c)
 
-    print("## Comparing with Catalogs...")
+    print("# Comparing with Catalogs...")
     catA, catB = get_catalogs()
     camera_comparison([catA, catB])
-    print("## Successful comparison!")
+    print("# Successful comparison!")
     return deepcopy(data)
 
 

@@ -16,7 +16,7 @@ Notes:
       To repeat the step, just delete the output files of that step.
 
 Dependencies for running the pipeline:
-    - Change paths for data in `_choose_OS()`
+    - Change paths for data in `_handle_dirpaths()`
 
 TODO:
     - insert possibility to load residuals of proper shapes to act as BKG for output IROS skies (not oversampled)
@@ -29,35 +29,56 @@ import mbloodmoon.iros_management as iros
 
 from mbloodmoon.io import simulation_files, simulation
 from mbloodmoon.mask import codedmask, decode, count, variance, snratio
-from mbloodmoon.images import upscale, downscale
+from mbloodmoon.images import upscale #, downscale
 
 
-def _choose_OS() -> tuple[str]:
+def _handle_dirpaths(
+    mask: str,
+    skyfield: str,
+    simul: str,
+) -> tuple[str]:
     """Handles paths depending on the OS."""
-    if Path(base_path := "/media/egiancarli/Data/Edos_Magnificent_Manor/PhD_AASS/Coding/Data/").is_dir():  # base dirpath
-        data_path = base_path + "Simulations/"                                                             # dirpath with simul files
-        save_path = base_path + "Outputs/"                                                                 # dirpath to save output data
+
+    if Path(base_path := "/media/egiancarli/Data/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/").is_dir():
+        if skyfield is None or simul is None:
+            raise ValueError("When using Debian, 'skyfield' and 'simul' must exist.")
+        mask_path = base_path + "Simulations/" + mask                                  # dirpath to WFM mask file 
+        data_path = base_path + "Simulations/" + skyfield + "/" + simul + "/"          # dirpath with simul files
+        save_path = base_path + "Outputs/" + "Out" + skyfield + "/" + simul + "/"      # dirpath to save output data
+        
     elif Path(base_path := "/mnt/d/PhD_AASS/Coding/Images_fits/").is_dir():
-        data_path = base_path
+        mask_path = base_path + mask
+        data_path = base_path + skyfield + "/" + simul + "/"
         save_path = base_path
+
     else:
         raise ValueError("A0, ma ndo sei finit*?")
-    return data_path, save_path
+    
+    if not Path(mask_path).is_file():
+        raise ValueError(f"WFM mask '{mask}' does not exist.")
+    for name, dirpath in zip(
+            ("data_path", "save_path"),
+            (data_path, save_path),
+        ):
+            if not Path(dirpath).is_dir():
+                raise ValueError(f"{name} '{dirpath}' does not exist.")
+
+    return mask_path, data_path, save_path
 
 
-## TODO [1:-1, :] because of problems with `upscale()` and wfm upscaling
-#def _upscale(arr, upsy):
-#    return upscale(arr, upscale_y=upsy)#[1:-1, :]
+# TODO [1:-1, :] because of problems with `upscale()` and wfm upscaling
+def _upscale(arr, upsy):
+    return upscale(arr, upscale_y=upsy)#[1:-1, :]
 
 
-def handle_simulation(
+def _handle_simul_correction(
     ideal_mask: bool,
     dataset: str,
 ) -> tuple[bool, bool]:
     """Handles vignetting and psf correction along y for IROS."""
 
     if dataset not in ["detected", "reconstructed"]:
-        raise ValueError("dataset must be either 'detected' or  'reconstructed'.")
+        raise ValueError("dataset must be either 'detected' or 'reconstructed'.")
     
     psfy = False if dataset == "detected" else True
     vignetting = False if ideal_mask else True
@@ -71,10 +92,28 @@ if __name__ == "__main__":
     """
     #### INITIALIZE PIPELINE.
     """
-    data_path, save_path = _choose_OS()
-    IDEAL_MASK = False                     # infinitely opaque and thin mask
-    N_TEST = "6_NORMALMASK"
+    print("#### Initializing...\n")
+    mask_FITS = "wfm_mask.fits"
+    IDEAL_MASK = False           # infinitely opaque and thin mask
+
+    N_TEST = "__operating_test__"
     UPSX_0, UPSY_FINAL = 3, 5
+
+    skyfield = "GalacticCenter"
+    data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+    
+    mask_file, simul_data, save_path = _handle_dirpaths(
+        mask=mask_FITS,
+        skyfield=skyfield,
+        simul=data_FITS,
+    )
+
+    cam_a = "cam1a"
+    cam_b = "cam1b"
+    dataset = "reconstructed"
+
+    max_iterations = 3
+    snr_threshold = 5
 
 
 
@@ -82,22 +121,12 @@ if __name__ == "__main__":
     #### IROS SETUP.
     """
     print("#### IROS Setup...\n")
-    mask_file = data_path + "wfm_mask.fits"                                                                     # WFM mask
-    simul_data = data_path + "iros_simulation_GC_LMC/20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb/"   # Simulated photons
-
-    cam_a = "cam1a"
-    cam_b = "cam1b"
-    dataset = "reconstructed"
-    vignetting, psfy = handle_simulation(IDEAL_MASK, dataset)
-
-    wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=1)     # for IROS the skies are upscaled only along the x-dim
+    vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
+    wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=1)           # for IROS the skies are upscaled only along the x-dim
 
     filepaths = simulation_files(simul_data)
     sdlA = simulation(filepaths[cam_a][dataset])
     sdlB = simulation(filepaths[cam_b][dataset])
-
-    max_iterations = 20
-    snr_threshold = 5
 
     sdls = (sdlA, sdlB)
     detectors = tuple(count(wfm, sdl.data)[0] for sdl in sdls)
@@ -211,7 +240,7 @@ if __name__ == "__main__":
     #### CATALOG COMPARISON AND DATABASE UPDATE.
     """
     print("#### Performing catalog comparison...\n")
-    DB_name = save_path + "Images_tests/" + f"IROS_sources_database_TEST{N_TEST}.fits"
+    DB_name = save_path + f"IROS_sources_database_TEST{N_TEST}.fits"
     # WARNING: source assignment relies only on catalog sources
     if not Path(DB_name).is_file():
         database = iros.compare_w_catalog(
