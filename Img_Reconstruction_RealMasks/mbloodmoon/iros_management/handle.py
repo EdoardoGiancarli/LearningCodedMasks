@@ -494,54 +494,54 @@ def camera_composition(
         >>> TypeError: "WCS does not have celestial components."
     """
     with fits.open(skyA_path) as hduA, fits.open(skyB_path) as hduB:
-        print("# Composing WFM skies...")
         skies, snrs = (hduA[1], hduB[1]), (hduA[2], hduB[2])
-        wcs_out, shape_out = find_optimal_celestial_wcs(input_data=skies)
+    
+    print("# Composing WFM skies...")
+    wcs_out, shape_out = find_optimal_celestial_wcs(input_data=skies)
+    sky_comp, _ = reproject_and_coadd(
+        input_data=skies,
+        output_projection=wcs_out,
+        shape_out=shape_out,
+        reproject_function=reproject_interp,
+        combine_function="sum",
+    )
+    snr_comp, _ = reproject_and_coadd(
+        input_data=snrs,
+        output_projection=wcs_out,
+        shape_out=shape_out,
+        reproject_function=reproject_interp,
+        combine_function="max",
+    )
+    #snr_compA, _ = reproject_and_coadd(
+    #    input_data=snrs,
+    #    output_projection=wcs_out,
+    #    shape_out=shape_out,
+    #    reproject_function=reproject_interp,
+    #    combine_function="first",
+    #)
+    #snr_compB, _ = reproject_and_coadd(
+    #    input_data=snrs,
+    #    output_projection=wcs_out,
+    #    shape_out=shape_out,
+    #    reproject_function=reproject_interp,
+    #    combine_function="last",
+    #)
+    #snr_comp = np.sqrt(np.square(snr_compA) + np.square(snr_compB))
 
-        sky_comp, _ = reproject_and_coadd(
-            input_data=skies,
-            output_projection=wcs_out,
-            shape_out=shape_out,
-            reproject_function=reproject_interp,
-            combine_function="sum",
+    #hduA[1].header.update(wcs_out.to_header())  # updating the header of CAMERA A
+    hdu_list = fits.HDUList([fits.PrimaryHDU()])
+
+    for img, name in zip([np.int32(sky_comp), np.float32(snr_comp)], ["sky", "snr"]):
+        image_hdu = fits.ImageHDU(
+            data=img,
+            header=wcs_out.to_header(),
+            name=name.upper(),
         )
-        snr_comp, _ = reproject_and_coadd(
-            input_data=snrs,
-            output_projection=wcs_out,
-            shape_out=shape_out,
-            reproject_function=reproject_interp,
-            combine_function="max",
-        )
-        #snr_compA, _ = reproject_and_coadd(
-        #    input_data=snrs,
-        #    output_projection=wcs_out,
-        #    shape_out=shape_out,
-        #    reproject_function=reproject_interp,
-        #    combine_function="first",
-        #)
-        #snr_compB, _ = reproject_and_coadd(
-        #    input_data=snrs,
-        #    output_projection=wcs_out,
-        #    shape_out=shape_out,
-        #    reproject_function=reproject_interp,
-        #    combine_function="last",
-        #)
-        #snr_comp = np.sqrt(np.square(snr_compA) + np.square(snr_compB))
-
-        #hduA[1].header.update(wcs_out.to_header())  # updating the header of CAMERA A
-        hdu_list = fits.HDUList([fits.PrimaryHDU()])
-
-        for img, name in zip([np.int32(sky_comp), np.float32(snr_comp)], ["sky", "snr"]):
-            image_hdu = fits.ImageHDU(
-                data=img,
-                header=wcs_out.to_header(),
-                name=name.upper(),
-            )
-            hdu_list.append(image_hdu)
-        
-        hdu_list.writeto(save_to, output_verify="fix+ignore")
-        hdu_list.close()
-        print("# WFM composition completed!")
+        hdu_list.append(image_hdu)
+    
+    hdu_list.writeto(save_to, output_verify="fix+ignore")
+    hdu_list.close()
+    print("# WFM composition completed!")
 
 
 # end
