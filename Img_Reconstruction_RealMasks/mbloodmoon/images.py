@@ -24,13 +24,17 @@ from .types import BinsRectangular
 from .types import UpscaleFactor
 
 
+# TODO: here put _enlarge
+
+
 def upscale(
     data: npt.NDArray,
     upscale_y: int = 1,
     upscale_x: int = 1,
 ) -> npt.NDArray:
     """
-    Upscale a 2D array by repeating elements along each axis.
+    Upscales a 2D array by repeating elements along each axis and
+    by interpolating array values.
 
     Args:
         data (npt.NDArray): Input 2D array.
@@ -53,10 +57,13 @@ def upscale(
     ):
         raise ValueError("Upscaling factors must be positive integers.")
     
-    for i, f in enumerate((upscale_y, upscale_x)):
+    for i, f in enumerate((upscale_y, upscale_x)):  #TODO: here put _enlarge
         data = np.repeat(data, f, axis=i)
     
     return data/np.prod((upscale_y, upscale_x))
+
+
+# TODO: here put _reduce
 
 
 def downscale(
@@ -65,7 +72,8 @@ def downscale(
     downscale_x: int = 1,
 ) -> npt.NDArray:
     """
-    Downscale a 2D array.
+    Downscales a 2D array by dividing the input array in blocks
+    and adding over them to interpolate array values.
 
     Args:
         data (npt.NDArray): Input 2D array.
