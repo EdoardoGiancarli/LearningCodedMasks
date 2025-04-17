@@ -1,5 +1,5 @@
 """
-Temporary test script.
+Temporary test script for `CodedMaskCamera` and `codedmask()`.
 """
 
 from pathlib import Path
@@ -12,157 +12,9 @@ from scipy.signal import correlate
 
 from mbloodmoon.mask import _bisect_interval
 from mbloodmoon.mask import _fold
+from mbloodmoon.images import _enlarge
 from mbloodmoon.types import BinsRectangular, UpscaleFactor
 from mbloodmoon.io import MaskDataLoader
-
-
-
-
-def _enlarge(
-    m: npt.NDArray,
-    upscale_f: UpscaleFactor,
-) -> npt.NDArray:
-    """
-    Oversamples a 2D array by repeating elements along the axes.
-
-    Args:
-        m (npt.NDArray): Input 2D array.
-        upscale_f (UpscaleFactor): Upscaling factors.
-
-    Returns:
-        output (npt.NDArray): Oversampled array.
-
-    Notes:
-        - the total sum is NOT conserved.
-    """    
-    for i, f in enumerate(upscale_f[::-1]):
-        m = np.repeat(m, f, axis=i)
-    return m
-
-
-def upscale(
-    data: npt.NDArray,
-    upscale_y: int = 1,
-    upscale_x: int = 1,
-) -> npt.NDArray:
-    """
-    Upscales a 2D array by repeating elements along each axis and
-    by interpolating array values.
-
-    Args:
-        data (npt.NDArray): Input 2D array.
-        upscale_y (int): Upscaling factor over the y direction.
-        upscale_x (int): Upscaling factor over the x direction.
-
-    Returns:
-        output (npt.NDArray): Oversampled array.
-
-    Raises:
-        ValueError: if upscale factors are not positive integers.
-    
-    Notes:
-        - The array total sum is conserved through linear interpolation.
-        - For N-dim arrays, consider using `astropy.nndata.block_replicate()`.
-    """
-    if not (
-        (isinstance(upscale_y, int) and upscale_y > 0) and
-        (isinstance(upscale_x, int) and upscale_x > 0)
-    ):
-        raise ValueError("Upscaling factors must be positive integers.")
-    
-    upscaling = UpscaleFactor(upscale_x, upscale_y)
-    return _enlarge(data, upscaling)/np.prod(upscaling)
-
-
-
-def _reduce(
-    m: npt.NDArray,
-    downscaling: npt.NDArray,
-) -> npt.NDArray:
-    """
-    Downsamples a 2D array.
-
-    Args:
-        m (npt.NDArray): Input 2D array.
-        downscaling (npt.NDArray): Downscaling factors.
-
-    Returns:
-        output (npt.NDArray): Downsampled array.
-
-    Notes:
-        - the total sum is conserved.
-    """
-    def _handle_shape(
-        data: npt.NDArray,
-        factors: npt.NDArray,
-    ) -> npt.NDArray:
-        """Adjusts array for blocks subdivision by cutting extra-rows/columns."""
-
-        def _handle_axis(a: npt.NDArray, idx: int) -> npt.NDArray:
-            """Redistributes cutted values in the block-adjusted axis."""
-            return a[:idx] + a[idx:].sum(axis=0) / idx
-        
-        adj_shape = (np.array(data.shape) // factors) * factors
-        for ax in range(data.ndim):
-            if data.shape[ax] != adj_shape[ax]:
-                data = data.swapaxes(0, ax)
-                data = _handle_axis(data, adj_shape[ax])
-                data = data.swapaxes(0, ax)
-        return data
-
-    def _to_blocks(
-        data: npt.NDArray,
-        factors: npt.NDArray,
-    ) -> npt.NDArray:
-        """Reshapes input array into blocks."""
-        assert not np.any(np.mod(data.shape, factors) != 0)
-        nblocks = np.array(data.shape) // factors
-        reshaping = tuple(dim for dims in zip(nblocks, factors) for dim in dims)
-        return data.reshape(reshaping).transpose((0, 2, 1, 3))
-    
-    m = _handle_shape(m, downscaling)
-    m = _to_blocks(m, downscaling)
-    return m.sum(axis=(2, 3))
-
-
-
-def downscale(
-    data: npt.NDArray,
-    downscale_y: int = 1,
-    downscale_x: int = 1,
-) -> npt.NDArray:
-    """
-    Downscales a 2D array by dividing the input array in blocks
-    and adding over them to interpolate array values.
-
-    Args:
-        data (npt.NDArray): Input 2D array.
-        downscale_y (int): Downscaling factor over the y direction.
-        downscale_x (int): Downscaling factor over the x direction.
-
-    Returns:
-        output (npt.NDArray): Downsampled array.
-
-    Raises:
-        ValueError: if downscale factors are not positive integers.
-    
-    Notes:
-        - The downsampling is performed through blocks subdivision, which
-          represent the elements of the downsampled array. Each block is
-          reduced by adding its elements for linear interpolation.
-        - The total sum of the array is conserved.
-        - For N-dim arrays, consider using `astropy.nndata.block_reduce()`.
-    """
-    
-    if not (
-        (isinstance(downscale_y, int) and downscale_y > 0) and
-        (isinstance(downscale_x, int) and downscale_x > 0)
-    ):
-        raise ValueError("Downscaling factors must be positive integers.")
-    
-    downscaling = np.array((downscale_y, downscale_x))
-    return _reduce(data, downscaling)
-
 
 
 def _bins(
@@ -213,24 +65,11 @@ class CodedMaskCamera:
             _bins(self.mdl["mask_miny"], self.mdl["mask_maxy"], self.mdl["mask_deltay"], upscale_f.y),
         )
     
-    # def _bins_detector(
-    #     self,
-    #     upscale_f: UpscaleFactor,
-    # ) -> BinsRectangular:
-    #     """Generate binning structure for detector with given upscale factors."""
-    #     mask_bins = self._bins_mask(upscale_f)
-    #     xmin, xmax = _bisect_interval(mask_bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-    #     ymin, ymax = _bisect_interval(mask_bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-    #     return BinsRectangular(
-    #         mask_bins.x[xmin : xmax + 1],
-    #         mask_bins.y[ymin : ymax + 1],
-    #     )
-    
     def _bins_detector(
         self,
         upscale_f: UpscaleFactor,
     ) -> BinsRectangular:
-        """Generate binning structure for detector with given upscale factors."""
+        """Generate detector binning structure from mask with given upscale factors."""
         base_mask_bins = self._bins_mask(UpscaleFactor(1, 1))
         mask_bins = self.bins_mask
         xmin, xmax = _bisect_interval(base_mask_bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
@@ -265,7 +104,20 @@ class CodedMaskCamera:
 
     @cached_property
     def bins_detector(self) -> BinsRectangular:
-        """Binning structure for the detector."""
+        """
+        Binning structure for the detector.
+
+        Notes:
+            - the binning is taken directly from the (upscaled) mask binning structure, so
+              that the detector binning and the mask binning are aligned.
+            - note that the detector physical dimensions are not integer multiple of the
+              pixels physical dimensions, as in the case for the mask.
+            - the binning is structured to be self-consistent at different upscaling, i.e.
+              the edges are fixed to the same values. In this way, for a given upscale
+              factor `f` the detector shape is `f` times the basic detector one.
+            - from above, it follows that the binning edges are not superimposed with respect
+              to the physical detector edges (this is addressed in `self.bulk`).
+        """
         return self._bins_detector(self.upscale_f)
     
     @cached_property
@@ -284,20 +136,18 @@ class CodedMaskCamera:
         """2D array representing the mask pattern used for decoding."""
         base = _fold(self.mdl.decoder, self._bins_mask(UpscaleFactor(1, 1)))
         return _enlarge(base, self.upscale_f)
-    
-    # @cached_property
-    # def bulk(self) -> npt.NDArray:
-    #     """2D array representing the bulk (sensitivity) array of the mask."""
-    #     framed_bulk = _fold(self.mdl.bulk, self._bins_mask(UpscaleFactor(1, 1)))
-    #     framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
-    #     bins = self._bins_mask(self.upscale_f)
-    #     xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-    #     ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-    #     return _enlarge(framed_bulk, self.upscale_f)[ymin : ymax, xmin : xmax]
 
     @cached_property
     def bulk(self) -> npt.NDArray:
-        """2D array representing the bulk (sensitivity) array of the mask."""
+        """
+        2D array representing the bulk (sensitivity) array of the mask.
+
+        Notes:
+            - because the binning edges and the physical detector are not
+              superimposed (see `self.bins_detector`), at a given upscaling
+              `f` the redundant pixels which not correspond to a sensitive
+              detector physical zone are set to zero.
+        """
         base_bins = self._bins_mask(UpscaleFactor(1, 1))
         framed_bulk = _fold(self.mdl.bulk, base_bins)
         framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
@@ -379,7 +229,10 @@ def codedmask(
     ):
         raise ValueError("Detector plane is larger than mask.")
 
-    if not ((isinstance(upscale_x, int) and upscale_x > 0) and (isinstance(upscale_y, int) and upscale_y > 0)):
+    if not (
+        (isinstance(upscale_x, int) and upscale_x > 0) and
+        (isinstance(upscale_y, int) and upscale_y > 0)
+    ):
         raise ValueError("Upscale factors must be positive integers.")
 
     return CodedMaskCamera(mdl, UpscaleFactor(x=upscale_x, y=upscale_y))
@@ -391,34 +244,26 @@ def codedmask(
 #     upscale_f: UpscaleFactor,
 # ) -> BinsRectangular:
 #     """Generate binning structure for detector with given upscale factors."""
-#     base_mask_bins = self._bins_mask(UpscaleFactor(1, 1))
-#     mask_bins = self.bins_mask
-#     xmin, xmax = _bisect_interval(base_mask_bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-#     ymin, ymax = _bisect_interval(base_mask_bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
+#     mask_bins = self._bins_mask(upscale_f)
+#     xmin, xmax = _bisect_interval(mask_bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+#     ymin, ymax = _bisect_interval(mask_bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
 #     return BinsRectangular(
-#         mask_bins.x[xmin * upscale_f.x : xmax * upscale_f.x + 1],
-#         mask_bins.y[ymin * upscale_f.y : ymax * upscale_f.y + 1],
+#         mask_bins.x[xmin : xmax + 1],
+#         mask_bins.y[ymin : ymax + 1],
 #     )
+
 
 # @cached_property
 # def bulk(self) -> npt.NDArray:
 #     """2D array representing the bulk (sensitivity) array of the mask."""
-#     base_bins = self._bins_mask(UpscaleFactor(1, 1))
-#     framed_bulk = _fold(self.mdl.bulk, base_bins)
+#     framed_bulk = _fold(self.mdl.bulk, self._bins_mask(UpscaleFactor(1, 1)))
 #     framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
-#     xmin, xmax = _bisect_interval(base_bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-#     ymin, ymax = _bisect_interval(base_bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-#     framed_bulk[ymin : ymin + self.upscale_f.y // 2] = 0
-#     framed_bulk[ymax - self.upscale_f.y // 2 : ymax] = 0
-#     return (
-#         _enlarge(
-#             framed_bulk,
-#             self.upscale_f,
-#         )[
-#             ymin * self.upscale_f.y : ymax * self.upscale_f.y,
-#             xmin * self.upscale_f.x : xmax * self.upscale_f.x
-#         ]
-#     )
+#     bins = self._bins_mask(self.upscale_f)
+#     xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
+#     ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
+#     return _enlarge(framed_bulk, self.upscale_f)[ymin : ymax, xmin : xmax]
+
+
 
 # test_mask_bins = self._bins_mask(self.upscale_f)
 # test_xmin, test_xmax = _bisect_interval(test_mask_bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
