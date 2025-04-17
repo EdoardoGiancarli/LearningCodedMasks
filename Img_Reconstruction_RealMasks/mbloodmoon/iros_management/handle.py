@@ -490,22 +490,22 @@ def camera_composition(
     with fits.open(skyA_path) as hduA, fits.open(skyB_path) as hduB:
         skies, snrs = (hduA[1], hduB[1]), (hduA[2], hduB[2])
     
-    print("# Composing WFM skies...")
-    wcs_out, shape_out = find_optimal_celestial_wcs(input_data=skies)
-    sky_comp, _ = reproject_and_coadd(
-        input_data=skies,
-        output_projection=wcs_out,
-        shape_out=shape_out,
-        reproject_function=reproject_interp,
-        combine_function="sum",
-    )
-    snr_comp, _ = reproject_and_coadd(
-        input_data=snrs,
-        output_projection=wcs_out,
-        shape_out=shape_out,
-        reproject_function=reproject_interp,
-        combine_function="max",
-    )
+        print("# Composing WFM skies...")
+        wcs_out, shape_out = find_optimal_celestial_wcs(input_data=skies)
+        sky_comp, _ = reproject_and_coadd(
+            input_data=skies,
+            output_projection=wcs_out,
+            shape_out=shape_out,
+            reproject_function=reproject_interp,
+            combine_function="sum",
+        )
+        snr_comp, _ = reproject_and_coadd(
+            input_data=snrs,
+            output_projection=wcs_out,
+            shape_out=shape_out,
+            reproject_function=reproject_interp,
+            combine_function="max",
+        )
     #snr_compA, _ = reproject_and_coadd(
     #    input_data=snrs,
     #    output_projection=wcs_out,

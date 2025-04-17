@@ -28,8 +28,10 @@ import numpy as np
 import mbloodmoon.iros_management as iros
 
 from mbloodmoon.io import simulation_files, simulation
-from mbloodmoon.mask import codedmask, decode, count, variance, snratio
-from mbloodmoon.images import upscale #, downscale
+from mbloodmoon.mask import decode, count, variance, snratio #, codedmask
+# from mbloodmoon.images import upscale #, downscale
+
+from temp_camera import codedmask
 
 
 def _handle_dirpaths(
@@ -39,7 +41,7 @@ def _handle_dirpaths(
 ) -> tuple[str]:
     """Handles paths depending on the OS."""
 
-    if Path(base_path := "/media/egiancarli/Data/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/").is_dir():
+    if Path(base_path := "/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/").is_dir():
         if skyfield is None or simul is None:
             raise ValueError("When using Debian, 'skyfield' and 'simul' must exist.")
         mask_path = base_path + "Simulations/" + mask                                  # dirpath to WFM mask file 
@@ -64,11 +66,6 @@ def _handle_dirpaths(
                 raise ValueError(f"{name} '{dirpath}' does not exist.")
 
     return mask_path, data_path, save_path
-
-
-# TODO [1:-1, :] because of problems with `upscale()` and wfm upscaling
-def _upscale(arr, upsy):
-    return upscale(arr, upscale_y=upsy)#[1:-1, :]
 
 
 def _handle_simul_correction(
@@ -97,7 +94,8 @@ if __name__ == "__main__":
     IDEAL_MASK = False           # infinitely opaque and thin mask
 
     N_TEST = "__operating_test__"
-    UPSX_0, UPSY_FINAL = 3, 5
+    UPSX_0, UPSY_0 = 3, 2
+    UPSX_FINAL, UPSY_FINAL = 3, 2
 
     skyfield = "GalacticCenter"
     data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
@@ -112,7 +110,7 @@ if __name__ == "__main__":
     cam_b = "cam1b"
     dataset = "reconstructed"
 
-    max_iterations = 3
+    max_iterations = 15
     snr_threshold = 5
 
 
@@ -122,7 +120,7 @@ if __name__ == "__main__":
     """
     print("#### IROS Setup...\n")
     vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
-    wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=1)           # for IROS the skies are upscaled only along the x-dim
+    wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_0)              # for IROS the skies are upscaled only along the x-dim
 
     filepaths = simulation_files(simul_data)
     sdlA = simulation(filepaths[cam_a][dataset])
@@ -132,7 +130,7 @@ if __name__ == "__main__":
     detectors = tuple(count(wfm, sdl.data)[0] for sdl in sdls)
     variances = tuple(variance(wfm, d) for d in detectors)
 
-    wfm_WCS = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_FINAL)     # WCS fit (here the camera is upscaled with the final upscaling)
+    wfm_WCS = codedmask(mask_file, upscale_x=UPSX_FINAL, upscale_y=UPSY_FINAL)  # WCS fit (here the camera is upscaled with the final upscaling)
     wcs_fit = tuple(iros.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
 
 
@@ -148,10 +146,10 @@ if __name__ == "__main__":
         skies = tuple(decode(wfm, d) for d in detectors)
         snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-        ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
-        ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
+        # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
+        # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
 
-        for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
+        for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
             iros.save_sky(res, snr, sdl, name, wcs)
 
     if not Path(comp_name).is_file():
@@ -187,10 +185,10 @@ if __name__ == "__main__":
 
         snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-        ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
-        ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
+        # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
+        # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
 
-        for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
+        for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
             iros.save_sky(res, snr, sdl, name, wcs)
 
     else:
@@ -274,10 +272,10 @@ if __name__ == "__main__":
         skies = tuple(iros.make_sky(database, camID, wfm, res) for camID, res in zip((cam_a, cam_b), skies))
         snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-        ups_skies = tuple(_upscale(sky, upsy=UPSY_FINAL) for sky in skies)
-        ups_snrs = tuple(_upscale(snr, upsy=UPSY_FINAL) for snr in snrs)
+        # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
+        # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
 
-        for res, snr, sdl, name, wcs in zip(ups_skies, ups_snrs, sdls, names, wcs_fit):
+        for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
             iros.save_sky(res, snr, sdl, name, wcs)
 
     if not Path(comp_name).is_file():

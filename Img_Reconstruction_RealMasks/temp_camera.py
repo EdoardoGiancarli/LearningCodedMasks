@@ -264,16 +264,4 @@ def codedmask(
 #     return _enlarge(framed_bulk, self.upscale_f)[ymin : ymax, xmin : xmax]
 
 
-
-# test_mask_bins = self._bins_mask(self.upscale_f)
-# test_xmin, test_xmax = _bisect_interval(test_mask_bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
-# test_ymin, test_ymax = _bisect_interval(test_mask_bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-# print(
-#     f"n_zero_resp_pxs_y: {n_zero_resp_pxs_y * 2}\n"
-#     f"delta len det bins y: {len(test_mask_bins.y[test_ymin : test_ymax + 1]) - len(self.bins_detector.y)}\n"
-#     f"n_zero_resp_pxs_x: {n_zero_resp_pxs_x * 2}\n"
-#     f"delta len det bins x: {len(test_mask_bins.x[test_xmin : test_xmax + 1]) - len(self.bins_detector.x)}\n"
-# )
-
-
 # end
