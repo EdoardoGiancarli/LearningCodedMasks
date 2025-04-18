@@ -77,8 +77,8 @@ def _handle_simul_correction(
     if dataset not in ["detected", "reconstructed"]:
         raise ValueError("dataset must be either 'detected' or 'reconstructed'.")
     
-    psfy = False if dataset == "detected" else True
     vignetting = False if ideal_mask else True
+    psfy = False if dataset == "detected" else True
     return vignetting, psfy
 
 
@@ -91,11 +91,11 @@ if __name__ == "__main__":
     """
     print("#### Initializing...\n")
     mask_FITS = "wfm_mask.fits"
-    IDEAL_MASK = False           # infinitely opaque and thin mask
+    IDEAL_MASK = False                 # infinitely opaque and thin mask
 
-    N_TEST = "__operating_test__"
-    UPSX_0, UPSY_0 = 3, 2
-    UPSX_FINAL, UPSY_FINAL = 3, 2
+    N_TEST = "_" + "no_upscaling"
+    UPSX_0, UPSY_0 = 5, 2              # initial upscaling (with which IROS is performed)
+    UPSX_FINAL, UPSY_FINAL = 5, 2      # final upscaling for skies and visualisation
 
     skyfield = "GalacticCenter"
     data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
@@ -114,178 +114,184 @@ if __name__ == "__main__":
     snr_threshold = 5
 
 
+    with iros.timer("##### IROS PIPELINE #####"):
+        """
+        #### IROS SETUP.
+        """
+        print("#### IROS Setup...\n")
 
-    """
-    #### IROS SETUP.
-    """
-    print("#### IROS Setup...\n")
+        with iros.timer("IROS Setup"):
+            vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
+            wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_0)
 
-    with iros.timer("IROS Setup"):
-        vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
-        wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_0)              # for IROS the skies are upscaled only along the x-dim
+            filepaths = simulation_files(simul_data)
+            sdlA = simulation(filepaths[cam_a][dataset])
+            sdlB = simulation(filepaths[cam_b][dataset])
 
-        filepaths = simulation_files(simul_data)
-        sdlA = simulation(filepaths[cam_a][dataset])
-        sdlB = simulation(filepaths[cam_b][dataset])
+            sdls = (sdlA, sdlB)
+            with iros.timer("Compute dets/vars"):
+                detectors = tuple(count(wfm, sdl.data)[0] for sdl in sdls)
+                variances = tuple(variance(wfm, d) for d in detectors)
 
-        sdls = (sdlA, sdlB)
-        detectors = tuple(count(wfm, sdl.data)[0] for sdl in sdls)
-        variances = tuple(variance(wfm, d) for d in detectors)
-
-        wfm_WCS = codedmask(mask_file, upscale_x=UPSX_FINAL, upscale_y=UPSY_FINAL)  # WCS fit (here the camera is upscaled with the final upscaling)
-        wcs_fit = tuple(iros.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
-
-
-
-    """
-    #### SAVING SIMULATED SKIES.
-    """
-    print("#### Saving simulated skies...\n")
-    names = tuple(save_path + f"sky_SIMUL_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
-    comp_name = save_path + f"COMPOSED_sky_SIMUL_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
-
-    if not Path(names[0]).is_file() and not Path(names[1]).is_file():
-        skies = tuple(decode(wfm, d) for d in detectors)
-        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
-
-        # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
-        # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
-
-        for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
-            iros.save_sky(res, snr, sdl, name, wcs)
-
-    if not Path(comp_name).is_file():
-        iros.camera_composition(
-            skyA_path=names[0],
-            skyB_path=names[1],
-            save_to=comp_name,
-        )
+            # WCS fit (here the camera is upscaled with the final upscaling)
+            with iros.timer("WCS fit"):
+                wfm_WCS = codedmask(mask_file, upscale_x=UPSX_FINAL, upscale_y=UPSY_FINAL)
+                wcs_fit = tuple(iros.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
 
 
 
-    """
-    #### RUN IROS AND SAVE OUTPUT + RESIDUES.
-    """
-    print("#### Running IROS...\n")
-    iros_output_name = save_path + f"IROS_output_TEST{N_TEST}.fits"
-    names = tuple(save_path + f"skyRES_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
-    comp_name = save_path + f"COMPOSED_skyRES_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
+        """
+        #### SAVING SIMULATED SKIES.
+        """
+        print("#### Saving simulated skies...\n")
+        names = tuple(save_path + f"sky_SIMUL_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
+        comp_name = save_path + f"COMPOSED_sky_SIMUL_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
 
-    if not Path(iros_output_name).is_file() or not (Path(names[0]).is_file() and Path(names[1]).is_file()):
-        iros_output, skies = iros.perform_iros(
-            camerasID=(cam_a, cam_b),
-            camera=wfm,
-            sdl_camA=sdlA,
-            sdl_camB=sdlB,
-            max_iterations=max_iterations,
-            snr_threshold=snr_threshold,
-            vignetting=vignetting,
-            psfy=psfy,
-        )
+        if not Path(names[0]).is_file() and not Path(names[1]).is_file():
+            skies = tuple(decode(wfm, d) for d in detectors)
+            snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-        iros.save_iros_output(iros_output, mask_file, iros_output_name)
+            # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
+            # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
 
-        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
+            for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
+                iros.save_sky(res, snr, sdl, name, wcs)
 
-        # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
-        # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
-
-        for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
-            iros.save_sky(res, snr, sdl, name, wcs)
-
-    else:
-        iros_output = iros.load_iros_output(iros_output_name)
-
-
-    if not Path(comp_name).is_file():
-        iros.camera_composition(
-            skyA_path=names[0],
-            skyB_path=names[1],
-            save_to=comp_name,
-        )
+        if not Path(comp_name).is_file():
+            with iros.timer("Camera composition"):
+                iros.camera_composition(
+                    skyA_path=names[0],
+                    skyB_path=names[1],
+                    save_to=comp_name,
+                )
 
 
 
-    """
-    #### COMPUTE SOURCES PARAMS WITH IROS OUTPUT.
-    """
-    print("#### Computing sources parameters...\n")
-    iros_data_name = save_path + f"IROS_data_TEST{N_TEST}.fits"
+        """
+        #### RUN IROS AND SAVE OUTPUT + RESIDUES.
+        """
+        print("#### Running IROS...\n")
+        iros_output_name = save_path + f"IROS_output_TEST{N_TEST}.fits"
+        names = tuple(save_path + f"skyRES_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
+        comp_name = save_path + f"COMPOSED_skyRES_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
 
-    if not Path(iros_data_name).is_file():
-        log = iros.gen_params_log((cam_a, cam_b))
+        if not Path(iros_output_name).is_file() or not (Path(names[0]).is_file() and Path(names[1]).is_file()):
+            iros_output, skies = iros.perform_iros(
+                camerasID=(cam_a, cam_b),
+                camera=wfm,
+                sdl_camA=sdlA,
+                sdl_camB=sdlB,
+                max_iterations=max_iterations,
+                snr_threshold=snr_threshold,
+                vignetting=vignetting,
+                psfy=psfy,
+            )
 
-        iros_data = iros.compute_params(
-            iros_output=iros_output,
-            camera=wfm,
-            sdl_camA=sdlA,
-            sdl_camB=sdlB,
-            log=log,
-        )
+            iros.save_iros_output(iros_output, mask_file, iros_output_name)
 
-        # WARNING: the px position in this DB might not match with upscaled skies
-        iros.save_iros_data(
-            data=iros_data,
-            mask_file=mask_file,
-            sdls=(sdlA, sdlB),
-            save_to=iros_data_name,
-        )
+            snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-    else:
-        iros_data = iros.load_iros_data(iros_data_name)
+            # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
+            # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
+
+            for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
+                iros.save_sky(res, snr, sdl, name, wcs)
+
+        else:
+            iros_output = iros.load_iros_output(iros_output_name)
 
 
-
-    """
-    #### CATALOG COMPARISON AND DATABASE UPDATE.
-    """
-    print("#### Performing catalog comparison...\n")
-    DB_name = save_path + f"IROS_sources_database_TEST{N_TEST}.fits"
-    # WARNING: source assignment relies only on catalog sources
-    if not Path(DB_name).is_file():
-        database = iros.compare_w_catalog(
-            data=iros_data,
-            catalogA=filepaths[cam_a]["sources"],
-            catalogB=filepaths[cam_b]["sources"],
-            camerasID=(cam_a, cam_b),
-            min_flux=1e-1,
-        )
-
-        iros.save_iros_data(
-            data=database,
-            mask_file=mask_file,
-            sdls=(sdlA, sdlB),
-            save_to=DB_name,
-        )
-
-    else:
-        database = iros.load_iros_data(DB_name)
+        if not Path(comp_name).is_file():
+            with iros.timer("Camera composition"):
+                iros.camera_composition(
+                    skyA_path=names[0],
+                    skyB_path=names[1],
+                    save_to=comp_name,
+                )
 
 
 
-    """
-    #### GENERATING SKIES FROM IROS OUTPUT + RESIDUES.
-    """
-    print("#### Generating and saving IROS output skies...\n")
-    names = tuple(save_path + f"OUTsky_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
-    comp_name = save_path + f"COMPOSED_OUTsky_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
+        """
+        #### COMPUTE SOURCES PARAMS WITH IROS OUTPUT.
+        """
+        print("#### Computing sources parameters...\n")
+        iros_data_name = save_path + f"IROS_data_TEST{N_TEST}.fits"
 
-    if not Path(names[0]).is_file() and not Path(names[1]).is_file():
-        skies = tuple(iros.make_sky(database, camID, wfm, res) for camID, res in zip((cam_a, cam_b), skies))
-        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
+        if not Path(iros_data_name).is_file():
+            log = iros.gen_params_log((cam_a, cam_b))
 
-        # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
-        # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
+            iros_data = iros.compute_params(
+                iros_output=iros_output,
+                camera=wfm,
+                sdl_camA=sdlA,
+                sdl_camB=sdlB,
+                log=log,
+            )
 
-        for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
-            iros.save_sky(res, snr, sdl, name, wcs)
+            # WARNING: the px position in this DB might not match with upscaled skies
+            iros.save_iros_data(
+                data=iros_data,
+                mask_file=mask_file,
+                sdls=(sdlA, sdlB),
+                save_to=iros_data_name,
+            )
 
-    if not Path(comp_name).is_file():
-        iros.camera_composition(
-            skyA_path=names[0],
-            skyB_path=names[1],
-            save_to=comp_name,
-        )
+        else:
+            iros_data = iros.load_iros_data(iros_data_name)
+
+
+
+        """
+        #### CATALOG COMPARISON AND DATABASE UPDATE.
+        """
+        print("#### Performing catalog comparison...\n")
+        DB_name = save_path + f"IROS_sources_database_TEST{N_TEST}.fits"
+        # WARNING: source assignment relies only on catalog sources
+        if not Path(DB_name).is_file():
+            database = iros.compare_w_catalog(
+                data=iros_data,
+                catalogA=filepaths[cam_a]["sources"],
+                catalogB=filepaths[cam_b]["sources"],
+                camerasID=(cam_a, cam_b),
+                min_flux=1e-1,
+            )
+
+            iros.save_iros_data(
+                data=database,
+                mask_file=mask_file,
+                sdls=(sdlA, sdlB),
+                save_to=DB_name,
+            )
+
+        else:
+            database = iros.load_iros_data(DB_name)
+
+
+
+        """
+        #### GENERATING SKIES FROM IROS OUTPUT + RESIDUES.
+        """
+        print("#### Generating and saving IROS output skies...\n")
+        names = tuple(save_path + f"OUTsky_IROS_{cam.upper()}_TEST{N_TEST}.fits" for cam in (cam_a, cam_b))
+        comp_name = save_path + f"COMPOSED_OUTsky_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST{N_TEST}.fits"
+
+        if not Path(names[0]).is_file() and not Path(names[1]).is_file():
+            skies = tuple(iros.make_sky(database, camID, wfm, res) for camID, res in zip((cam_a, cam_b), skies))
+            snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
+
+            # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL) for sky in skies)
+            # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL) for snr in snrs)
+
+            for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, names, wcs_fit):
+                iros.save_sky(res, snr, sdl, name, wcs)
+
+        if not Path(comp_name).is_file():
+            with iros.timer("Camera composition"):
+                iros.camera_composition(
+                    skyA_path=names[0],
+                    skyB_path=names[1],
+                    save_to=comp_name,
+                )
 
 
 # end

@@ -288,8 +288,8 @@ def compute_params(
                 return len(phs)
         
             y, x = shift2pos(camera, shiftx, shifty)                        # pos in px (from optimized shifts)
-            thetax = np.rad2deg(np.arctan(shiftx / l))                      # pos in angles wrt axis [deg]
-            thetay = np.rad2deg(np.arctan(shifty / l))
+            thetay = np.rad2deg(np.arctan(shifty / l))                      # pos in angles wrt axis [deg]
+            thetax = np.rad2deg(np.arctan(shiftx / l))                      
             dthetay, dthetax = _get_theta_errs()                            # theta errs [deg]
             ra, dec = shift2equatorial(sdls[idx], camera, shiftx, shifty)   # RA, DEC [deg]
             dra, ddec = _get_coord_errs(sdls[idx])                          # RA, DEC errs [deg]
@@ -302,10 +302,14 @@ def compute_params(
             simulphotons = _get_simulphs(sdls[idx])                         # simulated photons [ph]
 
             params = [
-                y, x, shiftx, dshiftx, shifty, dshifty, thetax, dthetax,
-                thetay, dthetay, ra, dra, dec, ddec, counts, dcounts,
-                rate, drate, flux, dflux, obs_counts, np.sqrt(obs_counts),
-                sub_counts, simulphotons, snr, chi,
+                y, x,
+                shiftx, dshiftx, shifty, dshifty,
+                thetax, dthetax, thetay, dthetay,
+                ra, dra, dec, ddec,
+                counts, dcounts, rate, drate, flux, dflux,
+                obs_counts, np.sqrt(obs_counts),
+                sub_counts, simulphotons,
+                snr, chi,
             ]
             return params
 
