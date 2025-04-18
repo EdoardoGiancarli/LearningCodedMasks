@@ -23,6 +23,12 @@ from mbloodmoon.images import _shift
 from mbloodmoon.images import argmax
 from mbloodmoon.optim import iros
 
+__all__ = [
+    "perform_iros", "gen_params_log",
+    "compute_params", "compare_w_catalog",
+    "dict2df",
+]
+
 
 def perform_iros(
     camerasID: tuple[str],

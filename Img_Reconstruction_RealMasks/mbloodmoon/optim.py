@@ -12,7 +12,7 @@ The optimization handles both spatial and intensity parameters simultaneously.
 """
 
 from functools import lru_cache
-from typing import Callable, Iterable, Literal
+from typing import Callable, Iterable
 import warnings
 
 import numpy as np
@@ -22,7 +22,6 @@ from scipy.signal import convolve
 
 from .images import _rbilinear_relative
 from .images import _shift
-from .images import argmax
 from .io import SimulationDataLoader
 from .mask import _convolution_kernel_psfy
 from .mask import _detector_footprint

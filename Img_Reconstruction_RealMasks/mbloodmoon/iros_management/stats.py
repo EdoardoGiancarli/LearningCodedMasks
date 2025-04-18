@@ -9,6 +9,11 @@ from pandas import DataFrame
 from .analyze import dict2df
 from mbloodmoon.io import SimulationDataLoader
 
+__all__ = [
+    "iros_radec_accuracy", "iros_radec_accuracy_finecoord",
+    "iros_fluence", "iros_sources_res",
+]
+
 
 def iros_radec_accuracy(
     data: dict,
@@ -164,7 +169,7 @@ def iros_fluence(
     return dict2df(db)
 
 
-def check_sources_res(
+def iros_sources_res(
     data: dict,
     catalogs: tuple[np.recarray],
 ) -> DataFrame:

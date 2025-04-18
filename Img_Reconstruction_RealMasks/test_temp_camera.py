@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from mbloodmoon.mask import _bisect_interval
-from temp_camera import CodedMaskCamera, codedmask
+from temp_camera import codedmask
 
 
 mask_path = "/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/wfm_mask.fits"
@@ -48,15 +48,15 @@ class TestCamera(unittest.TestCase):
                 )
 
                 # testing bins step
-                step = wfm.specs["mask_delta" + ax] / up
+                step = wfm.specs["mask_delta" + ax]
                 self.assertAlmostEqual(
-                    mask_bins[b][1] - mask_bins[b][0], step, places=7,
+                    up * (mask_bins[b][1] - mask_bins[b][0]), step, places=7,
                 )
                 self.assertAlmostEqual(
-                    detector_bins[b][1] - detector_bins[b][0], step, places=7,
+                    up * (detector_bins[b][1] - detector_bins[b][0]), step, places=7,
                 )
                 self.assertAlmostEqual(
-                    sky_bins[b][1] - sky_bins[b][0], step, places=7,
+                    up * (sky_bins[b][1] - sky_bins[b][0]), step, places=7,
                 )
 
                 # testing superimposition

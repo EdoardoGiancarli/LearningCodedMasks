@@ -119,19 +119,21 @@ if __name__ == "__main__":
     #### IROS SETUP.
     """
     print("#### IROS Setup...\n")
-    vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
-    wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_0)              # for IROS the skies are upscaled only along the x-dim
 
-    filepaths = simulation_files(simul_data)
-    sdlA = simulation(filepaths[cam_a][dataset])
-    sdlB = simulation(filepaths[cam_b][dataset])
+    with iros.timer("IROS Setup"):
+        vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
+        wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_0)              # for IROS the skies are upscaled only along the x-dim
 
-    sdls = (sdlA, sdlB)
-    detectors = tuple(count(wfm, sdl.data)[0] for sdl in sdls)
-    variances = tuple(variance(wfm, d) for d in detectors)
+        filepaths = simulation_files(simul_data)
+        sdlA = simulation(filepaths[cam_a][dataset])
+        sdlB = simulation(filepaths[cam_b][dataset])
 
-    wfm_WCS = codedmask(mask_file, upscale_x=UPSX_FINAL, upscale_y=UPSY_FINAL)  # WCS fit (here the camera is upscaled with the final upscaling)
-    wcs_fit = tuple(iros.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
+        sdls = (sdlA, sdlB)
+        detectors = tuple(count(wfm, sdl.data)[0] for sdl in sdls)
+        variances = tuple(variance(wfm, d) for d in detectors)
+
+        wfm_WCS = codedmask(mask_file, upscale_x=UPSX_FINAL, upscale_y=UPSY_FINAL)  # WCS fit (here the camera is upscaled with the final upscaling)
+        wcs_fit = tuple(iros.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
 
 
 

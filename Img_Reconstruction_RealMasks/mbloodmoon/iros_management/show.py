@@ -12,6 +12,11 @@ import matplotlib.pyplot as plt
 from mbloodmoon.mask import CodedMaskCamera
 from mbloodmoon.mask import model_sky
 
+__all__ = [
+    "crop", "plot_distr", "plot_sequence",
+    "enhance_slices", "make_sky", "plot_sky",
+]
+
 RCPARAMS = {
     'font.family': 'sans-serif',
     'font.weight': 'bold',
