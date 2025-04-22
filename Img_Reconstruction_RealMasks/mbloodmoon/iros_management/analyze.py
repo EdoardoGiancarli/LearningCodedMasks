@@ -2,7 +2,6 @@
 IROS output data management and computation.
 """
 
-from typing import Literal
 from pathlib import Path
 from copy import deepcopy
 
@@ -16,9 +15,9 @@ from mbloodmoon.mask import CodedMaskCamera
 
 from mbloodmoon.io import _validate_fits
 from mbloodmoon.coords import shift2equatorial
+from mbloodmoon.coords import shift2pos
 from mbloodmoon.mask import count
 from mbloodmoon.mask import decode
-from mbloodmoon.mask import shift2pos
 from mbloodmoon.images import _shift
 from mbloodmoon.images import argmax
 from mbloodmoon.optim import iros
