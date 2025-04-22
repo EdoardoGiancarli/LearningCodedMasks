@@ -13,9 +13,7 @@ __all__ = [
 
 
 @contextmanager
-def timer(
-    name: str,
-) -> Generator[None, Any, None]:
+def timer(name: str) -> Generator[None, Any, None]:
     """
     Timer context manager.
 
@@ -23,7 +21,7 @@ def timer(
         name (str): Name of the task the timer is handling.
     
     Raises:
-        Exception: The timer raises the encoutered exception (any)
+        Exception: The timer raises the encoutered exception
                    within the algorithm and prints its name.
     """
     start_time = time.perf_counter()

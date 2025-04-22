@@ -38,7 +38,5 @@ from .stats import iros_radec_accuracy_finecoord
 from .stats import iros_fluence
 from .stats import iros_sources_res
 
-from .utils import timer
-
 
 # end

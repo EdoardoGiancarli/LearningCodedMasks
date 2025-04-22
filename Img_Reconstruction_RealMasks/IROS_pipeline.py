@@ -30,6 +30,7 @@ import mbloodmoon.iros_management as iros
 from mbloodmoon.io import simulation_files, simulation
 from mbloodmoon.mask import decode, count, variance, snratio #, codedmask
 # from mbloodmoon.images import upscale #, downscale
+from mbloodmoon.utils import timer
 
 from temp_camera import codedmask
 
@@ -114,13 +115,13 @@ if __name__ == "__main__":
     snr_threshold = 5
 
 
-    with iros.timer("##### IROS PIPELINE #####"):
+    with timer("##### IROS PIPELINE #####"):
         """
         #### IROS SETUP.
         """
         print("#### IROS Setup...\n")
 
-        with iros.timer("IROS Setup"):
+        with timer("IROS Setup"):
             vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
             wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_0)
 
@@ -129,12 +130,12 @@ if __name__ == "__main__":
             sdlB = simulation(filepaths[cam_b][dataset])
 
             sdls = (sdlA, sdlB)
-            with iros.timer("Compute dets/vars"):
+            with timer("Compute dets/vars"):
                 detectors = tuple(count(wfm, sdl.data)[0] for sdl in sdls)
                 variances = tuple(variance(wfm, d) for d in detectors)
 
             # WCS fit (here the camera is upscaled with the final upscaling)
-            with iros.timer("WCS fit"):
+            with timer("WCS fit"):
                 wfm_WCS = codedmask(mask_file, upscale_x=UPSX_FINAL, upscale_y=UPSY_FINAL)
                 wcs_fit = tuple(iros.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
 
@@ -158,7 +159,7 @@ if __name__ == "__main__":
                 iros.save_sky(res, snr, sdl, name, wcs)
 
         if not Path(comp_name).is_file():
-            with iros.timer("Camera composition"):
+            with timer("Camera composition"):
                 iros.camera_composition(
                     skyA_path=names[0],
                     skyB_path=names[1],
@@ -202,7 +203,7 @@ if __name__ == "__main__":
 
 
         if not Path(comp_name).is_file():
-            with iros.timer("Camera composition"):
+            with timer("Camera composition"):
                 iros.camera_composition(
                     skyA_path=names[0],
                     skyB_path=names[1],
@@ -286,7 +287,7 @@ if __name__ == "__main__":
                 iros.save_sky(res, snr, sdl, name, wcs)
 
         if not Path(comp_name).is_file():
-            with iros.timer("Camera composition"):
+            with timer("Camera composition"):
                 iros.camera_composition(
                     skyA_path=names[0],
                     skyB_path=names[1],
