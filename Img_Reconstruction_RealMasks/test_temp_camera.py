@@ -31,8 +31,8 @@ class TestCamera(unittest.TestCase):
             detector_bins = wfm.bins_detector
             sky_bins = wfm.bins_sky
 
-            for (idx, ax), b, up in zip(
-                enumerate(("y", "x")), (1, 0), (ups_y, ups_x),
+            for ax, b, up in zip(
+                ("y", "x"), (1, 0), (ups_y, ups_x),
             ):
                 print(f"    - testing {ax} axis")
                 # testing edges
@@ -150,6 +150,31 @@ class TestCamera(unittest.TestCase):
             self.assertEqual(
                 2 * n_zero_resp_pxs_x,
                 len(wfm.bins_detector.x) - len(wfm.bins_mask.x[test_xmin : test_xmax + 1]),
+            )
+    
+    def test_array_values(self):
+        """Tests the unique values in the mask, decoder and bulk."""
+        print("## Testing unique values...")
+        for ups_y, ups_x in tuple(
+            (i + 1, i + 1) for i in range(self.upscale_to)
+        ):
+            print(f"# Testing upscaling {ups_y, ups_x}")
+            wfm = codedmask(mask_path, ups_x, ups_y)
+
+            np.testing.assert_equal(
+                np.unique(wfm.mask),
+                np.array([0, 1]),
+                strict=False,
+            )
+            np.testing.assert_almost_equal(
+                np.unique(wfm.decoder),
+                np.array([-wfm.specs["real_open_fraction"] / (1 - wfm.specs["real_open_fraction"]), 0, 1]),
+                decimal=7,
+            )
+            np.testing.assert_equal(
+                np.unique(wfm.bulk),
+                np.array([0, 1]),
+                strict=False,
             )
 
 
