@@ -183,11 +183,11 @@ def _shift2equatorial(
         pointing_radec_x,
     )
     r = np.sqrt(shift_x * shift_x + shift_y * shift_y + distance_detector_mask * distance_detector_mask)
-    _v = np.array([shift_x, shift_y, distance_detector_mask]) / r
-    vx, vy, vz = np.matmul(rotmat_cam2sky, _v)
+    v = np.array([shift_x, shift_y, distance_detector_mask]) / r
+    wx, wy, wz = np.matmul(rotmat_cam2sky, v)
     # the versors above are in the rectangular coordinates, we transform into angles
-    dec = 0.5 * np.pi - np.arccos(vz)
-    ra = np.arctan2(vy, vx)
+    dec = 0.5 * np.pi - np.arccos(wz)
+    ra = np.arctan2(wy, wx)
     ra += 2 * np.pi if ra < 0 else 0.0
     dec = np.rad2deg(dec)
     ra = np.rad2deg(ra)
@@ -260,16 +260,18 @@ def _equatorial2shift(
     )
     ra = np.deg2rad(ra)
     dec = np.deg2rad(dec)
-    wx, wy = np.cos(ra), np.sin(ra)
-    wz = np.cos(0.5 * np.pi - dec)
-    vx, vy, vz = np.matmul(
-        rotmat_sky2cam,
-        np.array([wx, wy, wz])
+    w = np.array(
+        [
+            np.cos(ra) * np.cos(dec),
+            np.sin(ra) * np.cos(dec),
+            np.sin(dec),
+        ]
     )
+    vx, vy, vz = np.matmul(rotmat_sky2cam, w)
     # the sky-shifts are computed from the versor `v` using the mask-detector distance
-    shiftx = vx * distance_detector_mask / vz
-    shifty = vy * distance_detector_mask / vz
-    return CoordSky(shiftx, shifty)
+    shift_x = vx * distance_detector_mask / vz
+    shift_y = vy * distance_detector_mask / vz
+    return CoordSky(*map(float, (shift_x, shift_y)))
 
 
 def _rotation_matrices(

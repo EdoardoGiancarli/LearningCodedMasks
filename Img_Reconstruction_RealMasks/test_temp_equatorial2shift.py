@@ -6,10 +6,11 @@ import numpy as np
 from mbloodmoon.types import CoordEquatorial
 from mbloodmoon.coords import shift2equatorial, equatorial2shift
 from mbloodmoon.coords import _rotation_matrices
-import mbloodmoon as bm
 
-mask_path = "/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/wfm_mask.fits"
-wfm = bm.codedmask(mask_path, upscale_x=3, upscale_y=3)
+from temp_camera import codedmask
+
+#mask_path = "/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/wfm_mask.fits"
+mask_path = "/mnt/d/PhD_AASS/Coding/Images_fits/wfm_mask.fits"
 
 @dataclass(frozen=True)
 class MiniSDL:
@@ -36,6 +37,7 @@ class TestEquatorial2Shift(unittest.TestCase):
     """Test for the `equatorial2shift()` function in `coords.py`."""
 
     def setUp(self):
+        self.wfm = codedmask(mask_path, upscale_x=3, upscale_y=3)
         self.sdl = MiniSDL(
             CAMZRA=266.4,
             CAMZDEC=-28.94,
@@ -48,20 +50,21 @@ class TestEquatorial2Shift(unittest.TestCase):
         Tests if computed shifts through `equatorial2shift()` refer to the
         same sky-shifts coordinates obtained with `shift2equatorial()`.
         """
-        for i in range(20):
-            sky_bins = wfm.bins_sky
+        for _ in range(100_000):
+            sky_bins = self.wfm.bins_sky
             input_shiftx = np.random.uniform(sky_bins.x[0], sky_bins.x[-1])
             input_shifty = np.random.uniform(sky_bins.y[0], sky_bins.y[-1])
-            print(f"# Iteration {i}")
+
+            # testing shifts coordinates (output shifts = input shifts, i.e. shift2equatorial -> equatorial2shift)
             ra, dec = shift2equatorial(
                 sdl=self.sdl,
-                camera=wfm,
+                camera=self.wfm,
                 shift_x=input_shiftx,
                 shift_y=input_shifty,
             )
             output_shiftx, output_shifty = equatorial2shift(
                 sdl=self.sdl,
-                camera=wfm,
+                camera=self.wfm,
                 ra=ra,
                 dec=dec,
             )
@@ -70,7 +73,20 @@ class TestEquatorial2Shift(unittest.TestCase):
                 np.array([output_shiftx, output_shifty]),
                 decimal=7,
             )
-    
+
+            # testing equatorial coordinates (output ra/dec = ra/dec, i.e. equatorial2shift -> shift2equatorial)
+            output_ra, output_dec = shift2equatorial(
+                sdl=self.sdl,
+                camera=self.wfm,
+                shift_x=output_shiftx,
+                shift_y=output_shifty,
+            )
+            np.testing.assert_almost_equal(
+                np.array([ra, dec]),
+                np.array([output_ra, output_dec]),
+                decimal=7,
+            )
+
     def test_rotation_matrices(self):
         """Tests if rotation matrices are orthogonal."""
         sky2cam, cam2sky = _rotation_matrices(
@@ -79,7 +95,7 @@ class TestEquatorial2Shift(unittest.TestCase):
         )
         np.testing.assert_almost_equal(
             np.matmul(sky2cam, cam2sky),
-            np.eye(*sky2cam.shape)
+            np.eye(*sky2cam.shape),
         )
 
 
