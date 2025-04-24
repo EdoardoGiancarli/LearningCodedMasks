@@ -49,8 +49,6 @@ def crop(
     
     Notes:
         - Negative indexes are allowed.
-    
-    TODO: insert croppingy, croppingx for further freedom
     """
     n, m = image.shape
     y, x = pos
@@ -213,7 +211,9 @@ def plot_sequence(
 def enhance_slices(
     sky: np.array,
     pos: tuple[int],
-    cr: int = 100,
+    crp: tuple[int] = (40, 40),
+    source: str = None,
+    cameraID: str = None,
 ) -> None:
     """
     Displays the counts distribution along the y-dim and the x-dim
@@ -222,19 +222,25 @@ def enhance_slices(
     Args:
         sky (np.array): 2D array of the sky.
         pos (tuple[int]): Indexes of the source.
-        cr (int, optional (default=100)): Half-size of the cropping.
+        crp (tuple[int], optional (default=(30, 30))): Half-size of the cropping.
+        source (str, optional (default=None)): Source name.
+        cameraID (str, optional (default=None)): WFM camera name (e.g. 'CAM1A').
     
     Notes:
         - `sky` is cropped to enhance the source counts distribution.
     """
-    cropped = crop(sky, pos, (cr, cr))
-    xslice, yslice = cropped[cr//2, :], cropped[:, cr//2]
+    cropped = crop(sky, pos, crp)
+    xslice, yslice = cropped[crp[0], :], cropped[:, crp[1]]
     plot_sequence(
         input_sequence=[xslice, yslice],
-        title=["Source X-axis Slice", "Source Y-axis Slice"],
+        title=[
+            f"{source.upper() if source else "Source"} {ax}-axis Slice - {cameraID.upper() if cameraID else ""}"
+            for ax in ("X", "Y")
+        ],
+        x=[np.arange(len(s)) - len(s) // 2 for s in (xslice, yslice)],
         xlabel=["x", "y"],
         ylabel=["counts", "counts"],
-        offsety=[(np.min(s) - 10, np.max(s) + 10) for s in zip(xslice, yslice)]
+        offsety=[(np.min(s) - 10, np.max(s) + 10) for s in (xslice, yslice)]
     )
 
 
@@ -334,7 +340,7 @@ def make_sky(
     elif valid_BG():
         sky = background
     
-    cropy, cropx = 32, 10
+    cropy, cropx = 46, 10
     
     for shiftx, shifty, fluence, x, y in zip(
         data[cameraID]["shift_x"]["data"],

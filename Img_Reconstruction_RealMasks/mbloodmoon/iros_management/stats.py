@@ -19,7 +19,7 @@ def iros_radec_accuracy(
     data: dict,
     catalogs: tuple[np.recarray],
     sigma: int | float,
-) -> DataFrame: #tuple[list[tuple[str, bool]], tuple[float]]:
+) -> tuple[DataFrame, float]: #tuple[list[tuple[str, bool]], tuple[float]]:
     """
     Analysis of the IROS reconstruction RA/DEC estimates and
     comparison with catalogs coordinates.
@@ -67,7 +67,7 @@ def iros_radec_accuracy_finecoord(
     data: dict,
     catalogs: tuple[np.recarray],
     sigma: int | float,
-) -> DataFrame: #tuple[list[tuple[str, bool]], tuple[float]]:
+) -> tuple[DataFrame, float]: #tuple[list[tuple[str, bool]], tuple[float]]:
     """
     Analysis of the IROS reconstruction RA/DEC estimates and
     comparison with catalogs coordinates taking into account

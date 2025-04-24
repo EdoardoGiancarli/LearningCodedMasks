@@ -13,16 +13,28 @@ __all__ = [
 
 
 @contextmanager
-def timer(name: str) -> Generator[None, Any, None]:
+def timer(
+    name: str,
+    units: str = "s",
+) -> Generator[None, Any, None]:
     """
     Timer context manager.
 
     Args:
-        name (str): Name of the task the timer is handling.
+        name (str):
+            Name of the task the timer is handling.
+        units (str, optional (default='s')):
+            Units of the measured time (seconds 's', minutes 'min' or hours 'h').
     
     Raises:
+        ValueError: For invalid 'units' input.
         Exception: Encoutered exception within the algorithm (if any).
+    
+    TODO: insert units for final elapsed time.
     """
+    if units not in ["s", "min", "h"]:
+        raise ValueError(f"Invalid 'units' {units}, choose between 's', 'min' or 'h'.")
+
     start_time = time.perf_counter()
     error = False
 

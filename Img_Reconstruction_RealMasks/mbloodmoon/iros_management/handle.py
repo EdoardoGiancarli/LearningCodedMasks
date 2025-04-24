@@ -24,7 +24,7 @@ from mbloodmoon.coords import pos2equatorial
 __all__ = [
     "save_iros_output", "load_iros_output",
     "save_iros_data", "load_iros_data",
-    "save_iros_data", "load_iros_data",
+    "save_sky", "load_sky",
     "fit_WCS", "camera_composition",
 ]
 
@@ -267,7 +267,7 @@ def check_fits(filepath: Path) -> bool:
         ValueError: If file not in valid FITS format.
     """
     if not filepath.is_file():
-        raise FileNotFoundError("FITS file does not exists.")
+        raise FileNotFoundError(f"FITS file '{filepath}' does not exists.")
     elif not _validate_fits(filepath):
         raise ValueError("File not in valid FITS format.")
     return True
