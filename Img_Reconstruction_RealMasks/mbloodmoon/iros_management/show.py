@@ -60,6 +60,12 @@ def crop(
         (((0 <= y - cy) and (y + cy < n)) or (((cy - y <= n) and (y + cy < 0))))
     ):
         raise IndexError(f"Cropping {cropping} at pos {pos} exceeds array edges.")
+    #check_cy = ((0 <= y - cy) and (y + cy < n)) or (((cy - y <= n) and (y + cy < 0)))
+    #check_cx = ((0 <= x - cx) and (x + cx < m)) or (((cx - x <= m) and (x + cx < 0)))
+    #if not (check_cy and check_cx):
+    #    print(f"Cropping {cropping} at pos {pos} exceeds array edges, redirecting to new cropping...")
+    #    if not check_cy: cy -= n - y + 1
+    #    if not check_cx: cx -= m - x + 1
     y1, y2 = y - cy, y + cy
     x1, x2 = x - cx, x + cx
     return image[y1 : y2, x1 : x2]

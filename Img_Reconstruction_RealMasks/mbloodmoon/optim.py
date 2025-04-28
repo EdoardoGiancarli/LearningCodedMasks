@@ -632,6 +632,9 @@ def iros(
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
+        
+        #shiftx -= 0.5 * camera.specs["mask_deltax"] / camera.upscale_f.x
+        #shifty -= 0.5 * camera.specs["mask_deltay"] / camera.upscale_f.y
 
         significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
         model = model_sky(camera, shiftx, shifty, fluence)

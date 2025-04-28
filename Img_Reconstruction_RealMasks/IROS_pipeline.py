@@ -78,7 +78,7 @@ def _handle_simul_correction(
     if dataset not in ["detected", "reconstructed"]:
         raise ValueError("dataset must be either 'detected' or 'reconstructed'.")
     
-    vignetting = False if ideal_mask else True
+    vignetting = not ideal_mask
     psfy = False if dataset == "detected" else True
     return vignetting, psfy
 
@@ -87,6 +87,8 @@ def iros_pipeline_report(
     skyfield: tuple[str],
     dataset: str,
     mask_type: bool,
+    vignetting: bool,
+    psfy: bool,
     start_upscaling: tuple[int],
     final_upscaling: tuple[int],
     iros_iterations: int,
@@ -97,6 +99,8 @@ def iros_pipeline_report(
         f"Testing skyfield: '{skyfield[0]}', simulation of: {skyfield[1][:4]}/{skyfield[1][4:6]}/{skyfield[1][6:8]}\n"
         f"Dataset type: '{dataset}'\n"
         f"Mask type: '{"ideal" if mask_type else "realistic"}'\n"
+        f"Vignetting: {vignetting}\n"
+        f"Psfy: {psfy}\n"
         f"Starting upscaling: {start_upscaling}\n"
         f"Final upscaling: {final_upscaling}\n"
         f"Max IROS iteration: {iros_iterations}\n"
@@ -115,7 +119,7 @@ if __name__ == "__main__":
     mask_FITS = "wfm_mask.fits"
     IDEAL_MASK = False                 # infinitely opaque and thin mask
 
-    N_TEST = "_" + "no_upscaling_and_shifts_offset4"
+    N_TEST = "_" + "increased_distance_plus_offset"
     UPSX_0, UPSY_0 = 5, 2              # initial upscaling (with which IROS is performed)
     UPSX_FINAL, UPSY_FINAL = 5, 2      # final upscaling for skies and visualisation
 
@@ -135,12 +139,15 @@ if __name__ == "__main__":
     max_iterations = 15
     snr_threshold = 5
 
-    sky_compositions = False           # if True, the WFM cameras will be joint to get the composed sky
+    sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky
+    vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
 
     iros_pipeline_report(
         skyfield=(skyfield, data_FITS),
         dataset=dataset,
         mask_type=IDEAL_MASK,
+        vignetting=vignetting,
+        psfy=psfy,
         start_upscaling=(UPSX_0, UPSY_0),
         final_upscaling=(UPSX_FINAL, UPSY_FINAL),
         iros_iterations=max_iterations,
@@ -155,7 +162,6 @@ if __name__ == "__main__":
         print("\n#### IROS Setup...")
 
         with timer("IROS Setup"):
-            vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
             wfm = codedmask(mask_file, upscale_x=UPSX_0, upscale_y=UPSY_0)
 
             filepaths = simulation_files(simul_data)

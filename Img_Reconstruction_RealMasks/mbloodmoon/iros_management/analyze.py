@@ -16,6 +16,7 @@ from mbloodmoon.mask import CodedMaskCamera
 from mbloodmoon.io import _validate_fits
 from mbloodmoon.coords import shift2equatorial
 from mbloodmoon.coords import shift2pos
+from mbloodmoon.coords import shift2theta
 from mbloodmoon.mask import count
 from mbloodmoon.mask import decode
 from mbloodmoon.images import _shift
@@ -287,8 +288,8 @@ def compute_params(
                 return len(phs)
         
             y, x = shift2pos(camera, shiftx, shifty)                        # pos in px (from optimized shifts)
-            thetay = np.rad2deg(np.arctan(shifty / l))                      # pos in angles wrt axis [deg]
-            thetax = np.rad2deg(np.arctan(shiftx / l))                      
+            thetay = shift2theta(camera, shifty)                            # pos in angles wrt axis [deg]
+            thetax = shift2theta(camera, shiftx)                      
             dthetay, dthetax = _get_theta_errs()                            # theta errs [deg]
             ra, dec = shift2equatorial(sdls[idx], camera, shiftx, shifty)   # RA, DEC [deg]
             dra, ddec = _get_coord_errs(sdls[idx])                          # RA, DEC errs [deg]
