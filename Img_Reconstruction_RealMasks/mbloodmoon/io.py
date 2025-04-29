@@ -201,27 +201,51 @@ class MaskDataLoader:
         Extract and convert mask parameters from FITS headers (extensions 0 and 2).
 
         Returns:
-            Dictionary of mask parameters (dimensions, bounds, distances) as float values
+            Dictionary of mask parameters (dimensions, bounds, distances) as float values:
+                - "mask_minx": left physical mask edge along x-axis [mm]
+                - "mask_miny": bottom physical mask edge along y-axis [mm]
+                - "mask_maxx": right physical mask edge along x-axis [mm]
+                - "mask_maxy": top physical mask edge along y-axis [mm]
+                - "mask_deltax": mask pixel physical dimension along x [mm]
+                - "mask_deltay": mask pixel physical dimension along y [mm]
+                - "mask_thickness": mask plate thickness [mm]
+                - "slit_deltax": slit length along x [mm]
+                - "slit_deltay": slit length along y [mm]
+                - "detector_minx": left physical detector edge along x-axis [mm]
+                - "detector_maxx": bottom physical detector edge along y-axis [mm]
+                - "detector_miny": right physical detector edge along x-axis [mm]
+                - "detector_maxy": top physical detector edge along y-axis [mm]
+                - "detector_bmmask_dist": detector - bottom mask distance [mm] (with detector median absorption)
+                - "detector_midmask_dist": detector - mid mask plate distance [mm] (with detector median absorption)
+                - "detector_topmask_dist": detector - top mask distance [mm] (with detector median absorption)
+                - "open_fraction": mask open fraction
+                - "real_open_fraction": mask open fraction with ribs correction
         """
         h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
         h2 = dict(fits.getheader(self.filepath, ext=3))
 
-        info = {"mask_minx": h1["MINX"],
-                "mask_miny": h1["MINY"],
-                "mask_maxx": h1["MAXX"],
-                "mask_maxy": h1["MAXY"],
-                "mask_deltax": h1["ELXDIM"],
-                "mask_deltay": h1["ELYDIM"],
-                "mask_thickness": h1["MASKTHK"],
-                "slit_deltax": h1["DXSLIT"],
-                "slit_deltay": h1["DYSLIT"],
-                "detector_minx": h1["PLNXMIN"],
-                "detector_maxx": h1["PLNXMAX"],
-                "detector_miny": h1["PLNYMIN"],
-                "detector_maxy": h1["PLNYMAX"],
-                "mask_detector_distance": h1["MDDIST"], # + h1["MASKTHK"] / 2 + 0.01,
-                "open_fraction": h2["OPENFR"],
-                "real_open_fraction": h2["RLOPENFR"]}
+        detector_absorption = 0.01     # median photon length absorption in the detector [mm]
+
+        info = {
+            "mask_minx": h1["MINX"],
+            "mask_miny": h1["MINY"],
+            "mask_maxx": h1["MAXX"],
+            "mask_maxy": h1["MAXY"],
+            "mask_deltax": h1["ELXDIM"],
+            "mask_deltay": h1["ELYDIM"],
+            "mask_thickness": h1["MASKTHK"],
+            "slit_deltax": h1["DXSLIT"],
+            "slit_deltay": h1["DYSLIT"],
+            "detector_minx": h1["PLNXMIN"],
+            "detector_maxx": h1["PLNXMAX"],
+            "detector_miny": h1["PLNYMIN"],
+            "detector_maxy": h1["PLNYMAX"],
+            "detector_bmmask_dist": h1["MDDIST"] + detector_absorption,
+            "detector_midmask_dist": h1["MDDIST"] + h1["MASKTHK"] / 2 + detector_absorption,
+            "detector_topmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
+            "open_fraction": h2["OPENFR"],
+            "real_open_fraction": h2["RLOPENFR"]
+        }
 
         return {k: float(v) for k, v in info.items()}
 

@@ -89,7 +89,7 @@ def perform_iros(
             for key, p in zip(log_keys, params):
                 log_output[camera][key].append(p)
     
-    def data2array() -> dict:
+    def data2array() -> None:
         """Converts the log lists in arrays."""
         for camera in camerasID:
             for key in log_keys:
@@ -264,7 +264,7 @@ def compute_params(
             def _get_theta_errs():
                 """Computes angular sky coords errors."""
                 def propagation(s, ds) -> tuple[float]:
-                    return np.rad2deg(1 / (1 + np.square(s/l)) * np.sqrt(np.square(ds / l) + np.square(s * dl / np.square(l))))
+                    return np.rad2deg(1 / (1 + np.square(s / l)) * np.sqrt(np.square(ds / l) + np.square(s * dl / np.square(l))))
                 return propagation(shifty, dshifty), propagation(shiftx, dshiftx)
             
             def _get_coord_errs(sdl: SimulationDataLoader) -> tuple[float]:

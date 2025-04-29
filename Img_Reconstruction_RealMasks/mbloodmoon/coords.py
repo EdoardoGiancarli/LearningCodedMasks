@@ -105,8 +105,7 @@ def shift2theta(camera: CodedMaskCamera, shift: float) -> float:
         - `shift` must have same physical dimension of mask-detector distance, i.e. [mm].
         - the distance to compute `theta` is assumed to be mask-detector plus half the mask thickness.
     """
-    l = camera.specs["mask_detector_distance"] + camera.specs["mask_thickness"] / 2
-    return np.rad2deg(np.arctan(shift / camera.specs["mask_detector_distance"]))
+    return np.rad2deg(np.arctan(shift / camera.specs["detector_midmask_dist"]))
 
 
 def theta2shift(camera: CodedMaskCamera, theta: float) -> float:
@@ -123,8 +122,7 @@ def theta2shift(camera: CodedMaskCamera, theta: float) -> float:
     Notes:
         - the distance to compute `theta` is assumed to be mask-detector plus half the mask thickness.
     """
-    l = camera.specs["mask_detector_distance"] + camera.specs["mask_thickness"] / 2
-    return camera.specs["mask_detector_distance"] * np.tan(np.deg2rad(theta))
+    return camera.specs["detector_midmask_dist"] * np.tan(np.deg2rad(theta))
 
 
 def pos2equatorial(
@@ -186,7 +184,7 @@ def shift2equatorial(
         shift_y,
         sdl.pointings["z"],
         sdl.pointings["x"],
-        camera.specs["mask_detector_distance"],
+        camera.specs["detector_midmask_dist"],
     )
 
 
@@ -261,7 +259,7 @@ def equatorial2shift(
         dec,
         sdl.pointings["z"],
         sdl.pointings["x"],
-        camera.specs["mask_detector_distance"],
+        camera.specs["detector_midmask_dist"],
     )
 
 
@@ -421,7 +419,7 @@ def shiftgrid2equatorial(
         *np.meshgrid(shift_xs, shift_ys),
         sdl.pointings["z"],
         sdl.pointings["x"],
-        camera.specs["mask_detector_distance"],
+        camera.specs["detector_midmask_dist"],
     )
 
 

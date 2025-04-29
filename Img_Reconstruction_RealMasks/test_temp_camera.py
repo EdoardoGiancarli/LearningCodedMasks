@@ -12,7 +12,7 @@ class TestCamera(unittest.TestCase):
     Test for the `CodedMaskCamera` class in `mask.py`.
 
     The test is performed over the typical oversampling that
-    will be taken into account in the WFM analyses.
+    will be taken into account for the WFM analyses.
     """
     def setUp(self):
         self.upscale_to = 10

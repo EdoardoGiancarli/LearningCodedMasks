@@ -43,8 +43,6 @@ def _handle_dirpaths(
     """Handles paths depending on the OS."""
 
     if Path(base_path := "/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/").is_dir():
-        if skyfield is None or simul is None:
-            raise ValueError("When using Debian, 'skyfield' and 'simul' must exist.")
         mask_path = base_path + "Simulations/" + mask                                  # dirpath to WFM mask file 
         data_path = base_path + "Simulations/" + skyfield + "/" + simul + "/"          # dirpath with simul files
         save_path = base_path + "Outputs/" + "Out" + skyfield + "/" + simul + "/"      # dirpath to save output data
@@ -69,11 +67,11 @@ def _handle_dirpaths(
     return mask_path, data_path, save_path
 
 
-def _handle_simul_correction(
+def handle_simul_correction(
     ideal_mask: bool,
     dataset: str,
 ) -> tuple[bool, bool]:
-    """Handles vignetting and psf correction along y for IROS."""
+    """Handles CAI vignetting and psf correction along y-axis."""
 
     if dataset not in ["detected", "reconstructed"]:
         raise ValueError("dataset must be either 'detected' or 'reconstructed'.")
@@ -96,16 +94,71 @@ def iros_pipeline_report(
 ) -> None:
     """Prints out some IROS pipeline info."""
     print(
-        f"Testing skyfield: '{skyfield[0]}', simulation of: {skyfield[1][:4]}/{skyfield[1][4:6]}/{skyfield[1][6:8]}\n"
-        f"Dataset type: '{dataset}'\n"
-        f"Mask type: '{"ideal" if mask_type else "realistic"}'\n"
-        f"Vignetting: {vignetting}\n"
-        f"Psfy: {psfy}\n"
-        f"Starting upscaling: {start_upscaling}\n"
-        f"Final upscaling: {final_upscaling}\n"
-        f"Max IROS iteration: {iros_iterations}\n"
-        f"Sky compositions: {sky_composition}\n"
+        f"# IROS Pipeline Report\n"
+        f"  - Testing skyfield: '{skyfield[0]}', simulation of: {skyfield[1][:4]}/{skyfield[1][4:6]}/{skyfield[1][6:8]}\n"
+        f"  - Dataset type: '{dataset}'\n"
+        f"  - Mask type: '{"ideal" if mask_type else "realistic"}'\n"
+        f"  - Vignetting: {vignetting}\n"
+        f"  - Psfy: {psfy}\n"
+        f"  - Starting upscaling: {start_upscaling}\n"
+        f"  - Final upscaling: {final_upscaling}\n"
+        f"  - Max IROS iteration: {iros_iterations}\n"
+        f"  - Sky compositions: {sky_composition}\n"
     )
+
+
+def handle_pipeline_files(
+    output_file_path: str | Path,
+    test: str,
+    camerasID: tuple[str],
+) -> None:
+    """
+    Prints out which pipeline files have been already saved.
+    TODO: exit pipeline if all files have been saved
+    """
+    def check(condition: bool) -> str:
+        return "SAVED" if condition else "MISSING"
+    
+    camerasID = tuple(camID.upper() for camID in camerasID)
+    print("# IROS Pipeline Files")
+    
+    for camID in camerasID:
+        print(
+            f"  - Simulated Sky {camID}: {check(Path(output_file_path + f"sky_SIMUL_{camID}_TEST{test}.fits").is_file())}\n"
+            f"  - IROS Residues {camID}: {check(Path(output_file_path + f"skyRES_IROS_{camID}_TEST{test}.fits").is_file())}\n"
+            f"  - Output IROS Sky {camID}: {check(Path(output_file_path + f"OUTsky_IROS_{camID}_TEST{test}.fits").is_file())}"
+        )
+
+    for t, p in zip(
+        (
+            "IROS output log",
+            "IROS sources parameters",
+            "IROS-catalog comparison",
+        ),
+        (
+            Path(output_file_path + f"IROS_output_TEST{N_TEST}.fits").is_file(),
+            Path(output_file_path + f"IROS_data_TEST{N_TEST}.fits").is_file(),
+            Path(output_file_path + f"IROS_sources_database_TEST{N_TEST}.fits").is_file(),
+        ),
+    ):
+        print(f"  - {t}: {check(p)}")
+
+    for t, p in zip(
+        (
+            "Simulated Sky",
+            "IROS Residues",
+            "Output IROS Sky"
+        ),
+        (
+            Path(output_file_path + f"COMPOSED_sky_SIMUL_{camerasID[0]}_{camerasID[1]}_TEST{test}.fits").is_file(),
+            Path(output_file_path + f"COMPOSED_skyRES_IROS_{camerasID[0]}_{camerasID[1]}_TEST{test}.fits").is_file(),
+            Path(output_file_path + f"COMPOSED_OUTsky_IROS_{camerasID[0]}_{camerasID[1]}_TEST{test}.fits").is_file(),
+        ),
+    ):
+        print(f"  - {t} Composition: {check(p)}")
+    print("\n\n")
+
+
 
 
 
@@ -119,7 +172,7 @@ if __name__ == "__main__":
     mask_FITS = "wfm_mask.fits"
     IDEAL_MASK = False                 # infinitely opaque and thin mask
 
-    N_TEST = "_" + "increased_distance_plus_offset"
+    N_TEST = "_" + "bottom_mask_d_in_vignetting_detected"
     UPSX_0, UPSY_0 = 5, 2              # initial upscaling (with which IROS is performed)
     UPSX_FINAL, UPSY_FINAL = 5, 2      # final upscaling for skies and visualisation
 
@@ -134,13 +187,13 @@ if __name__ == "__main__":
 
     cam_a = "cam1a"
     cam_b = "cam1b"
-    dataset = "reconstructed"
+    dataset = "detected"
 
     max_iterations = 15
     snr_threshold = 5
 
     sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky
-    vignetting, psfy = _handle_simul_correction(IDEAL_MASK, dataset)
+    vignetting, psfy = handle_simul_correction(IDEAL_MASK, dataset)
 
     iros_pipeline_report(
         skyfield=(skyfield, data_FITS),
@@ -152,6 +205,11 @@ if __name__ == "__main__":
         final_upscaling=(UPSX_FINAL, UPSY_FINAL),
         iros_iterations=max_iterations,
         sky_composition=sky_compositions,
+    )
+    handle_pipeline_files(
+        output_file_path=save_path,
+        test=N_TEST,
+        camerasID=(cam_a, cam_b),
     )
 
 
