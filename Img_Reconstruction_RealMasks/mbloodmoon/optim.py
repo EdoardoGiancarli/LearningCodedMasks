@@ -334,6 +334,9 @@ def optimize(
     """
     # TODO: the upscaling factor should probably go into a configuration thing.
     shift_start_x, shift_start_y = _interpmax(camera, arg_sky, sky, UpscaleFactor(10, 10))
+
+    #from .coords import pos2shift
+    #shift_start_x, shift_start_y = pos2shift(camera, *arg_sky[::-1])
     fluence_start = sky.max()
 
     # initialize the function to compute coarse, fluence-dependent shadowgram model.

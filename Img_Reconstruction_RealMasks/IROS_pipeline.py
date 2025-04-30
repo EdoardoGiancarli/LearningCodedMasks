@@ -150,9 +150,9 @@ if __name__ == "__main__":
     mask_FITS = "wfm_mask.fits"
     IDEAL_MASK = False                 # infinitely opaque and thin mask
 
-    N_TEST = "detected"
-    UPSX_0, UPSY_0 = 5, 2              # initial upscaling (with which IROS is performed)
-    UPSX_FINAL, UPSY_FINAL = 5, 2      # final upscaling for skies and visualisation
+    N_TEST = "offset_dummy_test2"
+    UPSX_0, UPSY_0 = 4, 1              # initial upscaling (with which IROS is performed)
+    UPSX_FINAL, UPSY_FINAL = 4, 1      # final upscaling for skies and visualisation
 
     skyfield = "GalacticCenter"
     data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
@@ -307,7 +307,10 @@ if __name__ == "__main__":
             # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL - UPSY_0 + 1) for snr in snrs)
 
             for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, res_names, wcs_fit):
-                iros.save_sky(res, snr, sdl, name, wcs)
+                if not Path(name).is_file():
+                    iros.save_sky(res, snr, sdl, name, wcs)
+                else:
+                    print("# IROS residual already saved!")
 
         else:
             print("# IROS data already saved!")

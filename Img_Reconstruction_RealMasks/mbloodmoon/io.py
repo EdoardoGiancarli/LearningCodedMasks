@@ -220,6 +220,9 @@ class MaskDataLoader:
                 - "detector_topmask_dist": detector - top mask distance [mm] (with detector median absorption)
                 - "open_fraction": mask open fraction
                 - "real_open_fraction": mask open fraction with ribs correction
+        
+        Notes:
+            - The detector median absorption for the incident photons is set to 0.01 mm.
         """
         h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
         h2 = dict(fits.getheader(self.filepath, ext=3))

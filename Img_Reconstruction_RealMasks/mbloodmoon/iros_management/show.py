@@ -77,6 +77,7 @@ def plot_distr(
     bins: int | Sequence = 50,
     xlabel: str = None,
     pdf_distr: tuple[np.array, str] = None,
+    cut: tuple[float] = None,
 ) -> None:
     """
     Plots the histogram of the values inside the input array.
@@ -93,6 +94,8 @@ def plot_distr(
             Label for x-axis and for legend.
         pdf_distr (np.array, tuple[np.array, str], optional (default=None)):
             Input PDF distribution for comparison.
+        cut (float | tuple[float], optional (default=None)):
+            Edge values for the distribution.
 
     Notes:
         - `pdf_distr` could be used as:
@@ -103,6 +106,11 @@ def plot_distr(
         - for specific info, refer to matplotlib.pyplot docs
     """
     if np.ndim(arr) > 1: arr = arr.reshape(-1)
+
+    if cut is None: cut = (min(arr), max(arr))
+    elif isinstance(cut, float): cut = (-cut, cut)
+    arr = np.delete(arr=arr, obj=np.argwhere(arr < cut[0]))
+    arr = np.delete(arr=arr, obj=np.argwhere(arr > cut[1]))
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 6))
     fig.tight_layout()
