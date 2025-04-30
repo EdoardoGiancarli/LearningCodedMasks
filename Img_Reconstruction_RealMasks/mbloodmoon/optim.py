@@ -227,6 +227,8 @@ def _init_model_fine(
             pivot_i, pivot_j = pivot
             i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
             r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
+            #r += 0 if n % 2 == 0 else 1
+            #c += 0 if m % 2 == 0 else 1
 
             # we call with pivot because calling with shifts to ensure consistent cached/vignetting combos
             mask_processed = process_mask(camera.bins_sky.x[pivot_j], camera.bins_sky.y[pivot_i])

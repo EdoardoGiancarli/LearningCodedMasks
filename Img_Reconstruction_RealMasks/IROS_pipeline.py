@@ -150,7 +150,7 @@ if __name__ == "__main__":
     mask_FITS = "wfm_mask.fits"
     IDEAL_MASK = False                 # infinitely opaque and thin mask
 
-    N_TEST = "offset_dummy_test2"
+    N_TEST = "pivot_fine_model_vignetting2"
     UPSX_0, UPSY_0 = 4, 1              # initial upscaling (with which IROS is performed)
     UPSX_FINAL, UPSY_FINAL = 4, 1      # final upscaling for skies and visualisation
 

@@ -667,6 +667,8 @@ def model_shadowgram(
     _mask = convolve(_mask, _convolution_kernel_psfy(camera), mode="same") if psfy else _mask
     components, (pivot_i, pivot_j) = _rbilinear_relative(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
     r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
+    #r += 0 if n % 2 == 0 else 1
+    #c += 0 if m % 2 == 0 else 1
     mask_shifted_processed = _shift(_mask, (r, c))
 
     framed_shadowgram = mask_shifted_processed[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]
