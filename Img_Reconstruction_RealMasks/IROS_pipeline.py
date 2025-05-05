@@ -150,12 +150,12 @@ if __name__ == "__main__":
     mask_FITS = "wfm_mask.fits"
     IDEAL_MASK = False                 # infinitely opaque and thin mask
 
-    N_TEST = "pivot_fine_model_vignetting2"
-    UPSX_0, UPSY_0 = 4, 1              # initial upscaling (with which IROS is performed)
-    UPSX_FINAL, UPSY_FINAL = 4, 1      # final upscaling for skies and visualisation
+    N_TEST = "thinmask_realdet_distances_offset_detected"
+    UPSX_0, UPSY_0 = 5, 1              # initial upscaling (with which IROS is performed)
+    UPSX_FINAL, UPSY_FINAL = 5, 1      # final upscaling for skies and visualisation
 
     skyfield = "GalacticCenter"
-    data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+    data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_thinmask_realdet_sources_cxb"
     
     mask_file, simul_data, save_path = _handle_dirpaths(
         mask=mask_FITS,
