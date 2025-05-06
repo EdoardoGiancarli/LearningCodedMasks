@@ -62,12 +62,12 @@ class TestCamera(unittest.TestCase):
                 # testing superimposition
                 np.testing.assert_almost_equal(
                     mask_bins[b],
-                    sky_bins[b][len(detector_bins[b]) // 2 - 1 : -len(detector_bins[b]) // 2 + 1],
+                    sky_bins[b][len(detector_bins[b]) // 2 : -len(detector_bins[b]) // 2 + 2],
                     decimal=7,
                 )
                 np.testing.assert_almost_equal(
                     detector_bins[b],
-                    sky_bins[b][len(mask_bins[b]) // 2 - 1 : -len(mask_bins[b]) // 2 + 1],
+                    sky_bins[b][len(mask_bins[b]) // 2 : -len(mask_bins[b]) // 2 + 2],
                     decimal=7,
                 )
 

@@ -150,12 +150,12 @@ if __name__ == "__main__":
     mask_FITS = "wfm_mask.fits"
     IDEAL_MASK = False                 # infinitely opaque and thin mask
 
-    N_TEST = "thinmask_realdet_distances_offset_detected"
+    N_TEST = "crab_offset_stepsx"
     UPSX_0, UPSY_0 = 5, 1              # initial upscaling (with which IROS is performed)
     UPSX_FINAL, UPSY_FINAL = 5, 1      # final upscaling for skies and visualisation
 
-    skyfield = "GalacticCenter"
-    data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_thinmask_realdet_sources_cxb"
+    skyfield = "Crab"
+    data_FITS = "20250227_crab_cxb_2-50keV_1ks"
     
     mask_file, simul_data, save_path = _handle_dirpaths(
         mask=mask_FITS,
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     cam_b = "cam1b"
     dataset = "detected"
 
-    max_iterations = 15
+    max_iterations = 5
     snr_threshold = 5
 
     sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky
