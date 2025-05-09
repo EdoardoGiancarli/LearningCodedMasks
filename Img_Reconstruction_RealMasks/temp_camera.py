@@ -88,8 +88,8 @@ class CodedMaskCamera:
             np.abs(m_bins.y[1] - m_bins.y[0]),
         )
         return BinsRectangular(
-            np.linspace(m_bins.x[0] + d_bins.x[0], m_bins.x[-1] + d_bins.x[-1] - xstep, sx + 1),
-            np.linspace(m_bins.y[0] + d_bins.y[0], m_bins.y[-1] + d_bins.y[-1] - ystep, sy + 1),
+            np.linspace(m_bins.x[0] + d_bins.x[0] + xstep / 2, m_bins.x[-1] + d_bins.x[-1] - xstep / 2, sx + 1),
+            np.linspace(m_bins.y[0] + d_bins.y[0] + ystep / 2, m_bins.y[-1] + d_bins.y[-1] - ystep / 2, sy + 1),
         )
 
     @property
