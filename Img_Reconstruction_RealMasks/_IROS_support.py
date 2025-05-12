@@ -4,6 +4,13 @@ Support methods for the IROS pipeline.
 
 import os
 from pathlib import Path
+from dataclasses import dataclass
+
+__all__ = [
+    "_handle_dirpaths", "handle_simul_corrections",
+    "iros_pipeline_report", "PipelineParams",
+    "initialize_pipeline", "output_pipeline_files",
+]
 
 
 def _handle_dirpaths(
@@ -87,32 +94,238 @@ def iros_pipeline_report(
     )
 
 
-def output_pipeline_files(files: dict) -> None:
+@dataclass(frozen=True)
+class PipelineParams:
+    """
+    Container for the IROS pipeline parameters.
+
+    Attributes:
+        mask_file (str):
+            Directory path to the mask FITS file.
+        simul_data (str):
+            Directory path to the simulated data FITS file.
+        save_path (str):
+            Output FITS files directory path.
+        vignetting (bool):
+            Flag for vignetting effect on the detector.
+        psfy (bool):
+            Flag for detector PSF effect along the y axis.
+        wfm_cameras (tuple[str]):
+            Name of the WFM cameras (e.g., `('cam1a', 'cam1b')`).
+        dataset_type (str):
+            Photons position reconstruction effects. Either 'detected' or 'reconstructed'.
+        start_ups (tuple[int]):
+            Starting upscaling values.
+        end_ups (tuple[int]):
+            Final upscaling values.
+        iros_max_iterations (int, optional (default=20)):
+            Maximum number of iterations for the IROS loop.
+        iros_snr_threshold (int | float, optional (default=5)):
+            Minimum SNR value required to continue the iterative source removal process.
+        sky_compositions (bool, optional (default=False)):
+            Flag for WFM sky compositions.
+        simul_names (tuple[str]):
+            Names for the simulated skies FITS files.
+        simul_comp_name (str):
+            Name for the simulated sky composition FITS file.
+        iros_output_name (str):
+            Name for the output IROS database FITS file.
+        res_names (tuple[str]):
+            Names for the IROS sky residuals FITS files.
+        res_comp_name (str):
+            Name for the IROS sky residuals composition FITS file.
+        iros_data_name (str):
+            Name for the output IROS sources parameters database FITS file.
+        DB_name (str):
+            Name for the output database with the identified sources parameters FITS file.
+        out_names (tuple[str]):
+            Names for the IROS reconstructed skies FITS files.
+        out_comp_name (str):
+            Name for the IROS reconstructed sky composition FITS file.
+    """
+    mask_file: str
+    simul_data: str
+    save_path: str
+    vignetting: bool
+    psfy: bool
+    wfm_cameras: tuple[str]
+    dataset_type: str
+    start_ups: tuple[int]
+    end_ups: tuple[int]
+    iros_max_iterations: int
+    iros_snr_threshold: int | float
+    sky_compositions: bool
+    simul_names: tuple[str]
+    simul_comp_name: str
+    iros_output_name: str
+    res_names: tuple[str]
+    res_comp_name: str
+    iros_data_name: str
+    DB_name: str
+    out_names: tuple[str]
+    out_comp_name: str
+
+
+def initialize_pipeline(
+    mask: str,
+    ideal_mask: bool,
+    skyfield: str,
+    skydata: str,
+    wfm_cameras: tuple[str],
+    dataset_type: str,
+    start_ups: tuple[int],
+    end_ups: tuple[int],
+    testID: str,
+    iros_max_iterations: int = 20,
+    iros_snr_threshold: int | float = 5,
+    sky_compositions: bool = False,
+) -> PipelineParams:
+    """
+    Initializes the IROS pipeline by processing input parameters.
+
+    Args:
+        mask (str):
+            Name of the mask FITS file.
+        ideal_mask (bool):
+            Indicates if the mask is infinite thin and/or absorbent or realistic.
+        skyfield (str):
+            Name of the sky-field simulation (e.g., 'Crab', 'GalacticCenter', ...).
+        skydata (str):
+            Name of the directory with the sky-data simulation.
+        wfm_cameras (tuple[str]):
+            Name of the WFM cameras (e.g., `('cam1a', 'cam1b')`).
+        dataset_type (str):
+            Photons position reconstruction effects. Either 'detected' or 'reconstructed'.
+        start_ups (tuple[int]):
+            Starting upscaling values.
+        end_ups (tuple[int]):
+            Final upscaling values.
+        testID (str):
+            Test name.
+        iros_max_iterations (int, optional (default=20)):
+            Maximum number of iterations for the IROS loop.
+        iros_snr_threshold (int | float, optional (default=5)):
+            Minimum SNR value required to continue the iterative source removal process.
+        sky_compositions (bool, optional (default=False)):
+            Flag for WFM sky compositions.
+    
+    Returns:
+        params (PipelineParams):
+            Output PipelineParams instance with all the parameters to run the pipeline.
+    """
+    # file directory paths (mask, simulated, where to save output files)
+    mask_file, simul_data, save_path = _handle_dirpaths(
+        mask=mask,
+        skyfield=skyfield,
+        simul=skydata,
+        test_name=testID,
+    )
+
+    # detector corrections
+    vignetting, psfy = handle_simul_corrections(ideal_mask, dataset_type)
+    
+    # output files names (simul skies, iros output DB and sky residuals, sources and catalog-compared DB, IROS skies)
+    cam_a, cam_b = wfm_cameras
+
+    simul_names = tuple(save_path + f"sky_SIMUL_{cam.upper()}_TEST_{testID}.fits" for cam in (cam_a, cam_b))
+    simul_comp_name = save_path + f"COMPOSED_sky_SIMUL_{cam_a.upper()}_{cam_b.upper()}_TEST_{testID}.fits"
+
+    iros_output_name = save_path + f"IROS_output_TEST_{testID}.fits"
+    res_names = tuple(save_path + f"skyRES_IROS_{cam.upper()}_TEST_{testID}.fits" for cam in (cam_a, cam_b))
+    res_comp_name = save_path + f"COMPOSED_skyRES_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST_{testID}.fits"
+
+    iros_data_name = save_path + f"IROS_data_TEST_{testID}.fits"
+    DB_name = save_path + f"IROS_sources_database_TEST_{testID}.fits"
+
+    out_names = tuple(save_path + f"OUTsky_IROS_{cam.upper()}_TEST_{testID}.fits" for cam in (cam_a, cam_b))
+    out_comp_name = save_path + f"COMPOSED_OUTsky_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST_{testID}.fits"
+
+    params = PipelineParams(
+        mask_file=mask_file,
+        simul_data=simul_data,
+        save_path=save_path,
+        vignetting=vignetting,
+        psfy=psfy,
+        wfm_cameras=wfm_cameras,
+        dataset_type=dataset_type,
+        start_ups=start_ups,
+        end_ups=end_ups,
+        iros_max_iterations=iros_max_iterations,
+        iros_snr_threshold=iros_snr_threshold,
+        sky_compositions=sky_compositions,
+        simul_names=simul_names,
+        simul_comp_name=simul_comp_name,
+        iros_output_name=iros_output_name,
+        res_names=res_names,
+        res_comp_name=res_comp_name,
+        iros_data_name=iros_data_name,
+        DB_name=DB_name,
+        out_names=out_names,
+        out_comp_name=out_comp_name,
+    )
+
+    iros_pipeline_report(
+        skyfield=(skyfield, skydata),
+        test_name=testID,
+        dataset=dataset_type,
+        mask_type=ideal_mask,
+        vignetting=vignetting,
+        psfy=psfy,
+        start_upscaling=start_ups,
+        final_upscaling=end_ups,
+        iros_iterations=iros_max_iterations,
+        sky_composition=sky_compositions,
+    )
+
+    return params
+
+
+def output_pipeline_files(
+    params: PipelineParams,
+    check_out: bool = True,
+) -> None:
     """Prints out which pipeline files have been saved."""
+
     def check(_file: str) -> str:
         return "SAVED" if Path(_file).is_file() else "MISSING"
     
+
+    cam_a, cam_b = params.wfm_cameras
+    pipeline_files = {
+        "Simulation Files": [
+            (f"Simulated Sky {cam_a.upper()}", params.simul_names[0]),
+            (f"Simulated Sky {cam_b.upper()}", params.simul_names[1]),
+            ("Simulated Sky (composed)", params.simul_comp_name),
+        ],
+        "Residuals Files": [
+            (f"Residual Sky {cam_a.upper()}", params.res_names[0]),
+            (f"Residual Sky {cam_b.upper()}", params.res_names[1]),
+            ("Residual Sky (composed)", params.res_comp_name),
+        ],
+        "IROS Output Files": [
+            (f"Output Sky {cam_a.upper()}", params.out_names[0]),
+            (f"Output Sky {cam_b.upper()}", params.out_names[1]),
+            ("Output Sky (composed)", params.out_comp_name),
+        ],
+        "Databases Files": [
+            ("IROS output DB", params.iros_output_name),
+            ("IROS sources parameters", params.iros_data_name),
+            ("IROS-catalog comparison", params.DB_name),
+        ],
+    }
+    
     check_list = []
     print("\n#### GENERATED FILES")
-    for category, files_list in files.items():
+    for category, files_list in pipeline_files.items():
         print(f"# {category}")
         for name, path in files_list:
             check_list.append(status := check(path))
             print(f"  - {name}: {status}")
     
     print("\n")
-    if "MISSING" not in check_list: exit()
+    if check_out and "MISSING" not in check_list:
+        print("All files present!")
+        exit()
 
-
-def initialize_pipeline():
-    """Initializes the IROS pipeline by processing input parameters."""
-    #mask_file, simul_data, save_path = _handle_dirpaths(
-    #    mask=mask_FITS,
-    #    skyfield=skyfield,
-    #    simul=data_FITS,
-    #    test_name=N_TEST,
-    #)
-    #vignetting, psfy = handle_simul_corrections(IDEAL_MASK, dataset)
-    raise NotImplementedError
 
 # end

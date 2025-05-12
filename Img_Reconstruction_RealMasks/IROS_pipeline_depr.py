@@ -391,8 +391,7 @@ if __name__ == "__main__":
         if not Path(out_names[0]).is_file() and not Path(out_names[1]).is_file():
             with timer("IROS output skies"):
                 if "skies" not in globals():
-                    _names = tuple(f"skyRES_IROS_{cam.upper()}_TEST_{N_TEST}.fits" for cam in (cam_a, cam_b))
-                    skies = tuple(iros.load_sky(save_path + n)[0] for n in _names)
+                    skies = tuple(iros.load_sky(save_path + n)[0] for n in res_names)
                 skies = tuple(iros.make_sky(database, camID, wfm, res) for camID, res in zip((cam_a, cam_b), skies))
                 snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 

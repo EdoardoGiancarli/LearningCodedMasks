@@ -17,29 +17,6 @@ from mbloodmoon.types import BinsRectangular, UpscaleFactor
 from mbloodmoon.io import MaskDataLoader
 
 
-def _bins(
-    start: float,
-    stop: float,
-    px_size: float,
-    upscaling: int,
-) -> npt.NDArray:
-    """
-    Returns equally spaced points between start and stop, included.
-    The input `start`, `stop` and `px_size` must have same dimension.
-
-    Args:
-        start (float): Start point.
-        stop (float): Stop point.
-        px_size (float): Size of the pixels.
-        upscaling (int): Upscaling factor.
-
-    Returns:
-        output (npt.NDArray): Bin edges array.
-    """
-    return np.linspace(start, stop, int((stop - start) * upscaling / px_size) + 1)
-
-
-
 @dataclass(frozen=True)
 class CodedMaskCamera:
     """
@@ -60,6 +37,27 @@ class CodedMaskCamera:
         upscale_f: UpscaleFactor,
     ) -> BinsRectangular:
         """Generate binning structure for mask with given upscale factors."""
+        def _bins(
+            start: float,
+            stop: float,
+            px_size: float,
+            upscaling: int,
+        ) -> npt.NDArray:
+            """
+            Returns equally spaced points between start and stop, included.
+            The input `start`, `stop` and `px_size` must have same dimension.
+
+            Args:
+                start (float): Start point.
+                stop (float): Stop point.
+                px_size (float): Size of the pixels.
+                upscaling (int): Upscaling factor.
+
+            Returns:
+                output (npt.NDArray): Bin edges array.
+            """
+            return np.linspace(start, stop, int((stop - start) * upscaling / px_size) + 1)
+        
         return BinsRectangular(
             _bins(self.mdl["mask_minx"], self.mdl["mask_maxx"], self.mdl["mask_deltax"], upscale_f.x),
             _bins(self.mdl["mask_miny"], self.mdl["mask_maxy"], self.mdl["mask_deltay"], upscale_f.y),

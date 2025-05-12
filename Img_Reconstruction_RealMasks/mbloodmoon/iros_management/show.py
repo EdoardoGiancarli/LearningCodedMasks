@@ -206,14 +206,14 @@ def plot_sequence(
     fig, axes = _handle_subplots(nplots)
     for i, ax in enumerate(axes):
         x_values = x[i] if x[i] is not None else np.arange(len(input_sequence[i]))
-        fcolor, ecolor = color[i] or ('OrangeRed', 'r')
+        fcolor, ecolor = color[i]
       
         if style[i] == 'scatter':
             ax.scatter(x_values, input_sequence[i], c=fcolor, edgecolors=ecolor, 
                        s=70, alpha=0.8, linewidths=2)
         else:
-            ax.bar(x_values, input_sequence[i], width=1, color=fcolor, 
-                   edgecolor=ecolor, linewidth=3, alpha=0.70)
+            ax.bar(x_values, input_sequence[i], width=1, facecolor=fcolor, 
+                   edgecolor=ecolor, linewidth=1, alpha=0.70)
 
         ax.set_xlim(offsetx[i][0], offsetx[i][1])
         ax.set_ylim(offsety[i][0], offsety[i][1])
@@ -254,6 +254,7 @@ def enhance_slices(
         x=[np.arange(len(s)) - len(s) // 2 for s in (xslice, yslice)],
         xlabel=["x", "y"],
         ylabel=["counts", "counts"],
+        color=[('white', 'r'), ('white', 'r')],
         offsety=[(np.min(s) - 10, np.max(s) + 10) for s in (xslice, yslice)]
     )
 

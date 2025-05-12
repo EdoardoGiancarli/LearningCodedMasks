@@ -1,4 +1,4 @@
-"""
+r"""
              ___   ____     ___    ____         ____    _                  _   _         
             |_ _| |  _ \   / _ \  / ___|       |  _ \  (_)  _ __     ___  | | (_)  _ __  
              | |  | |_) | | | | | \___ \       | |_) | | | | '_ \   / _ \ | | | | | '_ \   / _ \
@@ -28,7 +28,10 @@ Dependencies for running the pipeline:
     - Change paths for data in `_handle_dirpaths()` in `_IROS_support.py`
 
 TODO:
+    - fix skies upscaling for output visualisation
     - insert possibility to load residuals of proper shapes to act as BKG for output IROS skies (not oversampled)
+    - generalize directory paths for all users
+    - WARNING: source assignment relies only on catalog sources
 """
 
 from _IROS_support import initialize_pipeline
@@ -47,20 +50,21 @@ if __name__ == "__main__":
     IDEAL_MASK = False                 # infinitely opaque and thin mask
 
     # data
-    skyfield = "GalacticCenter"
-    data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+    skyfield = "Crab"
+    # data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+    data_FITS = "20250227_crab_cxb_2-50keV_1ks"
 
     cam_a, cam_b = "cam1a", "cam1b"
-    dataset = "detected"
+    dataset = "reconstructed"
 
     # upscaling
-    UPSX_0, UPSY_0 = 4, 1              # initial upscaling (with which IROS is performed)
-    UPSX_FINAL, UPSY_FINAL = 4, 1      # final upscaling for skies and visualisation
+    UPSX_0, UPSY_0 = 5, 1              # initial upscaling (with which IROS is performed)
+    UPSX_FINAL, UPSY_FINAL = 5, 1      # final upscaling for skies and visualisation
 
     # test ID and IROS set-up
-    N_TEST = "galcenter_offset_centered_skybins"
+    TEST_ID = "model_psfy_params"
 
-    max_iterations = 15
+    max_iterations = 1
     snr_threshold = 5
 
     sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky
@@ -71,12 +75,24 @@ if __name__ == "__main__":
     RUNNING PIPELINE.
     """
     print("\n#### RUNNING PIPELINE..")
-
     # initialize pipeline parameters
-    iros_params = initialize_pipeline()
+    params = initialize_pipeline(
+        mask=mask_FITS,
+        ideal_mask=IDEAL_MASK,
+        skyfield=skyfield,
+        skydata=data_FITS,
+        wfm_cameras=(cam_a, cam_b),
+        dataset_type=dataset,
+        start_ups=(UPSX_0, UPSY_0),
+        end_ups=(UPSX_FINAL, UPSY_FINAL),
+        testID=TEST_ID,
+        iros_max_iterations=max_iterations,
+        iros_snr_threshold=snr_threshold,
+        sky_compositions=sky_compositions,
+    )
 
     # run pipeline
-    run_pipeline(iros_params)
+    run_pipeline(params)
 
 
 # end
