@@ -334,9 +334,6 @@ def optimize(
     """
     # TODO: the upscaling factor should probably go into a configuration thing.
     shift_start_x, shift_start_y = _interpmax(camera, arg_sky, sky, UpscaleFactor(10, 10))
-
-    #from .coords import pos2shift
-    #shift_start_x, shift_start_y = pos2shift(camera, *arg_sky[::-1])
     fluence_start = sky.max()
 
     # initialize the function to compute coarse, fluence-dependent shadowgram model.
@@ -627,20 +624,24 @@ def iros(
         """Runs optimizer and subtract source."""
         try:
             shiftx, shifty, fluence = optimize(
-                camera,
-                sky,
-                arg,
+                camera=camera,
+                sky=sky,
+                arg_sky=arg,
                 vignetting=vignetting,
                 psfy=psfy,
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
-        
-        #shiftx -= 0.5 * camera.specs["mask_deltax"] / camera.upscale_f.x
-        #shifty -= 0.5 * camera.specs["mask_deltay"] / camera.upscale_f.y
 
         significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
-        model = model_sky(camera, shiftx, shifty, fluence, vignetting, psfy)
+        model = model_sky(
+            camera=camera,
+            shift_x=shiftx,
+            shift_y=shifty,
+            fluence=fluence,
+            vignetting=vignetting,
+            psfy=psfy,
+        )
         residual = sky - model
         return (shiftx, shifty, fluence, significance), residual
 

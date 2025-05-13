@@ -58,13 +58,13 @@ if __name__ == "__main__":
     dataset = "detected"
 
     # upscaling
-    UPSX_0, UPSY_0 = 1, 1              # initial upscaling (with which IROS is performed)
-    UPSX_FINAL, UPSY_FINAL = 1, 1      # final upscaling for skies and visualisation
+    UPSX_0, UPSY_0 = 5, 8              # initial upscaling (with which IROS is performed)
+    UPSX_FINAL, UPSY_FINAL = 5, 8      # final upscaling for skies and visualisation
 
     # test ID and IROS set-up
-    TEST_ID = "test_psfy"
+    TEST_ID = "model_psfy_params_ups5x8y_detected"
 
-    max_iterations = 10
+    max_iterations = 1
     snr_threshold = 5
 
     sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky
