@@ -355,7 +355,8 @@ def make_sky(
     elif valid_BG():
         sky = background
     
-    cropy, cropx = 46, 10
+    upx, upy = camera.upscale_f
+    cropx, cropy = int(10 * (1 + upx / 3)), int(50 * (1 + upy))
     
     for shiftx, shifty, fluence, x, y in zip(
         data[cameraID]["shift_x"]["data"],

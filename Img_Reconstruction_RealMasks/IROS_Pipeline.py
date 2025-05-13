@@ -55,16 +55,16 @@ if __name__ == "__main__":
     data_FITS = "20250227_crab_cxb_2-50keV_1ks"
 
     cam_a, cam_b = "cam1a", "cam1b"
-    dataset = "reconstructed"
+    dataset = "detected"
 
     # upscaling
-    UPSX_0, UPSY_0 = 5, 1              # initial upscaling (with which IROS is performed)
-    UPSX_FINAL, UPSY_FINAL = 5, 1      # final upscaling for skies and visualisation
+    UPSX_0, UPSY_0 = 1, 1              # initial upscaling (with which IROS is performed)
+    UPSX_FINAL, UPSY_FINAL = 1, 1      # final upscaling for skies and visualisation
 
     # test ID and IROS set-up
-    TEST_ID = "model_psfy_params"
+    TEST_ID = "test_psfy"
 
-    max_iterations = 1
+    max_iterations = 10
     snr_threshold = 5
 
     sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky

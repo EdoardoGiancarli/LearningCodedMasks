@@ -640,7 +640,7 @@ def iros(
         #shifty -= 0.5 * camera.specs["mask_deltay"] / camera.upscale_f.y
 
         significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
-        model = model_sky(camera, shiftx, shifty, fluence)
+        model = model_sky(camera, shiftx, shifty, fluence, vignetting, psfy)
         residual = sky - model
         return (shiftx, shifty, fluence, significance), residual
 
