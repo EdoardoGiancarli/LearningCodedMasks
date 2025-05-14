@@ -305,6 +305,8 @@ def make_sky(
     cameraID: str,
     camera: CodedMaskCamera,
     background: np.array = None,
+    vignetting: bool = True,
+    psfy: bool = True,
 ) -> np.array:
     """
     Generates a skymap with the info retrieved by IROS.
@@ -318,6 +320,10 @@ def make_sky(
             CodedMaskCamera instance used for imaging and reconstruction.
         background (np.array, optional (default=None)):
             Background for the reconstructed sky.
+        vignetting (bool, optional (default=True)):
+            Simulates vignetting effects.
+        psfy (bool, optional (default=True)):
+            Simulates detector reconstruction effects.
     
     Returns:
         sky (np.array):
@@ -333,9 +339,9 @@ def make_sky(
         - The background is optional (e.g. could be a Poissonian distr.
           of photons decoded from the detector or the IROS residuals).
     """
-    def valid_BG() -> bool:
+    def valid_BG(bkg: np.array) -> bool:
         """Checks background shape."""
-        if not (background.shape == camera.sky_shape):
+        if not (bkg.shape == camera.sky_shape):
             raise ValueError(f"Background must have same sky shape {camera.sky_shape}.")
         return True
 
@@ -347,12 +353,12 @@ def make_sky(
         cropping: tuple[int],
     ) -> np.array:
         """Generates a source shadowgram and returns a crop of the source."""
-        model = model_sky(camera, shiftx, shifty, fluence)
+        model = model_sky(camera, shiftx, shifty, fluence, vignetting, psfy)
         return crop(model, pos, cropping)
 
     if background is None:
         sky = np.zeros(camera.sky_shape)
-    elif valid_BG():
+    elif valid_BG(background):
         sky = background
     
     upx, upy = camera.upscale_f

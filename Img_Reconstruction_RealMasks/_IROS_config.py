@@ -185,7 +185,10 @@ def run_pipeline(params: PipelineParams) -> None:
             not Path(params.out_names[1]).is_file()
         ):
             with timer("IROS reconstructed skies"):
-                skies = tuple(iros.make_sky(database, camID, wfm, res) for camID, res in zip(params.wfm_cameras, skies))
+                skies = tuple(
+                    iros.make_sky(database, camID, wfm, res, params.vignetting, params.psfy)
+                    for camID, res in zip(params.wfm_cameras, skies)
+                )
                 snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
             # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL - UPSY_0 + 1) for sky in skies)
