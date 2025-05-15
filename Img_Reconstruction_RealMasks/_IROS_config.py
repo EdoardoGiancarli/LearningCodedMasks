@@ -152,7 +152,7 @@ def run_pipeline(params: PipelineParams) -> None:
             iros.save_iros_data(
                 data=iros_data,
                 mask_file=params.mask_file,
-                sdls=(sdlA, sdlB),
+                sdls=sdls,
                 save_to=params.iros_data_name,
             )
         else:
@@ -172,7 +172,7 @@ def run_pipeline(params: PipelineParams) -> None:
             iros.save_iros_data(
                 data=database,
                 mask_file=params.mask_file,
-                sdls=(sdlA, sdlB),
+                sdls=sdls,
                 save_to=params.DB_name,
             )
         else:
