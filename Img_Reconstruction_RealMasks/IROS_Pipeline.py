@@ -38,38 +38,38 @@ from _IROS_support import initialize_pipeline
 from _IROS_config import run_pipeline
 
 
+"""
+PIPELINE SET-UP.
+"""
+print("\n#### INITIALIZING IROS PIPELINE")
+
+# mask
+mask_FITS = "wfm_mask.fits"
+IDEAL_MASK = False                 # infinitely opaque and thin mask
+
+# data
+skyfield = "Crab"
+# data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+data_FITS = "20250227_crab_cxb_2-50keV_1ks"
+
+cam_a, cam_b = "cam1a", "cam1b"
+dataset = "detected"
+
+# upscaling
+UPSX_0, UPSY_0 = 5, 1              # initial upscaling (with which IROS is performed)
+UPSX_FINAL, UPSY_FINAL = 5, 1      # final upscaling for skies and visualisation
+
+# test ID and IROS set-up
+TEST_ID = "test_x_detected"
+
+max_iterations = 1
+snr_threshold = 5
+
+sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky
+
+
+
 if __name__ == "__main__":
-
-    """
-    PIPELINE SET-UP.
-    """
-    print("\n#### INITIALIZING IROS PIPELINE")
-
-    # mask
-    mask_FITS = "wfm_mask.fits"
-    IDEAL_MASK = False                 # infinitely opaque and thin mask
-
-    # data
-    skyfield = "Crab"
-    # data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
-    data_FITS = "20250227_crab_cxb_2-50keV_1ks"
-
-    cam_a, cam_b = "cam1a", "cam1b"
-    dataset = "detected"
-
-    # upscaling
-    UPSX_0, UPSY_0 = 5, 1              # initial upscaling (with which IROS is performed)
-    UPSX_FINAL, UPSY_FINAL = 5, 1      # final upscaling for skies and visualisation
-
-    # test ID and IROS set-up
-    TEST_ID = "test_x_detected"
-
-    max_iterations = 1
-    snr_threshold = 5
-
-    sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky
-
-
 
     """
     RUNNING PIPELINE.
