@@ -44,28 +44,33 @@ PIPELINE SET-UP.
 print("\n#### INITIALIZING IROS PIPELINE")
 
 # mask
-mask_FITS = "wfm_mask.fits"
-IDEAL_MASK = False                 # infinitely opaque and thin mask
+mask_FITS: str = "wfm_mask.fits"
+IDEAL_MASK: bool = False                 # infinitely opaque and thin mask
 
 # data
-skyfield = "Crab"
-# data_FITS = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
-data_FITS = "20250227_crab_cxb_2-50keV_1ks"
+skyfield: str = "Crab"
+# data_FITS: str = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+data_FITS: str = "20250227_crab_cxb_2-50keV_1ks"
 
-cam_a, cam_b = "cam1a", "cam1b"
-dataset = "detected"
+cam_a: str = "cam1a"
+cam_b: str = "cam1b"
+dataset: str = "detected"
 
 # upscaling
-UPSX_0, UPSY_0 = 5, 1              # initial upscaling (with which IROS is performed)
-UPSX_FINAL, UPSY_FINAL = 5, 1      # final upscaling for skies and visualisation
+UPSX_0: int = 5                    # initial upscaling (with which IROS is performed) 
+UPSY_0: int = 1
 
-# test ID and IROS set-up
-TEST_ID = "test_x_detected"
+UPSX_FINAL: int = 5                # final upscaling for skies and visualisation
+UPSY_FINAL: int = 1
 
-max_iterations = 1
-snr_threshold = 5
+# test ID
+TEST_ID: str = "test_x_detected"
 
-sky_compositions = False           # if True, the WFM cameras will be joined to get the composed sky
+# IROS set-up
+max_iterations: int = 1
+snr_threshold: int | float = 5
+
+sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
 
 
 
