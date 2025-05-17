@@ -129,7 +129,7 @@ def save_iros_output(
 def save_iros_data(
     data: dict,
     mask_file: str | Path,
-    sdls: tuple[SimulationDataLoader],
+    sdls: tuple[SimulationDataLoader, SimulationDataLoader],
     save_to: str | Path,
 ) -> None:
     """
@@ -140,7 +140,7 @@ def save_iros_data(
             IROS data output from `compute_params()`.
         mask_file (str | Path):
             Path to the FITS file for the WFM mask.
-        sdls (tuple(SimulationDataLoader)):
+        sdls (tuple[SimulationDataLoader, SimulationDataLoader]):
             SDL instances for the cameras of the WFM (camA and camB).
         save_to (str | Path):
             Path to the directory for saving the FITS file._
@@ -421,7 +421,7 @@ def load_pickle(filepath: str | Path) -> object:
 def fit_WCS(
     camera: CodedMaskCamera,
     sdl: SimulationDataLoader,
-    pixels: list[tuple[int]] = None,
+    pixels: list[tuple[int, int]] = None,
     grid_step: int = 200,
 ) -> WCS:
     """
@@ -433,7 +433,7 @@ def fit_WCS(
             CodedMaskCamera instance used for imaging and reconstruction.
         sdl (SimulationDataLoader):
             SimulationDataLoader instance for the given camera.
-        pixels (list[tuple[int]], optional (default=None)):
+        pixels (list[tuple[int, int]], optional (default=None)):
             List of pxs position for the WCS fit.
         grid_step (int, optional (default=200)):
             Step for the points in a sky grid for computing the fit.

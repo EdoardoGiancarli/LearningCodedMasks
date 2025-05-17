@@ -29,16 +29,16 @@ mpl.rcParams.update(RCPARAMS)
 
 def crop(
     image: np.array,
-    pos: tuple[int],
-    cropping: tuple[int],
+    pos: tuple[int, int],
+    cropping: tuple[int, int],
 ) -> np.array:
     """
     Crops 2D array at given position and with given cropping.
 
     Args:
         image (np.array): 2D array to crop.
-        pos (tuple[int]): Center position for cropping.
-        cropping (tuple[int]): Size of the cropping (positive int).
+        pos (tuple[int, int]): Center position for cropping.
+        cropping (tuple[int, int]): Size of the cropping (positive int).
     
     Returns:
         output (np.array): Cropped 2D array (shape twice the `cropping`).
@@ -49,6 +49,8 @@ def crop(
     
     Notes:
         - Negative indexes are allowed.
+    
+    TODO: allow flexible and automatic cropping
     """
     n, m = image.shape
     y, x = pos
@@ -224,8 +226,8 @@ def plot_sequence(
 
 def enhance_slices(
     sky: np.array,
-    pos: tuple[int],
-    crp: tuple[int] = (40, 40),
+    pos: tuple[int, int],
+    crp: tuple[int, int] = (40, 40),
     source: str = None,
     cameraID: str = None,
 ) -> None:
@@ -235,8 +237,8 @@ def enhance_slices(
 
     Args:
         sky (np.array): 2D array of the sky.
-        pos (tuple[int]): Indexes of the source.
-        crp (tuple[int], optional (default=(30, 30))): Half-size of the cropping.
+        pos (tuple[int, int]): Indexes of the source.
+        crp (tuple[int, int], optional (default=(30, 30))): Half-size of the cropping.
         source (str, optional (default=None)): Source name.
         cameraID (str, optional (default=None)): WFM camera name (e.g. 'CAM1A').
     
@@ -349,8 +351,8 @@ def make_sky(
         shiftx: float,
         shifty: float,
         fluence: float,
-        pos: tuple[int],
-        cropping: tuple[int],
+        pos: tuple[int, int],
+        cropping: tuple[int, int],
     ) -> np.array:
         """Generates a source shadowgram and returns a crop of the source."""
         model = model_sky(camera, shiftx, shifty, fluence, vignetting, psfy)
@@ -391,7 +393,7 @@ def plot_sky(
     sky: np.array,
     title: str,
     sources_ID: list[str] = None,
-    sources_pos: list[tuple[int]] = None,
+    sources_pos: list[tuple[int, int]] = None,
     highlight_pos: bool = True,
     save_to: str | Path = None,
 ) -> None:
@@ -405,7 +407,7 @@ def plot_sky(
             Title of the plot.
         sources_ID (list[str], optional (default=None)):
             Names of the sources.
-        sources_pos (list[tuple[int]], optional (default=None)):
+        sources_pos (list[tuple[int, int]], optional (default=None)):
             Position of the sources.
         highlight_pos (bool (default=True)):
             If True, the sources will be circled.

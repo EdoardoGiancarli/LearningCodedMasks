@@ -17,7 +17,7 @@ __all__ = [
 
 def iros_radec_accuracy(
     data: dict,
-    catalogs: tuple[np.recarray],
+    catalogs: tuple[np.recarray, np.recarray],
     sigma: int | float,
 ) -> tuple[DataFrame, float]: #tuple[list[tuple[str, bool]], tuple[float]]:
     """
@@ -65,7 +65,7 @@ def iros_radec_accuracy(
 
 def iros_radec_accuracy_finecoord(
     data: dict,
-    catalogs: tuple[np.recarray],
+    catalogs: tuple[np.recarray, np.recarray],
     sigma: int | float,
 ) -> tuple[DataFrame, float]: #tuple[list[tuple[str, bool]], tuple[float]]:
     """
@@ -120,8 +120,8 @@ def iros_radec_accuracy_finecoord(
 
 def iros_fluence(
     data: dict,
-    sdls: tuple[SimulationDataLoader],
-    catalogs: tuple[np.recarray],
+    sdls: tuple[SimulationDataLoader, SimulationDataLoader],
+    catalogs: tuple[np.recarray, np.recarray],
 ) -> DataFrame:
     """
     Checks fluences.
@@ -171,7 +171,7 @@ def iros_fluence(
 
 def iros_sources_res(
     data: dict,
-    catalogs: tuple[np.recarray],
+    catalogs: tuple[np.recarray, np.recarray],
 ) -> DataFrame:
     """
     Check residues.

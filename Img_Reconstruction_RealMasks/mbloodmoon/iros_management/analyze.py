@@ -31,7 +31,7 @@ __all__ = [
 
 
 def perform_iros(
-    camerasID: tuple[str],
+    camerasID: tuple[str, str],
     camera: CodedMaskCamera,
     sdl_camA: SimulationDataLoader,
     sdl_camB: SimulationDataLoader,
@@ -47,7 +47,7 @@ def perform_iros(
     SNR threshold is met.
 
     Args:
-        camerasID (tuple[str]):
+        camerasID (tuple[str, str]):
             Cameras of the WFM being processed.
         camera (CodedMaskCamera):
             CodedMaskCamera instance used for imaging and reconstruction.
@@ -79,9 +79,9 @@ def perform_iros(
         return {camera: deepcopy(init_keys) for camera in camerasID}
     
     def store_output(
-        rec_source: tuple[tuple],
-        obs_counts: tuple[float],
-        sub_counts: tuple[float],
+        rec_source: tuple[tuple[float, float, float]],
+        obs_counts: tuple[float, float],
+        sub_counts: tuple[float, float],
     ) -> None:
         """Stores sources info into log."""
         for idx, camera in enumerate(camerasID):
@@ -132,9 +132,9 @@ class IrosParams:
     IROS parameters log management.
 
     Attributes:
-        camerasID (tuple[str]): WFM cameras IDs.
+        camerasID (tuple[str, str]): WFM cameras IDs.
     """
-    def __init__(self, camerasID: tuple[str]):
+    def __init__(self, camerasID: tuple[str, str]):
         self.cams = camerasID
         self.log = self.make_log()
         self.keys = self.log[self.cams[0]].keys()
@@ -347,7 +347,7 @@ def compare_w_catalog(
     data: dict,
     catalogA: str | Path,
     catalogB: str | Path,
-    camerasID: tuple[str],
+    camerasID: tuple[str, str],
     min_flux: float = 0.0,
 ) -> dict:
     """
@@ -361,7 +361,7 @@ def compare_w_catalog(
             Path to the catalog for camera A.
         catalogB (str | Path):
             Path to the catalog for camera B.
-        camerasID (tuple[str]):
+        camerasID (tuple[str, str]):
             Cameras of the WFM being processed.
         min_flux (float, optional (default=0.0)):
             Threshold for the minimum flux to be extracted from the
@@ -393,7 +393,7 @@ def compare_w_catalog(
             catB = fits.getdata(catalogB)
             return catA, catB
     
-    def camera_comparison(catalogs: list) -> None:
+    def camera_comparison(catalogs: list[np.recarray, np.recarray]) -> None:
         """
         Compares respective catalogs for the two cameras and
         updates the input data dictionary.
@@ -401,7 +401,7 @@ def compare_w_catalog(
 
         def optimized_pos(
             catalog: np.recarray,
-            pos: tuple[float],
+            pos: tuple[float, float],
         ) -> int:
             """Source association from catalog."""
             arg = np.argmin(np.square(catalog["RA"] - pos[0]) + np.square(catalog["DEC"] - pos[1]))
