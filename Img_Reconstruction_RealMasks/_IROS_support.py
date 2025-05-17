@@ -110,13 +110,13 @@ class PipelineParams:
             Flag for vignetting effect on the detector.
         psfy (bool):
             Flag for detector PSF effect along the y axis.
-        wfm_cameras (tuple[str]):
+        wfm_cameras (tuple[str, str]):
             Name of the WFM cameras (e.g., `('cam1a', 'cam1b')`).
         dataset_type (str):
             Photons position reconstruction effects. Either 'detected' or 'reconstructed'.
-        start_ups (tuple[int]):
+        start_ups (tuple[int, int]):
             Starting upscaling values.
-        end_ups (tuple[int]):
+        end_ups (tuple[int, int]):
             Final upscaling values.
         iros_max_iterations (int, optional (default=20)):
             Maximum number of iterations for the IROS loop.
@@ -124,13 +124,13 @@ class PipelineParams:
             Minimum SNR value required to continue the iterative source removal process.
         sky_compositions (bool, optional (default=False)):
             Flag for WFM sky compositions.
-        simul_names (tuple[str]):
+        simul_names (tuple[str, str]):
             Names for the simulated skies FITS files.
         simul_comp_name (str):
             Name for the simulated sky composition FITS file.
         iros_output_name (str):
             Name for the output IROS database FITS file.
-        res_names (tuple[str]):
+        res_names (tuple[str, str]):
             Names for the IROS sky residuals FITS files.
         res_comp_name (str):
             Name for the IROS sky residuals composition FITS file.
@@ -138,7 +138,7 @@ class PipelineParams:
             Name for the output IROS sources parameters database FITS file.
         DB_name (str):
             Name for the output database with the identified sources parameters FITS file.
-        out_names (tuple[str]):
+        out_names (tuple[str, str]):
             Names for the IROS reconstructed skies FITS files.
         out_comp_name (str):
             Name for the IROS reconstructed sky composition FITS file.
@@ -148,21 +148,21 @@ class PipelineParams:
     save_path: str
     vignetting: bool
     psfy: bool
-    wfm_cameras: tuple[str]
+    wfm_cameras: tuple[str, str]
     dataset_type: str
-    start_ups: tuple[int]
-    end_ups: tuple[int]
+    start_ups: tuple[int, int]
+    end_ups: tuple[int, int]
     iros_max_iterations: int
     iros_snr_threshold: int | float
     sky_compositions: bool
-    simul_names: tuple[str]
+    simul_names: tuple[str, str]
     simul_comp_name: str
     iros_output_name: str
-    res_names: tuple[str]
+    res_names: tuple[str, str]
     res_comp_name: str
     iros_data_name: str
     DB_name: str
-    out_names: tuple[str]
+    out_names: tuple[str, str]
     out_comp_name: str
 
 
