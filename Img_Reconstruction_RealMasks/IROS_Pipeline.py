@@ -33,6 +33,7 @@ TODO:
     - generalize directory paths for all users
     - WARNING: source assignment relies only on catalog sources
 """
+from collections.abc import Sequence
 
 from _IROS_support import initialize_pipeline
 from _IROS_config import run_pipeline
@@ -48,29 +49,38 @@ mask_FITS: str = "wfm_mask.fits"
 IDEAL_MASK: bool = False                 # infinitely opaque and thin mask
 
 # data
-skyfield: str = "Crab"
-# data_FITS: str = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
-data_FITS: str = "20250227_crab_cxb_2-50keV_1ks"
+skyfield: str = "GalacticCenter"
+data_FITS: str = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+#data_FITS: str = "20250227_crab_cxb_2-50keV_1ks"
 
 cam_a: str = "cam1a"
 cam_b: str = "cam1b"
-dataset: str = "detected"
+dataset: str = "reconstructed"
 
 # upscaling
-UPSX_0: int = 5                    # initial upscaling (with which IROS is performed) 
+UPSX_0: int = 1                    # initial upscaling (with which IROS is performed) 
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 5                # final upscaling for skies and visualisation
+UPSX_FINAL: int = 1                # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 # test ID
-TEST_ID: str = "test_x_detected"
+TEST_ID: str = "test1"
 
 # IROS set-up
-max_iterations: int = 1
+max_iterations: int = 5
 snr_threshold: int | float = 5
 
 sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
+
+# setup filters
+photons_energy_range: int | tuple[int, int] | None = None                            # photons energy filter
+photons_coords: tuple[float, float] | Sequence[tuple[float, float]] | None = (
+    244.979705810547, -15.6400995254517
+)    # RA/Dec filter (sources to filter out)
+
+n_sources: int | tuple[int, int] | None = None                                       # number of sources in the catalog for comparison
+sources_flux_range: int | float | tuple[int | float, int | float] | None = None      # sources flux filter for the catalog comparison
 
 
 
@@ -94,6 +104,10 @@ if __name__ == "__main__":
         iros_max_iterations=max_iterations,
         iros_snr_threshold=snr_threshold,
         sky_compositions=sky_compositions,
+        energy_range=photons_energy_range,
+        coords=photons_coords,
+        n=n_sources,
+        flux_range=sources_flux_range,
     )
 
     # run pipeline

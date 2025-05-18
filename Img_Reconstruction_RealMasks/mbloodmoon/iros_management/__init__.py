@@ -17,12 +17,13 @@ This package contains useful methods for handling IROS-based analyses.
 from .analyze import perform_iros
 from .analyze import gen_params_log
 from .analyze import compute_params
-from .analyze import compare_w_catalog
+from .analyze import catalog_comparison
 from .analyze import dict2df
 
 from .handle import save_iros_output, load_iros_output
 from .handle import save_iros_data, load_iros_data
 from .handle import save_sky, load_sky
+from .handle import load_catalogs
 from .handle import fit_WCS
 from .handle import camera_composition
 

@@ -11,8 +11,9 @@ from _IROS_support import output_pipeline_files
 
 from mbloodmoon.io import simulation_files, simulation
 from mbloodmoon.mask import decode, count, variance, snratio #, codedmask
-# from mbloodmoon.images import upscale #, downscale
 from mbloodmoon.utils import timer
+from mbloodmoon.filtering import catalog_filter
+# from mbloodmoon.images import upscale #, downscale
 import mbloodmoon.iros_management as iros
 
 from temp_camera import codedmask
@@ -50,8 +51,16 @@ def run_pipeline(params: PipelineParams) -> None:
                 upscale_y=UPSY_0,
             )
             filepaths = simulation_files(params.simul_data)
-            sdlA = simulation(filepaths[cam_a][params.dataset_type])
-            sdlB = simulation(filepaths[cam_b][params.dataset_type])
+            sdlA = simulation(
+                filepath=filepaths[cam_a][params.dataset_type],
+                energy_range=params.energy_range,
+                coords=params.coords,
+            )
+            sdlB = simulation(
+                filepath=filepaths[cam_b][params.dataset_type],
+                energy_range=params.energy_range,
+                coords=params.coords,
+            )
             sdls = (sdlA, sdlB)
 
             with timer("Compute dets/vars"):
@@ -76,8 +85,8 @@ def run_pipeline(params: PipelineParams) -> None:
             skies = tuple(decode(wfm, d) for d in detectors)
             snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skies, variances))
 
-            # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL - UPSY_0 + 1) for sky in skies)
-            # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL - UPSY_0 + 1) for snr in snrs)
+            # ups_skies = tuple(upscale(sky, upscale_y=UPY_TO) for sky in skies)
+            # ups_snrs = tuple(upscale(snr, upscale_y=UPY_TO) for snr in snrs)
 
             for res, snr, sdl, name, wcs in zip(skies, snrs, sdls, params.simul_names, wcs_fit):
                 if not Path(name).is_file():
@@ -161,12 +170,18 @@ def run_pipeline(params: PipelineParams) -> None:
         # CATALOG COMPARISON AND DATABASE UPDATE
         print("\n#### Performing catalog comparison...")
         if not Path(params.DB_name).is_file():
-            database = iros.compare_w_catalog(
-                data=iros_data,
+            catA, catB = iros.load_catalogs(
                 catalogA=filepaths[cam_a]["sources"],
                 catalogB=filepaths[cam_b]["sources"],
+            )
+            catA = catalog_filter(catA, params.n, params.flux_range)
+            catB = catalog_filter(catB, params.n, params.flux_range)
+
+            database = iros.catalog_comparison(
+                data=iros_data,
+                catalogA=catA,
+                catalogB=catB,
                 camerasID=params.wfm_cameras,
-                min_flux=1e-1,
             )
 
             iros.save_iros_data(

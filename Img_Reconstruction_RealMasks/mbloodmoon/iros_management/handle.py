@@ -17,7 +17,7 @@ from reproject.mosaicking import reproject_and_coadd
 from mbloodmoon.io import SimulationDataLoader
 from mbloodmoon.mask import CodedMaskCamera
 
-from mbloodmoon.io import _validate_fits
+from mbloodmoon.io import check_fits
 from mbloodmoon.coords import pos2equatorial
 #from mbloodmoon.coords import shift2equatorial
 
@@ -25,7 +25,7 @@ __all__ = [
     "save_iros_output", "load_iros_output",
     "save_iros_data", "load_iros_data",
     "save_sky", "load_sky",
-    "fit_WCS", "camera_composition",
+    "load_catalogs", "fit_WCS", "camera_composition",
 ]
 
 
@@ -252,25 +252,34 @@ def save_pickle(data: object, save_to: str | Path) -> None:
        @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@      
 """
 
-def check_fits(filepath: Path) -> bool:
+def load_catalogs(
+    catalogA: str | Path,
+    catalogB: str | Path,
+) -> tuple[np.recarray, np.recarray]:
     """
-    Check presence and validity of the FITS file.
+    Loads the WFM catalog data for the camera A and B.
 
     Args:
-        filepath (str | Path): Path to the FITS file.
+        catalogA (str | Path):
+            Path to the camera A catalog FITS file.
+        catalogB (str | Path):
+            Path to the camera B catalog FITS file.
     
     Returns:
-        output (bool): True if FITS exists and in valid format.
-
-    Raises:
-        FileNotFoundError: If FITS file does not exists.
-        ValueError: If file not in valid FITS format.
+        output (tuple[np.recarray, np.recarray]):
+            Data from the WFM cameras catalog files.
     """
-    if not filepath.is_file():
-        raise FileNotFoundError(f"FITS file '{filepath}' does not exists.")
-    elif not _validate_fits(filepath):
-        raise ValueError("File not in valid FITS format.")
-    return True
+    def load_cat(filepath: Path) -> np.recarray:
+        """Loads the catalog data."""
+        if check_fits(filepath):
+            data = fits.getdata(filepath, ext=1)
+        return data
+
+    for c in (catalogA, catalogB):
+        if not isinstance(c, Path):
+            c = Path(c)
+    
+    return load_cat(catalogA), load_cat(catalogB)
 
 
 def load_iros_output(filepath: str | Path) -> dict:

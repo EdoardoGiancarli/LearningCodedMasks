@@ -2,10 +2,14 @@
 Data filters for photons energy range, sources flux and sources positions.
 """
 
-from collections.abc import Sequence, Callable
+from collections.abc import Sequence
 
 import numpy.typing as npt
 import numpy as np
+
+__all__ = [
+    "data_filter", "flux_filter", "source_filter", "catalog_filter",
+]
 
 
 def data_filter(
@@ -34,7 +38,7 @@ def data_filter(
     ) -> npt.NDArray:
         """Creates an energy mask for the input `record`."""
         if isinstance(values, (int, float)):
-            mask &= (record["ENERGY"] > values)
+            mask &= (record["ENERGY"] < values)
         else:
             mask &= (record["ENERGY"] > values[0]) & (record["ENERGY"] < values[1])
         return mask
@@ -71,71 +75,92 @@ def data_filter(
 
 
 def flux_filter(
+    record: np.recarray,
     flux_range: int | float | tuple[int | float, int | float],
-) -> Callable[[np.recarray], np.recarray]:
+) -> np.recarray:
     """
     Filters the input catalog `record` for a given flux range.
 
     Args:
+        record (np.recarray):
+            Input simulated data container.
         flux_range (int | float | tuple[int | float, int | float]):
             Flux range in ph/cm2/s for the data filtering. If a specific flux
             is given, this will be considered as the minimum filter value.
             If a tuple is given, it's interpreted as (`F_min`, `F_max`).
 
     Returns:
-        apply (Callable[[np.recarray], np.recarray]):
-            Filter application to the given simulated photon list.
+        output (np.recarray): Output filtered data container.
     """
-    def apply(record: np.recarray) -> np.recarray:
-        """
-        Applies the filter in the specified flux range.
-
-        Args:
-            record (np.recarray): Input simulated data container.
-        
-        Returns:
-            output (np.recarray): Output filtered data container.
-        """
-        if isinstance(flux_range, (int, float)):
-            filtered = record[record["FLUX"] > flux_range]
-        else:
-            filtered = record[
-                (record["FLUX"] > flux_range[0]) &
-                (record["FLUX"] < flux_range[1])
-            ]
-        return filtered
+    mask = np.ones(len(record), dtype=bool)
+    if isinstance(flux_range, (int, float)):
+        mask &= (record["FLUX"] > flux_range)
+    else:
+        mask &= (record["FLUX"] > flux_range[0]) & (record["FLUX"] < flux_range[1])
     
-    return apply
+    return record[mask]
 
 
-def source_filter(n: int | tuple[int, int]) -> Callable[[np.recarray], np.recarray]:
+def source_filter(
+    record: np.recarray,
+    n: int | tuple[int, int]
+) -> np.recarray:
     """
     Select the `n` brightest sources from the input catalog `record`,
     or a given interval of sources.
 
     Args:
+        record (np.recarray):
+            Input simulated data container.
         n (int | tuple[int]):
             Filtered interval of sources, up to the n-th brightest
             source or from `n[0]` to `n[1]` if `n` is a tuple.
 
     Returns:
-        apply (Callable[[np.recarray], np.recarray]):
-            Filter application to the given simulated photon list.
-    """
-    def apply(record: np.recarray) -> np.recarray:
-        """
-        Applies the filter for the specified number of sources.
-
-        Args:
-            record (np.recarray): Input simulated data container.
-        
-        Returns:
-            output (np.recarray): Output filtered data container.
-        """
-        sorted_record = np.sort(record, order="NPHOTONS")[::-1]
-        return sorted_record[:n] if isinstance(n, int) else sorted_record[n[0] : n[1]]
+        output (np.recarray): Output filtered data container.
     
-    return apply
+    Notes:
+        - `n` follows the std Python indexing rules.
+    """
+    sorted_rec = np.sort(record, order="NPHOTONS")[::-1]
+    runs = len(sorted_rec) // len(np.unique(sorted_rec["NAME"]))
+    return sorted_rec[:runs * n] if isinstance(n, int) else sorted_rec[runs * n[0] : runs * n[1]]
+
+
+def catalog_filter(
+    catalog: np.recarray,
+    n: int | tuple[int, int] | None,
+    flux_range: int | float | tuple[int | float, int | float] | None = None,
+) -> np.recarray:
+    """
+    Filters the input `catalog` record based on the sources fluence OR flux.
+    If `n` is given, it selects the `n` brightest sources from the input
+    record, or a given interval of sources. If `flux_range` is given, it
+    filters the input record for a given flux range.
+    
+    Args:
+        catalog (np.recarray): Input simulated data container.
+        n (int | tuple[int] | None):
+            Filtered interval of sources, up to the n-th brightest
+            source or from `n[0]` to `n[1]` if `n` is a tuple.
+        flux_range (int | float | tuple[int | float, int | float] | None, optional (default=None)):
+            Flux range in ph/cm2/s for the data filtering. If a specific flux
+            is given, this will be considered as the minimum filter value.
+            If a tuple is given, it's interpreted as (`F_min`, `F_max`).
+    
+    Returns:
+        output (np.recarray): Output filtered data container.
+    
+    Raises:
+        ValueError: If `n` or `flux_range` are both specified for catalogs filtering.
+    """
+    if n and flux_range:
+        raise ValueError("Specify either 'n' or 'flux_range' to filter the catalog.")
+    elif n is not None:
+        return source_filter(catalog, n)
+    elif flux_range is not None:
+        return flux_filter(catalog, flux_range)
+    return catalog
 
 
 # end

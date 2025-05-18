@@ -5,6 +5,7 @@ Support methods for the IROS pipeline.
 import os
 from pathlib import Path
 from dataclasses import dataclass
+from collections.abc import Sequence
 
 __all__ = [
     "_handle_dirpaths", "handle_simul_corrections",
@@ -77,6 +78,10 @@ def iros_pipeline_report(
     final_upscaling: tuple[int],
     iros_iterations: int,
     sky_composition: bool,
+    energy_range: int | tuple[int, int] | None = None,
+    coords: tuple[float, float] | Sequence[tuple[float, float]] | None = None,
+    n: int | tuple[int, int] | None = None,
+    flux_range: int | float | tuple[int | float, int | float] | None = None,
 ) -> None:
     """Prints out some IROS pipeline info."""
     print(
@@ -91,6 +96,10 @@ def iros_pipeline_report(
         f"  - Final upscaling: {final_upscaling}\n"
         f"  - Max IROS iteration: {iros_iterations}\n"
         f"  - Sky compositions: {sky_composition}\n"
+        f"  - Simulated photons energy range [keV]: {energy_range}\n"
+        f"  - Excluded photons RA/Dec [deg]: {coords}\n"
+        f"  - Catalog selected brighest sources: {n}\n"
+        f"  - Catalog sources flux min/range [ph/cm2/s]: {flux_range}\n"
     )
 
 
@@ -142,6 +151,14 @@ class PipelineParams:
             Names for the IROS reconstructed skies FITS files.
         out_comp_name (str):
             Name for the IROS reconstructed sky composition FITS file.
+        energy_range (int | float | tuple[int | float, int | float] | None):
+            Energy range in keV for the data filtering.
+        coords (tuple[float, float] | Sequence[tuple[float, float]] | None):
+            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
+        n (int | tuple[int] | None):
+            Filtered interval of sources.
+        flux_range (int | float | tuple[int | float, int | float] | None, optional (default=None)):
+            Flux range in ph/cm2/s for the data filtering.
     """
     mask_file: str
     simul_data: str
@@ -164,6 +181,10 @@ class PipelineParams:
     DB_name: str
     out_names: tuple[str, str]
     out_comp_name: str
+    energy_range: int | tuple[int, int] | None
+    coords: tuple[float, float] | Sequence[tuple[float, float]] | None
+    n: int | tuple[int, int] | None
+    flux_range: int | float | tuple[int | float, int | float] | None
 
 
 def initialize_pipeline(
@@ -179,6 +200,10 @@ def initialize_pipeline(
     iros_max_iterations: int = 20,
     iros_snr_threshold: int | float = 5,
     sky_compositions: bool = False,
+    energy_range: int | tuple[int, int] | None = None,
+    coords: tuple[float, float] | Sequence[tuple[float, float]] | None = None,
+    n: int | tuple[int, int] | None = None,
+    flux_range: int | float | tuple[int | float, int | float] | None = None,
 ) -> PipelineParams:
     """
     Initializes the IROS pipeline by processing input parameters.
@@ -208,11 +233,31 @@ def initialize_pipeline(
             Minimum SNR value required to continue the iterative source removal process.
         sky_compositions (bool, optional (default=False)):
             Flag for WFM sky compositions.
+        energy_range (int | float | tuple[int | float, int | float] | None, optional (default=None)):
+            Energy range in keV for the data filtering. If a specific energy
+            is given, this will be considered as the maximum filter value.
+            If a tuple is given, it's interpreted as (`E_min`, `E_max`).
+        coords (tuple[float, float] | Sequence[tuple[float, float]] | None, optional (default=None)):
+            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
+        n (int | tuple[int] | None, optional (default=None)):
+            Filtered interval of sources, up to the n-th brightest
+            source or from `n[0]` to `n[1]` if `n` is a tuple.
+        flux_range (int | float | tuple[int | float, int | float] | None, optional (default=None)):
+            Flux range in ph/cm2/s for the data filtering. If a specific flux
+            is given, this will be considered as the minimum filter value.
+            If a tuple is given, it's interpreted as (`F_min`, `F_max`).
     
     Returns:
         params (PipelineParams):
             Output PipelineParams instance with all the parameters to run the pipeline.
+    
+    Raises:
+        ValueError: If `n` or `flux_range` are both specified for catalogs filtering.
     """
+    # configure n and flux_range for catalogs filtering
+    if n and flux_range:
+        raise ValueError("Specify either 'n' or 'flux_range' to filter the catalog.")
+
     # file directory paths (mask, simulated, where to save output files)
     mask_file, simul_data, save_path = _handle_dirpaths(
         mask=mask,
@@ -262,6 +307,10 @@ def initialize_pipeline(
         DB_name=DB_name,
         out_names=out_names,
         out_comp_name=out_comp_name,
+        energy_range=energy_range,
+        coords=coords,
+        n=n,
+        flux_range=flux_range,
     )
 
     iros_pipeline_report(
@@ -275,6 +324,10 @@ def initialize_pipeline(
         final_upscaling=end_ups,
         iros_iterations=iros_max_iterations,
         sky_composition=sky_compositions,
+        energy_range=energy_range,
+        coords=coords,
+        n=n,
+        flux_range=flux_range,
     )
 
     return params

@@ -7,13 +7,10 @@ from copy import deepcopy
 
 import numpy as np
 from tqdm import tqdm
-from astropy.io import fits
 from pandas import DataFrame
 
 from mbloodmoon.io import SimulationDataLoader
 from mbloodmoon.mask import CodedMaskCamera
-
-from mbloodmoon.io import _validate_fits
 from mbloodmoon.coords import shift2equatorial
 from mbloodmoon.coords import shift2pos
 from mbloodmoon.coords import shift2theta
@@ -25,7 +22,7 @@ from mbloodmoon.optim import iros
 
 __all__ = [
     "perform_iros", "gen_params_log",
-    "compute_params", "compare_w_catalog",
+    "compute_params", "catalog_comparison",
     "dict2df",
 ]
 
@@ -343,12 +340,11 @@ def compute_params(
     return deepcopy(iros_data)
 
 
-def compare_w_catalog(
+def catalog_comparison(
     data: dict,
-    catalogA: str | Path,
-    catalogB: str | Path,
+    catalogA: np.recarray,
+    catalogB: np.recarray,
     camerasID: tuple[str, str],
-    min_flux: float = 0.0,
 ) -> dict:
     """
     Compares the reconstructed IROS sources data with the catalog
@@ -357,10 +353,10 @@ def compare_w_catalog(
     Args:
         data (dict):
             IROS data output from `compute_params()`.
-        catalogA (str | Path):
-            Path to the catalog for camera A.
-        catalogB (str | Path):
-            Path to the catalog for camera B.
+        catalogA (np.recarray):
+            Catalog data for camera A.
+        catalogB (np.recarray):
+            Catalog data for camera B.
         camerasID (tuple[str, str]):
             Cameras of the WFM being processed.
         min_flux (float, optional (default=0.0)):
@@ -375,80 +371,53 @@ def compare_w_catalog(
     Raises:
         FileNotFoundError: if FITS files do not exist.
         ValueError: if files not in valid FITS format.
-    """
+    """ 
 
-    def get_catalogs() -> tuple[np.recarray]:
-        """Returns the catalogs data."""
-
-        def check_fits(pattern: Path) -> bool:
-            """Check presence and validity of the FITS file."""
-            if not pattern.is_file():
-                raise FileNotFoundError("FITS file does not exists.")
-            elif not _validate_fits(pattern):
-                raise ValueError("File not in valid FITS format.")
-            return True
-
-        if check_fits(catalogA) and check_fits(catalogB):
-            catA = fits.getdata(catalogA)
-            catB = fits.getdata(catalogB)
-            return catA, catB
+    def optimized_pos(
+        catalog: np.recarray,
+        pos: tuple[float, float],
+    ) -> int:
+        """Source association from catalog."""
+        arg = np.argmin(np.square(catalog["RA"] - pos[0]) + np.square(catalog["DEC"] - pos[1]))
+        return arg
     
-    def camera_comparison(catalogs: list[np.recarray, np.recarray]) -> None:
-        """
-        Compares respective catalogs for the two cameras and
-        updates the input data dictionary.
-        """
+    def check_source(catalog: np.recarray, arg: int) -> str:
+        """Checks if the source is in the catalog."""
+        # TODO: this nested method is not really of help here
+        # This should become important in later simulations
+        pass
+    
+    def source_in_db(cameraID: str, name: str) -> bool:
+        """Checks database to avoid sources repetition."""
+        if name in data[cameraID]["catalog_name"]["data"]:
+            return True
+        return False
 
-        def optimized_pos(
-            catalog: np.recarray,
-            pos: tuple[float, float],
-        ) -> int:
-            """Source association from catalog."""
-            arg = np.argmin(np.square(catalog["RA"] - pos[0]) + np.square(catalog["DEC"] - pos[1]))
-            return arg
-        
-        def check_source(catalog: np.recarray, arg: int) -> str:
-            """Checks if the source is in the catalog."""
-            # TODO: this nested method is not really of help here
-            # This should become important in later simulations
-            pass
-        
-        def source_in_db(cameraID: str, name: str) -> bool:
-            """Checks database to avoid sources repetition."""
-            if name in data[cameraID]["catalog_name"]["data"]:
-                return True
-            return False
-
-        def remove_source(cameraID: str, arg: int) -> None:
-            """Removes repeting source in database."""
-            # TODO: implement source removal by SNR comparison
-            cam = data[cameraID]
-            for key in list(cam.keys())[:-2]:
-                cam[key]["data"] = np.delete(cam[key]["data"], arg)
-
-        fake_sources = ["gctr_diffuse"]
-        for catalog, cameraID in zip(catalogs, camerasID):
-            catalog = catalog[catalog["FLUX"] > min_flux]
-            data[cameraID]["catalog_name"] = {"data": [], "format": "20A", "unit": ""}
-            data[cameraID]["catalog_flux"] = {"data": [], "format": "D", "unit": "ph/cm2/s"}
-
-            for ra, dec in zip(data[cameraID]["ra"]["data"], data[cameraID]["dec"]["data"]):
-                argsource = optimized_pos(catalog, (ra, dec))
-                sourceID = catalog["NAME"][argsource]
-                if not source_in_db(cameraID, sourceID) and (sourceID not in fake_sources):
-                    data[cameraID]["catalog_name"]["data"].append(sourceID)
-                    data[cameraID]["catalog_flux"]["data"].append(catalog["FLUX"][argsource])
-                else:
-                    arg = len(data[cameraID]["catalog_name"]["data"])
-                    remove_source(cameraID, arg)
-
-    for c in [catalogA, catalogB]:
-        if not isinstance(c, Path):
-            c = Path(c)
+    def remove_source(cameraID: str, arg: int) -> None:
+        """Removes repeting source in database."""
+        # TODO: implement source removal by SNR comparison
+        cam = data[cameraID]
+        for key in list(cam.keys())[:-2]:
+            cam[key]["data"] = np.delete(cam[key]["data"], arg)
 
     print("# Comparing with Catalogs...")
-    catA, catB = get_catalogs()
-    camera_comparison([catA, catB])
+    catalogs = (catalogA, catalogB)
+
+    fake_sources = ["gctr_diffuse"]
+    for catalog, cameraID in zip(catalogs, camerasID):
+        data[cameraID]["catalog_name"] = {"data": [], "format": "20A", "unit": ""}
+        data[cameraID]["catalog_flux"] = {"data": [], "format": "D", "unit": "ph/cm2/s"}
+
+        for ra, dec in zip(data[cameraID]["ra"]["data"], data[cameraID]["dec"]["data"]):
+            argsource = optimized_pos(catalog, (ra, dec))
+            sourceID = catalog["NAME"][argsource]
+            if not source_in_db(cameraID, sourceID) and (sourceID not in fake_sources):
+                data[cameraID]["catalog_name"]["data"].append(sourceID)
+                data[cameraID]["catalog_flux"]["data"].append(catalog["FLUX"][argsource])
+            else:
+                arg = len(data[cameraID]["catalog_name"]["data"])
+                remove_source(cameraID, arg)
+
     print("# Successful comparison!")
     return deepcopy(data)
 
