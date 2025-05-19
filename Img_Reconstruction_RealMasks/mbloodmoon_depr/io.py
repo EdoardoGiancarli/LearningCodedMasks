@@ -17,9 +17,9 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
-from bloodmoon.types import CoordEquatorial
-from bloodmoon.types import CoordHorizontal
-from bloodmoon.filtering import data_filter
+from .types import CoordEquatorial
+from .types import CoordHorizontal
+from .filtering import data_filter
 
 __all__ = [
     "_validate_fits", "check_fits",
@@ -103,12 +103,12 @@ def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
     return {
         "cam1a": {
             "detected": check_and_pick(dirpath, "cam1a/*detected*.fits"),
-            "reconstructed": check_and_pick(dirpath, "cam1a/*reconstructed.fits"),
+            "reconstructed": check_and_pick(dirpath, "cam1a/*reconstructed*.fits"),
             "sources": check_and_pick(dirpath, "cam1a/*sources.fits"),
         },
         "cam1b": {
             "detected": check_and_pick(dirpath, "cam1b/*detected*.fits"),
-            "reconstructed": check_and_pick(dirpath, "cam1b/*reconstructed.fits"),
+            "reconstructed": check_and_pick(dirpath, "cam1b/*reconstructed*.fits"),
             "sources": check_and_pick(dirpath, "cam1b/*sources.fits"),
         },
     }
@@ -131,7 +131,7 @@ class SimulationDataLoader:
             Input photons RA/Dec (or sequence of RA/Dec) to filter out.
 
     Properties:
-        data: Photon event data from FITS extension 1.
+        data: Photon event data from FITS extension 1, eventually filtered.
         header: Primary FITS header.
         pointings (dict[str, CoordEquatorial]): Camera axis directions in equatorial frame
             - 'z': Optical axis pointing (RA/Dec)
@@ -261,19 +261,19 @@ class MaskDataLoader:
                 - "detector_maxx": bottom physical detector edge along y-axis [mm]
                 - "detector_miny": right physical detector edge along x-axis [mm]
                 - "detector_maxy": top physical detector edge along y-axis [mm]
-                - "detector_bmmask_dist": detector - bottom mask distance [mm] (with detector median absorption)
-                - "detector_midmask_dist": detector - mid mask plate distance [mm] (with detector median absorption)
-                - "detector_topmask_dist": detector - top mask distance [mm] (with detector median absorption)
+                - "detector_bmmask_dist": detector - bottom mask distance [mm] (with detector median absorption distance)
+                - "detector_midmask_dist": detector - mid mask plate distance [mm] (with detector median absorption distance)
+                - "detector_topmask_dist": detector - top mask distance [mm] (with detector median absorption distance)
                 - "open_fraction": mask open fraction
                 - "real_open_fraction": mask open fraction with ribs correction
         
         Notes:
-            - The detector median absorption for the incident photons is set to 0.01 mm.
+            - The detector median absorption distance for the incident photons is set to 0.01 mm.
         """
         h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
         h2 = dict(fits.getheader(self.filepath, ext=3))
 
-        detector_absorption = 0.01     # median photon length absorption in the detector [mm]
+        detector_absrp_dist = 0.01     # median photon absorption distance in the detector [mm]
 
         info = {
             "mask_minx": h1["MINX"],
@@ -289,9 +289,9 @@ class MaskDataLoader:
             "detector_maxx": h1["PLNXMAX"],
             "detector_miny": h1["PLNYMIN"],
             "detector_maxy": h1["PLNYMAX"],
-            "detector_bmmask_dist": h1["MDDIST"] + detector_absorption,
-            "detector_midmask_dist": h1["MDDIST"] + h1["MASKTHK"] / 2 + detector_absorption,
-            "detector_topmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
+            "detector_bmmask_dist": h1["MDDIST"] + detector_absrp_dist,
+            "detector_midmask_dist": h1["MDDIST"] + h1["MASKTHK"] / 2 + detector_absrp_dist,
+            "detector_topmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absrp_dist,
             "open_fraction": h2["OPENFR"],
             "real_open_fraction": h2["RLOPENFR"]
         }

@@ -223,7 +223,7 @@ def _init_model_fine(
             decoded_components = cache_get((pivot, *relative_positions))
         else:
             # print("no cache hit")
-            n, m = camera.shape_sky
+            n, m = camera.sky_shape
             pivot_i, pivot_j = pivot
             i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
             r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
@@ -352,7 +352,7 @@ def optimize(
         options={
             "maxiter": 10,
             "iprint": 1 if verbose else -1,
-            "ftol": 1e-4,
+            "ftol": 10e-5,
         },
     )
     # we use the best fluence value as the initial value for the next step.
@@ -384,7 +384,7 @@ def optimize(
         options={
             "maxiter": 10,
             "iprint": 1 if verbose else -1,
-            "ftol": 1e-4,
+            "ftol": 10e-5,
         },
     )
     # store the final optimized positions and fluence.
@@ -618,8 +618,8 @@ def iros(
 
     def subtract(
         arg: tuple[int, int],
-        sky: npt.NDArray,
-        snr_map: npt.NDArray,
+        sky: np.ndarray,
+        snr_map: np.ndarray,
     ) -> tuple[tuple[float, float, float, float], np.ndarray]:
         """Runs optimizer and subtract source."""
         try:
@@ -646,8 +646,8 @@ def iros(
         return (shiftx, shifty, fluence, significance), residual
 
     def compute_snratios(
-        skymaps: tuple[npt.NDArray, npt.NDArray],
-        varmaps: tuple[npt.NDArray, npt.NDArray],
+        skymaps: tuple[np.ndarray, np.ndarray],
+        varmaps: tuple[np.ndarray, np.ndarray],
     ) -> tuple[np.ndarray, np.ndarray]:
         """Computes skies SNR."""
         # variance is clipped to improve numerical stability for off-axis sources,

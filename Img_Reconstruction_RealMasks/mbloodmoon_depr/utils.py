@@ -1,5 +1,5 @@
 """
-General utility functions for the bloodmoon package.
+Support methods for analyses.
 """
 
 from typing import Generator, Any

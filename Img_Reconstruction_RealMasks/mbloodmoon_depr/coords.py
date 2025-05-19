@@ -34,8 +34,8 @@ def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[
 
     Args:
         camera: CodedMaskCamera instance containing binning information
-        shift_x: x-coordinate in sky-shift space [mm]
-        shift_y: y-coordinate in sky-shift space [mm]
+        shift_x: x-coordinate in sky-shift space (mm)
+        shift_y: y-coordinate in sky-shift space (mm)
 
     Returns:
         Tuple of (row, column) indices in the discrete sky image grid
@@ -48,24 +48,20 @@ def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[
         return (shift >= bins[0]) and (shift <= bins[-1])
     
     if not (
-        check_bounds(camera.bins_sky.y, shift_y) and
-        check_bounds(camera.bins_sky.x, shift_x)
+        check_bounds(camera.bins_sky.y, shift_y) and check_bounds(camera.bins_sky.x, shift_x)
     ):
         raise ValueError("Shifts outside binning boundaries.")
     
-    return (
-        bisect(camera.bins_sky.y, shift_y) - 1,
-        bisect(camera.bins_sky.x, shift_x) - 1,
-    )
+    return bisect(camera.bins_sky.y, shift_y) - 1, bisect(camera.bins_sky.x, shift_x) - 1
 
 
 def pos2shift(
     camera: CodedMaskCamera,
     x: int,
     y: int,
-) -> CoordSky:
+) -> tuple[float, float]:
     """
-    Convert sky pixel position (x, y) to sky-coordinate shifts.
+    Convert pixel indexes (x, y) to sky-coordinate shifts.
 
     Args:
         camera (CodedMaskCamera): The camera object containing sky shape and binning information.
@@ -73,9 +69,9 @@ def pos2shift(
         y (int): Pixel index along the y-axis.
 
     Returns:
-        output (CoordSky): Output sky-shifts
-            - shift_x (float): sky-coordinate in [mm] along the x-direction.
-            - shift_y (float): sky-coordinate in [mm] along the y-direction.
+        A tuple containing:
+            shift_x (float): sky-coordinate in [mm] along the x-direction.
+            shift_y (float): sky-coordinate in [mm] along the y-direction.
     
     Raises:
         IndexError: if indexes are out of bound for given sky.
@@ -84,14 +80,14 @@ def pos2shift(
         - resulting shifts refer to the center of the pixel.
         - negative indexes are allowed.
     """
-    n, m = camera.shape_sky
+    n, m = camera.sky_shape
     if not (-n <= y < n) or not (-m <= x < m):
-        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.shape_sky}.")
+        raise IndexError(f"Indexes ({y}, {x}) are out of bound for sky shape {camera.sky_shape}.")
 
     # bins resemble sky shape
-    binsx = camera.bins_sky.x
-    binsy = camera.bins_sky.y
-    return CoordSky(x=binsx[x], y=binsy[y])
+    binsx = camera.bins_sky.x[:-1]; binsy = camera.bins_sky.y[:-1]
+    dbinx = binsx[1] - binsx[0]; dbiny = binsy[1] - binsy[0]
+    return binsx[x] + dbinx/2, binsy[y] + dbiny/2
 
 
 def shift2theta(camera: CodedMaskCamera, shift: float) -> float:
@@ -152,7 +148,7 @@ def pos2equatorial(
     Notes:
         - the sky-coord shifts are in [mm] wrt optical axis.
         - RA is normalized to [0, 360) degree range.
-        - resulting RA/Dec refer to the center of the pixel.
+        - resulting RA/Dec refers to the center of the pixel.
         - negative indexes are allowed.
     """    
     return shift2equatorial(sdl, camera, *pos2shift(camera, x, y))
@@ -178,9 +174,10 @@ def shift2equatorial(
             - dec: Declination in degrees [-90, 90]
 
     Notes:
-        - Input coordinates and distance must use consistent units
+        - input coordinates and distance must use consistent units
         - RA is normalized to [0, 360) degree range
-        - Zero point in sky-shift space is the optical axis
+        - zero point in sky-shift space is the optical axis
+        - the distance to compute `theta` is assumed to be mask-detector plus half the mask thickness.
     """
     return _shift2equatorial(
         shift_x,
@@ -198,7 +195,7 @@ def _shift2equatorial(
     pointing_radec_x: CoordEquatorial,
     distance_detector_mask: float,
 ) -> CoordEquatorial:
-    """Implementation to `shift2equatorial`.
+    """Implementation to `shift2equatorial()`.
 
     Args:
         shift_x: X coordinate on the sky-shift plane in spatial units (e.g., mm or cm).
@@ -455,7 +452,7 @@ def _shiftgrid2equatorial(
             - `ra` field: Grid of right ascension values in degrees, same shape as input arrays.
               Values are in the range [0, 360] degrees.
     """
-    _, rotmat_cam2sky = _rotation_matrices(
+    rotmat_sky2cam, rotmat_cam2sky = _rotation_matrices(
         pointing_radec_z,
         pointing_radec_x,
     )
