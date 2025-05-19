@@ -52,9 +52,9 @@ class TestWFM(unittest.TestCase):
     # this may take some time
     @unittest.skip
     def test_all_sources_projects(self):
-        n, m = self.wfm.shape_sky()
+        n, m = self.wfm.shape_sky
         for i in range(n):
             for j in range(m):
-                sky = np.zeros(self.wfm.shape_sky())
+                sky = np.zeros(self.wfm.shape_sky)
                 sky[i, j] = 1
                 self.assertTrue(np.any(self.wfm.encode(sky)))
