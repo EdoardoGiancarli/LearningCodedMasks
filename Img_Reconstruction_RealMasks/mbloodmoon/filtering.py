@@ -21,7 +21,8 @@ def data_filter(
     Filters the input `record` based on the photons energy and/or position.
     
     Args:
-        record (np.recarray): Input simulated data container.
+        record (np.recarray):
+            Input simulated data container.
         energy_range (int | float | tuple[int | float, int | float] | None):
             Energy range in keV for the data filtering. If a specific energy
             is given, this will be considered as the maximum filter value.
@@ -139,7 +140,8 @@ def catalog_filter(
     filters the input record for a given flux range.
     
     Args:
-        catalog (np.recarray): Input simulated data container.
+        catalog (np.recarray):
+            Input simulated data container.
         n (int | tuple[int] | None):
             Filtered interval of sources, up to the n-th brightest
             source or from `n[0]` to `n[1]` if `n` is a tuple.
