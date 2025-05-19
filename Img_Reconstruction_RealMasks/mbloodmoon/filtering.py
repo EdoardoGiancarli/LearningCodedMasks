@@ -156,10 +156,12 @@ def catalog_filter(
     """
     if n and flux_range:
         raise ValueError("Specify either 'n' or 'flux_range' to filter the catalog.")
-    elif n is not None:
+    
+    if n is not None:
         return source_filter(catalog, n)
     elif flux_range is not None:
         return flux_filter(catalog, flux_range)
+    
     return catalog
 
 
