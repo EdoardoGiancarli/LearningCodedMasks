@@ -17,9 +17,9 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
-from bloodmoon.types import CoordEquatorial
-from bloodmoon.types import CoordHorizontal
-from bloodmoon.filtering import data_filter
+from .types import CoordEquatorial
+from .types import CoordHorizontal
+from .filtering import data_filter
 
 __all__ = [
     "_validate_fits", "check_fits",
