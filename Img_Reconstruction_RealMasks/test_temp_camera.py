@@ -7,6 +7,48 @@ from temp_camera import codedmask
 
 mask_path = "/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/wfm_mask.fits"
 
+
+from mbloodmoon.mask import decode, encode, psf, variance
+class TestWFM(unittest.TestCase):
+    def setUp(self):
+        self.wfm = codedmask(mask_path, upscale_x=2, upscale_y=1)
+
+    def test_shape_bulk(self):
+        self.assertEqual(self.wfm.bulk.shape, self.wfm.shape_detector)
+
+    def test_shape_detector(self):
+        self.assertFalse(self.wfm.shape_detector == self.wfm.shape_mask)
+
+    def test_sky_bins(self):
+        xbins, ybins = self.wfm._bins_sky()
+        assert len(np.unique(xbins)) == len(xbins)
+        assert len(np.unique(ybins)) == len(ybins)
+        assert len(np.unique(np.round(np.diff(xbins), 7))) == 1
+        assert len(np.unique(np.round(np.diff(ybins), 7))) == 1
+
+    def test_encode_shape(self):
+        sky = np.zeros(self.wfm.shape_sky)
+        self.assertEqual(encode(self.wfm, sky).shape, self.wfm.shape_detector)
+
+    def test_encode_decode(self):
+        n, m = self.wfm.shape_sky
+        sky = np.zeros((n, m))
+        sky[n // 2, m // 2] = 10000
+        detector = encode(self.wfm, sky)
+        decoded_sky = decode(self.wfm, detector)
+        self.assertTrue(np.any(decoded_sky))
+
+    def test_decode_shape(self):
+        detector = np.zeros(self.wfm.shape_detector)
+        cc = decode(self.wfm, detector)
+        var = variance(self.wfm, detector)
+        self.assertEqual(cc.shape, self.wfm.shape_sky)
+        self.assertEqual(var.shape, self.wfm.shape_sky)
+
+    def test_psf_shape(self):
+        self.assertEqual(psf(self.wfm).shape, self.wfm.shape_mask)
+
+
 class TestCamera(unittest.TestCase):
     """
     Test for the `CodedMaskCamera` class in `mask.py`.
@@ -15,7 +57,7 @@ class TestCamera(unittest.TestCase):
     will be taken into account for the WFM analyses.
     """
     def setUp(self):
-        self.upscale_to = 10
+        self.upscale_to = 3
         self.wfm_base = codedmask(mask_path, 1, 1)
 
     def test_binning_alignment(self):
@@ -60,13 +102,14 @@ class TestCamera(unittest.TestCase):
                 )
 
                 # testing superimposition
+                hbin = (mask_bins[b][1] - mask_bins[b][0]) / 2
                 np.testing.assert_almost_equal(
-                    mask_bins[b],
+                    mask_bins[b] + hbin,
                     sky_bins[b][len(detector_bins[b]) // 2 : -len(detector_bins[b]) // 2 + 2],
                     decimal=7,
                 )
                 np.testing.assert_almost_equal(
-                    detector_bins[b],
+                    detector_bins[b] + hbin,
                     sky_bins[b][len(mask_bins[b]) // 2 : -len(mask_bins[b]) // 2 + 2],
                     decimal=7,
                 )
@@ -85,11 +128,11 @@ class TestCamera(unittest.TestCase):
                 enumerate(("y", "x")), (ups_y, ups_x),
             ):
                 print(f"    - testing {ax} axis")
-                self.assertEqual(wfm.mask_shape[idx], up * self.wfm_base.mask_shape[idx])
-                self.assertEqual(wfm.detector_shape[idx], up * self.wfm_base.detector_shape[idx])
+                self.assertEqual(wfm.shape_mask[idx], up * self.wfm_base.shape_mask[idx])
+                self.assertEqual(wfm.shape_detector[idx], up * self.wfm_base.shape_detector[idx])
                 self.assertEqual(
-                    wfm.sky_shape[idx],
-                    up * (self.wfm_base.mask_shape[idx] + self.wfm_base.detector_shape[idx]) - 1,
+                    wfm.shape_sky[idx],
+                    up * (self.wfm_base.shape_mask[idx] + self.wfm_base.shape_detector[idx]) - 1,
                 )
 
     def test_arrays_shape2(self):
@@ -101,10 +144,10 @@ class TestCamera(unittest.TestCase):
         ):
             print(f"# Testing upscaling {ups_y, ups_x}")
             wfm = codedmask(mask_path, ups_x, ups_y)
-            self.assertEqual(wfm.mask.shape, wfm.mask_shape)
-            self.assertEqual(wfm.decoder.shape, wfm.mask_shape)
-            self.assertEqual(wfm.bulk.shape, wfm.detector_shape)
-            self.assertEqual(wfm.balancing.shape, wfm.sky_shape)
+            self.assertEqual(wfm.mask.shape, wfm.shape_mask)
+            self.assertEqual(wfm.decoder.shape, wfm.shape_mask)
+            self.assertEqual(wfm.bulk.shape, wfm.shape_detector)
+            self.assertEqual(wfm.balancing.shape, wfm.shape_sky)
 
     def test_bulk_binning(self):
         """
@@ -176,6 +219,108 @@ class TestCamera(unittest.TestCase):
                 np.array([0, 1]),
                 strict=False,
             )
+
+
+
+
+
+
+
+
+from mbloodmoon.coords import shift2pos, pos2shift
+
+class TestShift2Pos(unittest.TestCase):
+    """Test for the `shift2pos()` function in `mask.py`."""
+
+    def setUp(self):
+        self.wfm = codedmask(mask_path, upscale_x=3, upscale_y=3)
+
+    def test_binning_boundaries(self):
+        """Test for allowed and not allowed shifts wrt the binning."""
+        # shifts with "_in" suffix refer to shifts inside binning
+        # shifts with "_out" suffix refer to shifts outside binning
+        f = 1e-5
+        shiftx_sx_in = self.wfm.bins_sky.x[0] + f
+        shiftx_sx_out = self.wfm.bins_sky.x[0] - f
+        shiftx_dx_in = self.wfm.bins_sky.x[-1] - f
+        shiftx_dx_out = self.wfm.bins_sky.x[-1] + f
+
+        shifty_up_in = self.wfm.bins_sky.y[0] + f
+        shifty_up_out = self.wfm.bins_sky.y[0] - f
+        shifty_bm_in = self.wfm.bins_sky.y[-1] - f
+        shifty_bm_out = self.wfm.bins_sky.y[-1] + f
+
+        # test for the allowed shifts at the edges of the binning
+        comb_yes = [
+            (shiftx_sx_in, shifty_up_in),
+            (shiftx_sx_in, shifty_bm_in),
+            (shiftx_dx_in, shifty_up_in),
+            (shiftx_dx_in, shifty_bm_in),
+        ]
+        testing = tuple(shift2pos(self.wfm, *shifts) for shifts in comb_yes)
+
+        with self.assertRaises(ValueError):
+            # test for the shifts outside the binning
+            comb_no = [
+                (shiftx_sx_in, shifty_up_out),
+                (shiftx_sx_in, shifty_bm_out),
+                (shiftx_dx_in, shifty_up_out),
+                (shiftx_dx_in, shifty_bm_out),
+                (shiftx_sx_out, shifty_up_in),
+                (shiftx_dx_out, shifty_up_in),
+                (shiftx_sx_out, shifty_bm_in),
+                (shiftx_dx_out, shifty_bm_in),
+                (shiftx_sx_out, shifty_up_out),
+                (shiftx_sx_out, shifty_bm_out),
+                (shiftx_dx_out, shifty_up_out),
+                (shiftx_dx_out, shifty_bm_out),
+            ]
+            testing = tuple(shift2pos(self.wfm, *shifts) for shifts in comb_no)
+
+
+class TestPos2Shift(unittest.TestCase):
+    """Test for the `pos2shift()` function in `coords.py`."""
+
+    def setUp(self):
+        self.wfm = codedmask(mask_path, upscale_x=3, upscale_y=3)
+
+    def test_p2s_and_s2p_are_inverse(self):
+        """
+        Tests if computed shifts through `pos2shift()` refer to the
+        same pixel indexes obtained with `shift2pos()`.
+        """
+        n, m = self.wfm.shape_sky
+        for _ in range(10000):
+            y, x = (np.random.randint(0, n), np.random.randint(0, m))
+            self.assertEqual((y, x), shift2pos(self.wfm, *pos2shift(self.wfm, x, y)))
+
+    def test_positive_and_negative_idxs(self):
+        """Tests if positive and negative idxs refer to the same shifts."""
+        n, m = self.wfm.shape_sky
+        in_pos = [
+            ((m, n), (-1, -1)),
+            ((3 * m // 4, n), (-m // 4 - 1, -1)),
+            ((m, 3 * n // 4), (-1, -n // 4 - 1)),
+            ((0, 0), (-m - 1, -n - 1)),
+        ]
+        # `in_pos` contains array positions expressed with positive
+        #  idxs and respective negative idxs
+        for pos in in_pos:
+            self.assertEqual(pos2shift(self.wfm, *pos[0]), pos2shift(self.wfm, *pos[1]))
+
+    def test_idxs_boundaries(self):
+        """Test for out-of-bound elements."""
+        n, m = self.wfm.shape_sky
+        with self.assertRaises(IndexError):
+            out_pos = [
+                (m + 1, n + 1),
+                (-m - 1, n + 1),
+                (m + 1, -n - 1),
+                (-m - 2, -n - 2),
+            ]
+            for pos in out_pos:
+                pos2shift(self.wfm, *pos)
+
 
 
 if __name__ == "__main__":
