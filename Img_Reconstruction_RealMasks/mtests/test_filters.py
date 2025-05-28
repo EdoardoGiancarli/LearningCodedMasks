@@ -10,7 +10,7 @@ from mbloodmoon.filtering import data_filter
 from mbloodmoon.filtering import flux_filter, source_filter, catalog_filter
 
 
-class TestWrappers(TestCase):
+class TestFilters(TestCase):
     """Tests for the filters in `filtering.py`."""
     
     def setUp(self):
