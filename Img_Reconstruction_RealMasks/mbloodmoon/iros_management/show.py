@@ -343,8 +343,8 @@ def make_sky(
     """
     def valid_BG(bkg: np.array) -> bool:
         """Checks background shape."""
-        if not (bkg.shape == camera.sky_shape):
-            raise ValueError(f"Background must have same sky shape {camera.sky_shape}.")
+        if not (bkg.shape == camera.shape_sky):
+            raise ValueError(f"Background must have same sky shape {camera.shape_sky}.")
         return True
 
     def make_source(
@@ -359,7 +359,7 @@ def make_sky(
         return crop(model, pos, cropping)
 
     if background is None:
-        sky = np.zeros(camera.sky_shape)
+        sky = np.zeros(camera.shape_sky)
     elif valid_BG(background):
         sky = background
     

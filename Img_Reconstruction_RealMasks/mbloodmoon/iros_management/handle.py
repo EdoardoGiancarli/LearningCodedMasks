@@ -451,7 +451,7 @@ def fit_WCS(
         output (WCS):
             WCS instance with info on the coords fit.
     """
-    n, m = camera.sky_shape
+    n, m = camera.shape_sky
     pxs = pixels if pixels else [
         (grid_step*y, grid_step*x) for y in range(1, n//grid_step) for x in range(1, m//grid_step)
     ]

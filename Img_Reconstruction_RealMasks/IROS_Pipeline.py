@@ -58,26 +58,24 @@ cam_b: str = "cam1b"
 dataset: str = "reconstructed"
 
 # upscaling
-UPSX_0: int = 1                    # initial upscaling (with which IROS is performed) 
+UPSX_0: int = 9                    # initial upscaling (with which IROS is performed) 
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 1                # final upscaling for skies and visualisation
+UPSX_FINAL: int = 9                # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 # test ID
-TEST_ID: str = "test1"
+TEST_ID: str = "test_linear_trend_UPx9y1"
 
 # IROS set-up
-max_iterations: int = 5
+max_iterations: int = 15
 snr_threshold: int | float = 5
 
 sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
 
 # setup filters
 photons_energy_range: int | tuple[int, int] | None = None                            # photons energy filter
-photons_coords: tuple[float, float] | Sequence[tuple[float, float]] | None = (
-    244.979705810547, -15.6400995254517
-)    # RA/Dec filter (sources to filter out)
+photons_coords: tuple[float, float] | Sequence[tuple[float, float]] | None = None    # RA/Dec filter (sources to filter out)
 
 n_sources: int | tuple[int, int] | None = None                                       # number of sources in the catalog for comparison
 sources_flux_range: int | float | tuple[int | float, int | float] | None = None      # sources flux filter for the catalog comparison

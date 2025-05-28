@@ -245,12 +245,12 @@ def compute_params(
                 """
                 def shift(x: int, y: int) -> np.array:
                     """Shifts bulk according to source projection."""
-                    I_bulk = np.zeros(camera.detector_shape)
+                    I_bulk = np.zeros(camera.shape_detector)
                     I_bulk[camera.bulk > 0] = 1
                     return _shift(camera.bulk, (x, y)) * I_bulk
 
                 scalingy, scalingx = tuple(
-                    d / s for d, s in zip(camera.detector_shape, camera.sky_shape)
+                    d / s for d, s in zip(camera.shape_detector, camera.shape_sky)
                 )
                 shiftx_px = int(shiftx * scalingx / camera.specs["mask_deltax"])
                 shifty_px = int(shifty * scalingy / camera.specs["mask_deltay"])
