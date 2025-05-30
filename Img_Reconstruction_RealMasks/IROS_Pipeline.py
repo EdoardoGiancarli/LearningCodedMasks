@@ -50,7 +50,7 @@ IDEAL_MASK: bool = False                 # infinitely opaque and thin mask
 
 # data
 skyfield: str = "GalacticCenter"
-data_FITS: str = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+data_FITS: str = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"
 #data_FITS: str = "20250227_crab_cxb_2-50keV_1ks"
 
 cam_a: str = "cam1a"
@@ -65,7 +65,7 @@ UPSX_FINAL: int = 9                # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 # test ID
-TEST_ID: str = "test_linear_trend_UPx9y1"
+TEST_ID: str = "test_linear_trend_UPx9y1_whole_slit_optimize_densedet"
 
 # IROS set-up
 max_iterations: int = 15

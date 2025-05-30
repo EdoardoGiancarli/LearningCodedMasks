@@ -1,0 +1,133 @@
+import unittest
+import numpy as np
+
+
+def crop(
+    image: np.array,
+    pos: tuple[int, int],
+    cropping: tuple[int, int],
+    strict: bool = True,
+) -> np.array:
+    """
+    Crops 2D array at given position and with given cropping.
+
+    Args:
+        image (np.array):
+            2D array to crop.
+        pos (tuple[int, int]):
+            Center position for cropping.
+        cropping (tuple[int, int]):
+            Size of the cropping along (y, x).
+        strict (bool, optional (default=True)):
+            If `False` allows for the cropping to be adapted wrt
+            the array edges when they are exceeded.
+    
+    Returns:
+        output (np.array): Cropped 2D array (shape twice the `cropping`).
+    
+    Raises:
+        ValueError: If cropping is not a positive int tuple.
+        IndexError: If cropping wrt indexes exceeds 2D array edges
+                    (only if `strict` is `True`).
+    
+    Notes:
+        - Negative indexes are allowed.
+    """
+    n, m = image.shape
+    y, x = pos
+    cy, cx = cropping
+
+    if cy <= 0 or cx <= 0:
+        raise ValueError("Cropping must be a tuple of positive integers.")
+
+    if not (
+        (((0 <= x - cx) and (x + cx < m)) or (((cx - x <= m) and (x + cx < 0)))) and
+        (((0 <= y - cy) and (y + cy < n)) or (((cy - y <= n) and (y + cy < 0))))
+    ):
+        if not strict:
+            cy = min(y - 1, n - y - 2) if y > 0 else min(y + n + 1, -y - 1)
+            cx = min(x - 1, m - x - 2) if x > 0 else min(x + m + 1, -x - 1)
+            print(f"Cropping {cropping} at pos {pos} exceeds array edges, new cropping: {cy, cx}")
+        else:
+            raise IndexError(f"Cropping {cropping} at pos {pos} exceeds array edges.")
+    
+    y1, y2 = y - cy, y + cy
+    x1, x2 = x - cx, x + cx
+    return image[y1 : y2, x1 : x2]
+
+
+
+class TestCropping(unittest.TestCase):
+    """Test for the `crop()` method in `show.py`."""
+
+    def test_errors(self):
+        """Test for input values."""
+        n, m = 20, 20
+        pos = (5, 5)
+        cr = 10
+        a = np.random.randint(0, 10, (n, m))
+
+        with self.assertRaises(ValueError):
+            crop(a, pos, (-cr, cr))
+            crop(a, pos, (cr, -cr))
+            crop(a, pos, (-cr, -cr))
+        
+        with self.assertRaises(IndexError):
+            crop(a, (n // 4, m // 4), (cr, cr))
+            crop(a, (n // 4, -m // 4), (cr, cr))
+            crop(a, (-n // 4, m // 4), (cr, cr))
+            crop(a, (-n // 4, -m // 4), (cr, cr))
+    
+    def test_strict_cropping(self):
+        """Test for strict cropping."""
+        n, m = 20, 20
+        cr = 2
+        a = np.random.randint(0, 10, (n, m))
+        target_shape = (2* cr, 2* cr)
+
+        self.assertEqual(
+            crop(a, (n // 4, m // 4), (cr, cr), strict=False).shape,
+            target_shape,
+        )
+        self.assertEqual(
+            crop(a, (n // 4, -m // 4), (cr, cr), strict=False).shape,
+            target_shape,
+        )
+        self.assertEqual(
+            crop(a, (-n // 4, m // 4), (cr, cr), strict=False).shape,
+            target_shape,
+        )
+        self.assertEqual(
+            crop(a, (-n // 4, -m // 4), (cr, cr), strict=False).shape,
+            target_shape,
+        )
+    
+    def test_adaptable_cropping(self):
+        """Test for adaptable cropping."""
+        n, m = 20, 20
+        cr = 10
+        a = np.random.randint(0, 10, (n, m))
+        target_shape = (2 * (n // 4 - 1), 2 * (m // 4 - 1))
+
+        self.assertEqual(
+            crop(a, (n // 4, m // 4), (cr, cr), strict=False).shape,
+            target_shape,
+        )
+        self.assertEqual(
+            crop(a, (n // 4, -m // 4), (cr, cr), strict=False).shape,
+            target_shape,
+        )
+        self.assertEqual(
+            crop(a, (-n // 4, m // 4), (cr, cr), strict=False).shape,
+            target_shape,
+        )
+        self.assertEqual(
+            crop(a, (-n // 4, -m // 4), (cr, cr), strict=False).shape,
+            target_shape,
+        )
+
+
+
+
+if __name__ == "__main__":
+    unittest.main()
