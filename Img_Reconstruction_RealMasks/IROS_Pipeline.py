@@ -50,7 +50,7 @@ IDEAL_MASK: bool = False                 # infinitely opaque and thin mask
 
 # data
 skyfield: str = "GalacticCenter"
-data_FITS: str = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"
+data_FITS: str = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
 #data_FITS: str = "20250227_crab_cxb_2-50keV_1ks"
 
 cam_a: str = "cam1a"
@@ -58,20 +58,20 @@ cam_b: str = "cam1b"
 dataset: str = "reconstructed"
 
 # upscaling
-UPSX_0: int = 9                    # initial upscaling (with which IROS is performed) 
+UPSX_0: int = 2                    # initial upscaling (with which IROS is performed) 
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 9                # final upscaling for skies and visualisation
+UPSX_FINAL: int = 2                # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 # test ID
-TEST_ID: str = "test_linear_trend_UPx9y1_whole_slit_optimize_densedet"
+TEST_ID: str = "images_plot2"
 
 # IROS set-up
-max_iterations: int = 15
+max_iterations: int = 25
 snr_threshold: int | float = 5
 
-sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = True           # if True, the WFM cameras will be joined to get the composed sky
 
 # setup filters
 photons_energy_range: int | tuple[int, int] | None = None                            # photons energy filter

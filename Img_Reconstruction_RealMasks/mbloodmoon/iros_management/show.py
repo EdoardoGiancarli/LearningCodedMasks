@@ -31,43 +31,51 @@ def crop(
     image: np.array,
     pos: tuple[int, int],
     cropping: tuple[int, int],
+    strict: bool = True,
 ) -> np.array:
     """
     Crops 2D array at given position and with given cropping.
 
     Args:
-        image (np.array): 2D array to crop.
-        pos (tuple[int, int]): Center position for cropping.
-        cropping (tuple[int, int]): Size of the cropping (positive int).
+        image (np.array):
+            2D array to crop.
+        pos (tuple[int, int]):
+            Center position for cropping.
+        cropping (tuple[int, int]):
+            Size of the cropping along (y, x).
+        strict (bool, optional (default=True)):
+            If `False` allows for the cropping to be adapted
+            wrt the array edges when they are exceeded.
     
     Returns:
         output (np.array): Cropped 2D array (shape twice the `cropping`).
     
     Raises:
         ValueError: If cropping is not a positive int tuple.
-        IndexError: If cropping wrt indexes exceeds 2D array edges.
+        IndexError: If cropping wrt indexes exceeds 2D array edges
+                    (only if `strict` is `True`).
     
     Notes:
         - Negative indexes are allowed.
-    
-    TODO: allow flexible and automatic cropping
     """
     n, m = image.shape
     y, x = pos
     cy, cx = cropping
+
     if cy <= 0 or cx <= 0:
         raise ValueError("Cropping must be a tuple of positive integers.")
+
     if not (
         (((0 <= x - cx) and (x + cx < m)) or (((cx - x <= m) and (x + cx < 0)))) and
         (((0 <= y - cy) and (y + cy < n)) or (((cy - y <= n) and (y + cy < 0))))
     ):
-        raise IndexError(f"Cropping {cropping} at pos {pos} exceeds array edges.")
-    #check_cy = ((0 <= y - cy) and (y + cy < n)) or (((cy - y <= n) and (y + cy < 0)))
-    #check_cx = ((0 <= x - cx) and (x + cx < m)) or (((cx - x <= m) and (x + cx < 0)))
-    #if not (check_cy and check_cx):
-    #    print(f"Cropping {cropping} at pos {pos} exceeds array edges, redirecting to new cropping...")
-    #    if not check_cy: cy -= n - y + 1
-    #    if not check_cx: cx -= m - x + 1
+        if not strict:
+            cy = min(y - 1, n - y - 2) if y > 0 else min(y + n + 1, -y - 1)
+            cx = min(x - 1, m - x - 2) if x > 0 else min(x + m + 1, -x - 1)
+            print(f"Cropping {cropping} at pos {pos} exceeds array edges, new cropping: {cy, cx}")
+        else:
+            raise IndexError(f"Cropping {cropping} at pos {pos} exceeds array edges.")
+    
     y1, y2 = y - cy, y + cy
     x1, x2 = x - cx, x + cx
     return image[y1 : y2, x1 : x2]
@@ -356,7 +364,7 @@ def make_sky(
     ) -> np.array:
         """Generates a source shadowgram and returns a crop of the source."""
         model = model_sky(camera, shiftx, shifty, fluence, vignetting, psfy)
-        return crop(model, pos, cropping)
+        return crop(model, pos, cropping, strict=False)
 
     if background is None:
         sky = np.zeros(camera.shape_sky)
@@ -364,7 +372,7 @@ def make_sky(
         sky = background
     
     upx, upy = camera.upscale_f
-    cropx, cropy = int(10 * (1 + upx / 3)), int(50 * (1 + upy))
+    cropx, cropy = int(10 * (1 + upx / 3)), 50 #int(50 * (1 + upy))
     
     for shiftx, shifty, fluence, x, y in zip(
         data[cameraID]["shift_x"]["data"],

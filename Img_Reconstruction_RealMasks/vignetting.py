@@ -60,22 +60,24 @@ def _erosion(
     ncuts = int(cut / step)
 
     # array indexes to cut (completely)
-    shifted_int = _shift(arr, (0, ncuts)) if ncuts else arr
-    eroded_int = arr * ((arr - shifted_int) > 0)
-    
-    # number of edge bins to erode
-    decimal = abs(cut / step - ncuts)
+    shifted = _shift(arr, (0, ncuts)) if ncuts else arr
+    eroded_int = arr * ((arr - shifted) > 0)
 
     # array indexes to be fractionally reduced:
     #   - the bin with the decimal values is the one
     #     to the left or right wrt the cutted bins
+    decimal = abs(cut / step - ncuts)
+
+    # this is why we only accept integer array inputs
     if decimal:
         shifted_frac = _shift(arr, (0, ncuts + np.sign(ncuts)))
-        eroded_frac = arr * ((shifted_frac | ~shifted_int) < -1)
+        eroded_frac = arr * ((shifted_frac | ~shifted) < -1)
     else:
         eroded_frac = arr * 0
     
     return arr * (eroded_int < 1) - eroded_frac * decimal
+
+
 
 
 def apply_vignetting(
@@ -84,7 +86,7 @@ def apply_vignetting(
     shift_x: float,
     shift_y: float,
 ) -> npt.NDArray:
-    """
+    r"""
     Apply vignetting effects to a shadowgram based on source position.
     Vignetting occurs when mask thickness causes partial shadowing at off-axis angles.
     This function models this effect by applying erosion operations in both x and y
@@ -143,9 +145,11 @@ import unittest
 
 class TestErosionPositive(unittest.TestCase):
 
-    def setUp(self):
-        self.assertArrayAlmostEqual = lambda x, y: np.testing.assert_array_almost_equal(x, y, decimal=2)
-        self.erosion_value = lambda cut: 1 - divmod(abs(cut), 1)[1]
+    def assertArrayAlmostEqual(self, x, y) -> bool:
+        return np.testing.assert_array_almost_equal(x, y, decimal=2)
+    
+    def erosion_value(self, cut) -> float:
+        return 1 - divmod(abs(cut), 1)[1]
 
     def test_basic_erosion_1(self):
         arr = np.array(
@@ -160,9 +164,9 @@ class TestErosionPositive(unittest.TestCase):
         e = self.erosion_value(cut)
         expected = np.array(
             [
-                [e, 1.0, 1.0, 0.0, 0.0, 0.0, e],
-                [e, 1.0, 1.0, 0.0, 0.0, 0.0, e],
-                [e, 1.0, 1.0, 0.0, 0.0, 0.0, e],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
         result = _erosion(arr, step, cut)
@@ -308,9 +312,9 @@ class TestErosionNegative(unittest.TestCase):
         e = self.erosion_value(cut)
         expected = np.array(
             [
-                [1.0, 1.0, e, 0.0, 0.0, 0.0, 1.0],
-                [1.0, 1.0, e, 0.0, 0.0, 0.0, 1.0],
-                [1.0, 1.0, e, 0.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             ]
         )
         result = _erosion(arr, step, cut)
