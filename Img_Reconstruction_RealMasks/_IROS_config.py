@@ -12,7 +12,7 @@ from _IROS_support import output_pipeline_files
 from mbloodmoon.io import simulation_files, simulation
 from mbloodmoon.mask import decode, count, variance, snratio #, codedmask
 from mbloodmoon.utils import timer
-from mbloodmoon.filtering import catalog_filter
+from mbloodmoon.filtering import filter_catalog
 # from mbloodmoon.images import upscale #, downscale
 import mbloodmoon.iros_management as iros
 
@@ -174,8 +174,8 @@ def run_pipeline(params: PipelineParams) -> None:
                 catalogA=filepaths[cam_a]["sources"],
                 catalogB=filepaths[cam_b]["sources"],
             )
-            catA = catalog_filter(catA, params.n, params.flux_range)
-            catB = catalog_filter(catB, params.n, params.flux_range)
+            catA = filter_catalog(catA, n=params.n, flux_range=params.flux_range)
+            catB = filter_catalog(catB, n=params.n, flux_range=params.flux_range)
 
             database = iros.catalog_comparison(
                 data=iros_data,

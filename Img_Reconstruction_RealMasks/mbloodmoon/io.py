@@ -19,7 +19,7 @@ from astropy.io.fits.header import Header
 
 from .types import CoordEquatorial
 from .types import CoordHorizontal
-from .filtering import data_filter
+from .filtering import filter_data
 
 __all__ = [
     "_validate_fits", "check_fits",
@@ -127,7 +127,7 @@ class SimulationDataLoader:
             Path to the FITS file.
         energy_range (int | float | tuple[int | float, int | float] | None):
             Energy range in keV for the data filtering.
-        coords (tuple[float, float] | Sequence[tuple[float, float]] | None):
+        coords (CoordEquatorial | Sequence[CoordEquatorial] | None):
             Input photons RA/Dec (or sequence of RA/Dec) to filter out.
 
     Properties:
@@ -143,15 +143,16 @@ class SimulationDataLoader:
 
     filepath: Path
     energy_range: int | tuple[int, int] | None
-    coords: tuple[float, float] | Sequence[tuple[float, float]] | None
+    coords: CoordEquatorial | Sequence[CoordEquatorial] | None
 
     @cached_property
     def data(self) -> FITS_rec:
         rec = fits.getdata(self.filepath, ext=1, header=False)
         if self.energy_range or self.coords:
-            rec = data_filter(
-                record=rec,
-                energy_range=self.energy_range,
+            rec = filter_data(
+                data=rec,
+                E_min=self.energy_range[0],
+                E_max=self.energy_range[1],
                 coords=self.coords,
             )
         return rec
@@ -194,7 +195,7 @@ class SimulationDataLoader:
 def simulation(
     filepath: str | Path,
     energy_range: int | tuple[int, int] | None = None,
-    coords: tuple[float, float] | Sequence[tuple[float, float]] | None = None,
+    coords: CoordEquatorial | Sequence[CoordEquatorial] | None = None,
 ) -> SimulationDataLoader:
     """
     Checks validity of filepath and intializes SimulationDataLoader.
@@ -206,7 +207,7 @@ def simulation(
             Energy range in keV for the data filtering. If a specific energy
             is given, this will be considered as the maximum filter value.
             If a tuple is given, it's interpreted as (`E_min`, `E_max`).
-        coords (tuple[float, float] | Sequence[tuple[float, float]] | None, optional (default=None)):
+        coords (CoordEquatorial | Sequence[CoordEquatorial] | None, optional (default=None)):
             Input photons RA/Dec (or sequence of RA/Dec) to filter out.
 
     Returns:
@@ -273,7 +274,7 @@ class MaskDataLoader:
         h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
         h2 = dict(fits.getheader(self.filepath, ext=3))
 
-        detector_absorption = 0.01     # median photon length absorption in the detector [mm]
+        detector_absorption = 0.0     # median photon length absorption in the detector [mm]
 
         info = {
             "mask_minx": h1["MINX"],
@@ -289,8 +290,8 @@ class MaskDataLoader:
             "detector_maxx": h1["PLNXMAX"],
             "detector_miny": h1["PLNYMIN"],
             "detector_maxy": h1["PLNYMAX"],
-            "detector_bmmask_dist": h1["MDDIST"] + detector_absorption,
-            "detector_midmask_dist": h1["MDDIST"] + h1["MASKTHK"] / 2 + detector_absorption,
+            "detector_bmmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
+            "detector_midmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
             "detector_topmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
             "open_fraction": h2["OPENFR"],
             "real_open_fraction": h2["RLOPENFR"]

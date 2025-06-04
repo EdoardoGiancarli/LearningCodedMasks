@@ -58,24 +58,17 @@ def _erosion(
     
     # number of bins to cut
     ncuts = int(cut / step)
-
-    # array indexes to cut (completely)
-    shifted = _shift(arr, (0, ncuts)) if ncuts else arr
-    eroded_int = arr * ((arr - shifted) > 0)
+    cutted = arr * (arr & _shift(arr, (0, ncuts))) if ncuts else arr
 
     # array indexes to be fractionally reduced:
     #   - the bin with the decimal values is the one
     #     to the left or right wrt the cutted bins
-    decimal = abs(cut / step - ncuts)
-
-    # this is why we only accept integer array inputs
-    if decimal:
-        shifted_frac = _shift(arr, (0, ncuts + np.sign(ncuts)))
-        eroded_frac = arr * ((shifted_frac | ~shifted) < -1)
-    else:
-        eroded_frac = arr * 0
+    erosion_value = abs(cut / step - ncuts)
+    border = (
+        (cutted - _shift(cutted, (0, int(np.sign(cut))))) > 0
+    )
     
-    return arr * (eroded_int < 1) - eroded_frac * decimal
+    return cutted - border * erosion_value
 
 
 
@@ -148,8 +141,9 @@ class TestErosionPositive(unittest.TestCase):
     def assertArrayAlmostEqual(self, x, y) -> bool:
         return np.testing.assert_array_almost_equal(x, y, decimal=2)
     
-    def erosion_value(self, cut) -> float:
-        return 1 - divmod(abs(cut), 1)[1]
+    def erosion_value(self, cut, step) -> float:
+        return 1 - divmod(abs(cut / step), 1)[1]
+
 
     def test_basic_erosion_1(self):
         arr = np.array(
@@ -160,165 +154,293 @@ class TestErosionPositive(unittest.TestCase):
             ]
         )
         step = 0.5
+
+        # test positive cut
         cut = 0.25
-        e = self.erosion_value(cut)
+        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            ]
+                [e, 1, 1, 0, 0, 0, e],
+                [e, 1, 1, 0, 0, 0, e],
+                [e, 1, 1, 0, 0, 0, e],
+            ],
+            dtype=float,
         )
-        result = _erosion(arr, step, cut)
-        self.assertArrayAlmostEqual(result, expected)
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
 
-    #def test_wide_pattern(self):
-    #    arr = np.array(
-    #        [
-    #            [0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-    #            [0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-    #            [0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-    #        ]
-    #    )
-    #    step = 1.0
-    #    cut = 4.5
-    #    expected = np.array(
-    #        [
-    #            [0.0, 0.0, 0.0, 0.0, 0.75, 1.0, 0.75, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0],
-    #            [0.0, 0.0, 0.0, 0.0, 0.75, 1.0, 0.75, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0],
-    #            [0.0, 0.0, 0.0, 0.0, 0.75, 1.0, 0.75, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0],
-    #        ]
-    #    )
-    #    result = _erosion(arr, step, cut)
-    #    self.assertArrayAlmostEqual(result, expected)
-#
-    #def test_small_step_small_cut(self):
-    #    arr = np.array(
-    #        [
-    #            [0, 0, 1, 0, 0, 0],
-    #            [0, 0, 1, 0, 0, 0],
-    #            [0, 0, 1, 0, 0, 0],
-    #        ]
-    #    )
-    #    step = 0.5
-    #    cut = 0.45
-    #    expected = np.array(
-    #        [
-    #            [0.0, 0.0, 0.1, 0.0, 0.0, 0.0],
-    #            [0.0, 0.0, 0.1, 0.0, 0.0, 0.0],
-    #            [0.0, 0.0, 0.1, 0.0, 0.0, 0.0],
-    #        ]
-    #    )
-    #    result = _erosion(arr, step, cut)
-    #    self.assertArrayAlmostEqual(result, expected)
-#
-    #def test_double_ones(self):
-    #    arr = np.array(
-    #        [
-    #            [0, 0, 1, 1, 0, 0],
-    #            [0, 0, 1, 1, 0, 0],
-    #            [0, 0, 1, 1, 0, 0],
-    #        ]
-    #    )
-    #    step = 1.0
-    #    cut = 0.5
-    #    expected = np.array(
-    #        [
-    #            [0.0, 0.0, 0.75, 0.75, 0.0, 0.0],
-    #            [0.0, 0.0, 0.75, 0.75, 0.0, 0.0],
-    #            [0.0, 0.0, 0.75, 0.75, 0.0, 0.0],
-    #        ]
-    #    )
-    #    result = _erosion(arr, step, cut)
-    #    self.assertArrayAlmostEqual(result, expected)
-#
-    #def test_triple_ones_with_large_cut(self):
-    #    arr = np.array(
-    #        [
-    #            [1, 1, 1, 0, 0, 0],
-    #            [1, 1, 1, 0, 0, 0],
-    #            [1, 1, 1, 0, 0, 0],
-    #        ]
-    #    )
-    #    step = 0.5
-    #    cut = 1.0
-    #    expected = np.array(
-    #        [
-    #            [0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
-    #            [0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
-    #            [0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
-    #        ]
-    #    )
-    #    result = _erosion(arr, step, cut)
-    #    self.assertArrayAlmostEqual(result, expected)
-#
-    #def test_complex_pattern(self):
-    #    arr = np.array(
-    #        [
-    #            [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0],
-    #            [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0],
-    #            [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0],
-    #        ]
-    #    )
-    #    step = 0.5
-    #    cut = 0.49
-    #    expected = np.array(
-    #        [
-    #            [0.0, 0.0, 0.0, 0.51, 1.0, 0.51, 0.0, 0.0, 0.0, 0.51, 1.0, 0.51, 0.0, 0.02, 0.0],
-    #            [0.0, 0.0, 0.0, 0.51, 1.0, 0.51, 0.0, 0.0, 0.0, 0.51, 1.0, 0.51, 0.0, 0.02, 0.0],
-    #            [0.0, 0.0, 0.0, 0.51, 1.0, 0.51, 0.0, 0.0, 0.0, 0.51, 1.0, 0.51, 0.0, 0.02, 0.0],
-    #        ]
-    #    )
-    #    result = _erosion(arr, step, cut)
-    #    self.assertArrayAlmostEqual(result, expected)
-#
-    #def test_large_pattern_with_large_cut(self):
-    #    arr = np.array(
-    #        [
-    #            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0],
-    #            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0],
-    #            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0],
-    #        ]
-    #    )
-    #    step = 0.5
-    #    cut = 1.2
-    #    expected = np.array(
-    #        [
-    #            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 1.0, 0.8, 0.0, 0.0],
-    #            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 1.0, 0.8, 0.0, 0.0],
-    #            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 1.0, 0.8, 0.0, 0.0],
-    #        ]
-    #    )
-    #    result = _erosion(arr, step, cut)
-    #    self.assertArrayAlmostEqual(result, expected)
+        # test negative cut
+        cut = -0.25
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [1, 1, e, 0, 0, 0, e],
+                [1, 1, e, 0, 0, 0, e],
+                [1, 1, e, 0, 0, 0, e],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
 
-
-class TestErosionNegative(unittest.TestCase):
-
-    def setUp(self):
-        self.assertArrayAlmostEqual = lambda x, y: np.testing.assert_array_almost_equal(x, y, decimal=2)
-        self.erosion_value = lambda cut: 1 - divmod(abs(cut), 1)[1]
-    
-    def test_basic_erosion_1(self):
+    def test_wide_pattern(self):
         arr = np.array(
             [
-                [1, 1, 1, 0, 0, 0, 1],
-                [1, 1, 1, 0, 0, 0, 1],
-                [1, 1, 1, 0, 0, 0, 1],
+                [0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+                [0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+                [0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+            ]
+        )
+        step = 1.0
+
+        # test positive cut
+        cut = 4.5
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, e, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, e],
+                [0, 0, 0, 0, 0, 0, e, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, e],
+                [0, 0, 0, 0, 0, 0, e, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, e],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+        # test negative cut
+        cut = -4.5
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, 1, 1, e, 0, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, 0, 0],
+                [0, 0, 1, 1, e, 0, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, 0, 0],
+                [0, 0, 1, 1, e, 0, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, 0, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+    def test_small_step_small_cut(self):
+        arr = np.array(
+            [
+                [0, 0, 1, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
             ]
         )
         step = 0.5
-        cut = -0.25
-        e = self.erosion_value(cut)
+
+        # test positive cut
+        cut = 0.45
+        e = self.erosion_value(cut, step)
         expected = np.array(
             [
-                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0, 0, e, 0, 0, 0],
+                [0, 0, e, 0, 0, 0],
+                [0, 0, e, 0, 0, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+        # test negative cut
+        cut = -0.45
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, e, 0, 0, 0],
+                [0, 0, e, 0, 0, 0],
+                [0, 0, e, 0, 0, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+    def test_double_ones(self):
+        arr = np.array(
+            [
+                [0, 0, 1, 1, 0, 0],
+                [0, 0, 1, 1, 0, 0],
+                [0, 0, 1, 1, 0, 0],
             ]
         )
-        result = _erosion(arr, step, cut)
-        self.assertArrayAlmostEqual(result, expected)
+        step = 1.0
+
+        # test positive cut
+        cut = 0.5
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, e, 1, 0, 0],
+                [0, 0, e, 1, 0, 0],
+                [0, 0, e, 1, 0, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+        # test negative cut
+        cut = -0.5
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, 1, e, 0, 0],
+                [0, 0, 1, e, 0, 0],
+                [0, 0, 1, e, 0, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+    def test_triple_ones_with_large_cut(self):
+        arr = np.array(
+            [
+                [1, 1, 1, 0, 0, 0],
+                [1, 1, 1, 0, 0, 0],
+                [1, 1, 1, 0, 0, 0],
+            ]
+        )
+        step = 0.5
+
+        # test positive cut
+        cut = 1.0
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, e, 0, 0, 0],
+                [0, 0, e, 0, 0, 0],
+                [0, 0, e, 0, 0, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+        # test negative cut
+        cut = -1.0
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [e, 0, 0, 0, 0, 0],
+                [e, 0, 0, 0, 0, 0],
+                [e, 0, 0, 0, 0, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+        
+
+    def test_complex_pattern(self):
+        arr = np.array(
+            [
+                [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0],
+                [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0],
+                [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0],
+            ]
+        )
+        step = 0.5
+        
+        # test positive cut
+        cut = 0.49
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, 0, e, 1, 1, 0, 0, 0, e, 1, 1, 0, e, 0],
+                [0, 0, 0, e, 1, 1, 0, 0, 0, e, 1, 1, 0, e, 0],
+                [0, 0, 0, e, 1, 1, 0, 0, 0, e, 1, 1, 0, e, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+        # test negative cut
+        cut = -0.49
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, 0, 1, 1, e, 0, 0, 0, 1, 1, e, 0, e, 0],
+                [0, 0, 0, 1, 1, e, 0, 0, 0, 1, 1, e, 0, e, 0],
+                [0, 0, 0, 1, 1, e, 0, 0, 0, 1, 1, e, 0, e, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+        
+
+    def test_large_pattern_with_large_cut(self):
+        arr = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0],
+            ]
+        )
+        step = 0.5
+        
+        # test positive cut
+        cut = 1.2
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, e, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, e, 1, 1, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, e, 1, 1, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+
+        # test negative cut
+        cut = -1.2
+        e = self.erosion_value(cut, step)
+        expected = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, e, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, e, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, e, 0, 0, 0],
+            ],
+            dtype=float,
+        )
+        self.assertArrayAlmostEqual(
+            _erosion(arr, step, cut),
+            expected,
+        )
+        
 
 
 if __name__ == "__main__":

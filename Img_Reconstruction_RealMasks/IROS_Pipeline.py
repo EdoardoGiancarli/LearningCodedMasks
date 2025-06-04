@@ -35,6 +35,8 @@ TODO:
 """
 from collections.abc import Sequence
 
+from mbloodmoon.types import CoordEquatorial
+
 from _IROS_support import initialize_pipeline
 from _IROS_config import run_pipeline
 
@@ -46,11 +48,15 @@ print("\n#### INITIALIZING IROS PIPELINE")
 
 # mask
 mask_FITS: str = "wfm_mask.fits"
-IDEAL_MASK: bool = False                 # infinitely opaque and thin mask
+IDEAL_MASK: bool = True                 # infinitely opaque and/or thin mask
 
 # data
 skyfield: str = "GalacticCenter"
-data_FITS: str = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+#data_FITS: str = "20241011_galctr_rxte_sax_2-30keV_1ks_2cams_sources_cxb"
+#data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"
+#data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_thinmask_realdet_sources_cxb"
+data_FITS = "20250320_galctr_rxte_sax_2-50keV_1ks_sources_cxb_infmaskdet"
+
 #data_FITS: str = "20250227_crab_cxb_2-50keV_1ks"
 
 cam_a: str = "cam1a"
@@ -58,27 +64,27 @@ cam_b: str = "cam1b"
 dataset: str = "reconstructed"
 
 # upscaling
-UPSX_0: int = 2                    # initial upscaling (with which IROS is performed) 
+UPSX_0: int = 5                    # initial upscaling (with which IROS is performed) 
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 2                # final upscaling for skies and visualisation
+UPSX_FINAL: int = 5                # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 # test ID
-TEST_ID: str = "images_plot2"
+TEST_ID: str = "test_vignetting_opposite_cut"
 
 # IROS set-up
-max_iterations: int = 25
+max_iterations: int = 15
 snr_threshold: int | float = 5
 
-sky_compositions: bool = True           # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
 
 # setup filters
-photons_energy_range: int | tuple[int, int] | None = None                            # photons energy filter
-photons_coords: tuple[float, float] | Sequence[tuple[float, float]] | None = None    # RA/Dec filter (sources to filter out)
+photons_energy_range: int | tuple[int, int] | None = (2, 30)                         # photons energy filter - [keV]
+photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = None            # RA/Dec filter (sources to filter out) - [deg]
 
 n_sources: int | tuple[int, int] | None = None                                       # number of sources in the catalog for comparison
-sources_flux_range: int | float | tuple[int | float, int | float] | None = None      # sources flux filter for the catalog comparison
+sources_flux_range: int | float | tuple[int | float, int | float] | None = None      # sources flux filter for the catalog comparison - [ph/cm2/s]
 
 
 
