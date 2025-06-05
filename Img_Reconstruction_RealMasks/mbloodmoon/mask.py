@@ -645,11 +645,11 @@ def apply_vignetting(
     bins = camera.bins_detector
 
     angle_x_rad = np.arctan(shift_x / camera.mdl["detector_topmask_dist"])
-    red_factor = -1 * camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
+    red_factor = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
     sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
 
     angle_y_rad = np.arctan(shift_y / camera.mdl["detector_topmask_dist"])
-    red_factor = -1 * camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
+    red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
     sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
     
     return sg1 * sg2.T

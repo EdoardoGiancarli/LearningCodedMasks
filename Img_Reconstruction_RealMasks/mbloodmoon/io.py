@@ -274,7 +274,7 @@ class MaskDataLoader:
         h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
         h2 = dict(fits.getheader(self.filepath, ext=3))
 
-        detector_absorption = 0.0     # median photon length absorption in the detector [mm]
+        detector_absorption = 0.01     # median photon length absorption in the detector [mm]
 
         info = {
             "mask_minx": h1["MINX"],
