@@ -487,7 +487,7 @@ def camera_composition(
         - Opens the skies FITS file
         - Finds the optimal WCS fit and sky shape for the composition
         - Reprojects and sums the two skies making the composition
-        - Reprojects and averages the two SNRs making the composition
+        - Reprojects the two SNRs and takes the max
         - Saves the composition FITS file
 
     Args:
