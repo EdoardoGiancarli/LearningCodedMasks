@@ -19,8 +19,8 @@ def crop(
         cropping (tuple[int, int]):
             Size of the cropping along (y, x).
         strict (bool, optional (default=True)):
-            If `False` allows for the cropping to be adapted wrt
-            the array edges when they are exceeded.
+            If `False` allows for the cropping to be adapted
+            wrt the array edges when they are exceeded.
     
     Returns:
         output (np.array): Cropped 2D array (shape twice the `cropping`).
@@ -40,13 +40,15 @@ def crop(
     if cy <= 0 or cx <= 0:
         raise ValueError("Cropping must be a tuple of positive integers.")
 
-    if not (
-        (((0 <= x - cx) and (x + cx < m)) or (((cx - x <= m) and (x + cx < 0)))) and
-        (((0 <= y - cy) and (y + cy < n)) or (((cy - y <= n) and (y + cy < 0))))
-    ):
+    flagx = (((0 <= x - cx) and (x + cx < m)) or ((cx - x <= m) and (x + cx < 0)))
+    flagy = (((0 <= y - cy) and (y + cy < n)) or ((cy - y <= n) and (y + cy < 0)))
+    
+    if not (flagx and flagy):
         if not strict:
-            cy = min(y - 1, n - y - 2) if y > 0 else min(y + n + 1, -y - 1)
-            cx = min(x - 1, m - x - 2) if x > 0 else min(x + m + 1, -x - 1)
+            if not flagx:
+                cx = min(x - 1, m - x - 2) if x > 0 else min(x + m + 1, -x - 1)
+            if not flagy:
+                cy = min(y - 1, n - y - 2) if y > 0 else min(y + n + 1, -y - 1)
             print(f"Cropping {cropping} at pos {pos} exceeds array edges, new cropping: {cy, cx}")
         else:
             raise IndexError(f"Cropping {cropping} at pos {pos} exceeds array edges.")

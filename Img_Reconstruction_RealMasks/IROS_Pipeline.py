@@ -51,31 +51,31 @@ mask_FITS: str = "wfm_mask.fits"
 IDEAL_MASK: bool = False           # infinitely opaque and/or thin mask
 
 # data
-skyfield: str = "Crab"
-data_FITS = "20250227_crab_cxb_2-50keV_1ks"
+skyfield: str = "GalacticCenter"
+data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"
 
 cam_a: str = "cam1a"
 cam_b: str = "cam1b"
-dataset: str = "reconstructed"
+dataset: str = "detected"
 
 # upscaling
 UPSX_0: int = 5                    # initial upscaling (with which IROS is performed) 
-UPSY_0: int = 5
+UPSY_0: int = 1
 
 UPSX_FINAL: int = 5                # final upscaling for skies and visualisation
-UPSY_FINAL: int = 5
+UPSY_FINAL: int = 1
 
 # test ID
-TEST_ID: str = "test_PSFY_kernel_centered_upx5upy5"
+TEST_ID: str = "test_vignetting_detected"
 
 # IROS set-up
-max_iterations: int = 1
+max_iterations: int = 15
 snr_threshold: int | float = 5
 
 sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
 
 # setup filters
-photons_energy_range: int | tuple[int, int] | None = None                            # photons energy filter - [keV]
+photons_energy_range: int | tuple[int, int] | None = (2, 30)                            # photons energy filter - [keV]
 photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = None            # RA/Dec filter (sources to filter out) - [deg]
 
 n_sources: int | tuple[int, int] | None = None                                       # number of sources in the catalog for comparison
