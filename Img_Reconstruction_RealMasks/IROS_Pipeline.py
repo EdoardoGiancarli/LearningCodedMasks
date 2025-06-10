@@ -48,11 +48,13 @@ print("\n#### INITIALIZING IROS PIPELINE")
 
 # mask
 mask_FITS: str = "wfm_mask.fits"
-IDEAL_MASK: bool = False           # infinitely opaque and/or thin mask
+THIN_MASK: bool = False           # infinitely opaque and/or thin mask
 
 # data
-skyfield: str = "GalacticCenter"
-data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"
+#skyfield: str = "GalacticCenter"
+#data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"
+skyfield: str = "Crab"
+data_FITS = "20250227_crab_cxb_2-50keV_1ks"
 
 cam_a: str = "cam1a"
 cam_b: str = "cam1b"
@@ -66,10 +68,10 @@ UPSX_FINAL: int = 5                # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 # test ID
-TEST_ID: str = "test_vignetting_detected"
+TEST_ID: str = "test_loss_chop"
 
 # IROS set-up
-max_iterations: int = 15
+max_iterations: int = 1
 snr_threshold: int | float = 5
 
 sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
@@ -92,7 +94,7 @@ if __name__ == "__main__":
     # initialize pipeline parameters
     params = initialize_pipeline(
         mask=mask_FITS,
-        ideal_mask=IDEAL_MASK,
+        ideal_mask=THIN_MASK,
         skyfield=skyfield,
         skydata=data_FITS,
         wfm_cameras=(cam_a, cam_b),
