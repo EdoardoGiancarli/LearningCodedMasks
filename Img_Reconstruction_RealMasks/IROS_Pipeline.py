@@ -53,25 +53,27 @@ THIN_MASK: bool = False           # infinitely opaque and/or thin mask
 # data
 #skyfield: str = "GalacticCenter"
 #data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"
-skyfield: str = "Crab"
-data_FITS = "20250227_crab_cxb_2-50keV_1ks"
+#skyfield: str = "Crab"
+#data_FITS = "20250227_crab_cxb_2-50keV_1ks"
+skyfield: str = "IROSDummy"
+data_FITS = "obliquedistr_infdet_2-50keV_500s"
 
 cam_a: str = "cam1a"
 cam_b: str = "cam1b"
-dataset: str = "detected"
+dataset: str = "reconstructed"
 
 # upscaling
-UPSX_0: int = 5                    # initial upscaling (with which IROS is performed) 
-UPSY_0: int = 1
+UPSX_0: int = 3                    # initial upscaling (with which IROS is performed) 
+UPSY_0: int = 5
 
-UPSX_FINAL: int = 5                # final upscaling for skies and visualisation
-UPSY_FINAL: int = 1
+UPSX_FINAL: int = 3                # final upscaling for skies and visualisation
+UPSY_FINAL: int = 5
 
 # test ID
-TEST_ID: str = "test_loss_chop"
+TEST_ID: str = "test_model_upx3y5"
 
 # IROS set-up
-max_iterations: int = 1
+max_iterations: int = 10
 snr_threshold: int | float = 5
 
 sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
