@@ -46,44 +46,57 @@ PIPELINE SET-UP.
 """
 print("\n#### INITIALIZING IROS PIPELINE")
 
-# mask
+## mask
 mask_FITS: str = "wfm_mask.fits"
 THIN_MASK: bool = False           # infinitely opaque and/or thin mask
 
-# data
+## data
 #skyfield: str = "GalacticCenter"
 #data_FITS = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"
 #skyfield: str = "Crab"
 #data_FITS = "20250227_crab_cxb_2-50keV_1ks"
 skyfield: str = "IROSDummy"
-data_FITS = "obliquedistr_infdet_2-50keV_500s"
+data_FITS = "obliquedistr_infdet_2-50keV_1ks"
 
 cam_a: str = "cam1a"
 cam_b: str = "cam1b"
 dataset: str = "reconstructed"
 
-# upscaling
-UPSX_0: int = 3                    # initial upscaling (with which IROS is performed) 
+## upscaling
+UPSX_0: int = 1                    # initial upscaling (with which IROS is performed) 
 UPSY_0: int = 5
 
-UPSX_FINAL: int = 3                # final upscaling for skies and visualisation
+UPSX_FINAL: int = 1                # final upscaling for skies and visualisation
 UPSY_FINAL: int = 5
 
-# test ID
-TEST_ID: str = "test_model_upx3y5"
+## test ID
+TEST_ID: str = "test_model_upx1y5_central_source"
 
-# IROS set-up
-max_iterations: int = 10
+## IROS set-up
+max_iterations: int = 1
 snr_threshold: int | float = 5
 
 sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
 
-# setup filters
-photons_energy_range: int | tuple[int, int] | None = (2, 30)                            # photons energy filter - [keV]
-photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = None            # RA/Dec filter (sources to filter out) - [deg]
+## setup filters
+# - photons energy filter - [keV]
+photons_energy_range: int | tuple[int, int] | None = (2, 30)
+# - RA/Dec filter (sources to filter out) - [deg]
+photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = (
+    CoordEquatorial(ra=249.459, dec=-67.52572),
+    CoordEquatorial(ra=255.6928, dec=-60.21748),
+    CoordEquatorial(ra=260.2596, dec=-51.18224),
+    CoordEquatorial(ra=263.7089, dec=-40.5835),
+    CoordEquatorial(ra=268.5208, dec=-17.36688),
+    CoordEquatorial(ra=270.254, dec=-6.622541),
+    CoordEquatorial(ra=271.6881, dec=2.672805),
+    CoordEquatorial(ra=272.8929, dec=10.39376),
+)
 
-n_sources: int | tuple[int, int] | None = None                                       # number of sources in the catalog for comparison
-sources_flux_range: int | float | tuple[int | float, int | float] | None = None      # sources flux filter for the catalog comparison - [ph/cm2/s]
+# - number of sources in the catalog for comparison
+n_sources: int | tuple[int, int] | None = None
+# - sources flux filter for the catalog comparison - [ph/cm2/s]
+sources_flux_range: int | float | tuple[int | float, int | float] | None = None
 
 
 
