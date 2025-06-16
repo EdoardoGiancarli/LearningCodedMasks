@@ -1,4 +1,4 @@
-name: PhD_env__img_reconstruction_test
+name: lemx_irosdev
 channels:
   - anaconda
   - pytorch

@@ -28,14 +28,18 @@ __all__ = [
 ]
 
 
-def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[int, int]:
+def shift2pos(
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+) -> tuple[int, int]:
     """
     Convert continuous sky-shift coordinates to nearest discrete pixel indices.
 
     Args:
         camera: CodedMaskCamera instance containing binning information
-        shift_x: x-coordinate in sky-shift space [mm]
-        shift_y: y-coordinate in sky-shift space [mm]
+        shift_x: x-coordinate in sky-shift space (mm)
+        shift_y: y-coordinate in sky-shift space (mm)
 
     Returns:
         Tuple of (row, column) indices in the discrete sky image grid
@@ -43,19 +47,19 @@ def shift2pos(camera: CodedMaskCamera, shift_x: float, shift_y: float) -> tuple[
     Raises:
         ValueError: If shifts are outside valid range
     """
-    def check_bounds(bins: npt.NDArray, shift: float) -> bool:
+    def valid_shift(shift, bins, step):
         """Checks shifts validity wrt binning."""
-        return (shift >= bins[0]) and (shift <= bins[-1])
+        return (bins[0] - step / 2) < shift < (bins[-1] + step / 2)
     
-    if not (
-        check_bounds(camera.bins_sky.y, shift_y) and
-        check_bounds(camera.bins_sky.x, shift_x)
-    ):
+    binsx, binsy = camera.bins_sky
+    stepx, stepy = abs(binsx[0] - binsx[1]), abs(binsy[0] - binsy[1])
+
+    if not (valid_shift(shift_x, binsx, stepx) and valid_shift(shift_y, binsy, stepy)):
         raise ValueError("Shifts outside binning boundaries.")
-    
+
     return (
-        bisect(camera.bins_sky.y, shift_y) - 1,
-        bisect(camera.bins_sky.x, shift_x) - 1,
+        bisect(binsy - stepy / 2, shift_y) - 1,
+        bisect(binsx - stepx / 2, shift_x) - 1,
     )
 
 
@@ -156,6 +160,30 @@ def pos2equatorial(
         - negative indexes are allowed.
     """    
     return shift2equatorial(sdl, camera, *pos2shift(camera, x, y))
+
+
+def equatorial2pos(
+    sdl: SimulationDataLoader,
+    camera: CodedMaskCamera,
+    ra: float,
+    dec: float,
+) -> tuple[int, int]:
+    """
+    Convert equatorial coordinates (RA/Dec) to sky pixel position.
+
+    Args:
+        sdl: SimulationDataLoader containing camera pointings
+        camera: A CodedMaskCamera object containing sky shape and binning information.
+        ra: Right ascension in degrees [0, 360].
+        dec: Declination in degrees [-90, 90].
+
+    Returns:
+        Tuple of (row, column) indices in the discrete sky image grid.
+
+    Notes:
+        - RA must be normalized to [0, 360) degree range.
+    """
+    return shift2pos(camera, *equatorial2shift(sdl, camera, ra, dec))
 
 
 def shift2equatorial(
