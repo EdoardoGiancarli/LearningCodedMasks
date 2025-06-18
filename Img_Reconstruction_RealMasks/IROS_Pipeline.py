@@ -56,41 +56,41 @@ THIN_MASK: bool = False           # infinitely opaque and/or thin mask
 #skyfield: str = "Crab"
 #data_FITS = "20250227_crab_cxb_2-50keV_1ks"
 skyfield: str = "IROSDummy"
-data_FITS = "obliquedistr_infdet_2-50keV_1ks"
+data_FITS = "catalog_noCXB_1Crab_infdet_2-50keV_1ks"
 
 cam_a: str = "cam1a"
 cam_b: str = "cam1b"
-dataset: str = "reconstructed"
+dataset: str = "detected"
 
 ## upscaling
-UPSX_0: int = 1                    # initial upscaling (with which IROS is performed) 
+UPSX_0: int = 5                   # initial upscaling (with which IROS is performed)
 UPSY_0: int = 5
 
-UPSX_FINAL: int = 1                # final upscaling for skies and visualisation
+UPSX_FINAL: int = 5               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 5
 
 ## test ID
-TEST_ID: str = "test_model_upx1y5_central_source"
+TEST_ID: str = "test_s4_upx5y5_detected"
 
 ## IROS set-up
 max_iterations: int = 1
 snr_threshold: int | float = 5
 
-sky_compositions: bool = False           # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = False    # if True, the WFM cameras will be joined to get the composed sky
 
 ## setup filters
 # - photons energy filter - [keV]
-photons_energy_range: int | tuple[int, int] | None = (2, 30)
+photons_energy_range: int | tuple[int, int] | None = (None, None)
 # - RA/Dec filter (sources to filter out) - [deg]
 photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = (
-    CoordEquatorial(ra=249.459, dec=-67.52572),
-    CoordEquatorial(ra=255.6928, dec=-60.21748),
-    CoordEquatorial(ra=260.2596, dec=-51.18224),
-    CoordEquatorial(ra=263.7089, dec=-40.5835),
-    CoordEquatorial(ra=268.5208, dec=-17.36688),
-    CoordEquatorial(ra=270.254, dec=-6.622541),
-    CoordEquatorial(ra=271.6881, dec=2.672805),
-    CoordEquatorial(ra=272.8929, dec=10.39376),
+    CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417),
+    CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622),
+    CoordEquatorial(ra=241.426574413659, dec=-26.6219960573764),
+    CoordEquatorial(ra=253.284954989872, dec=-28.3032728404397),
+    CoordEquatorial(ra=266.4, dec=-17.3775096005863),
+    CoordEquatorial(ra=266.4, dec=-6.63642699386322),
+    CoordEquatorial(ra=266.4, dec=2.68547284486862),
+    CoordEquatorial(ra=266.4, dec=10.4607609542733),
 )
 
 # - number of sources in the catalog for comparison
