@@ -329,7 +329,7 @@ def compute_params(
         1e-2 * camera.specs["mask_deltax"] * camera.specs["mask_deltay"] / ups
     )
     exposure = [data.header["EXPOSURE"] for data in sdls]            # camera exposure [s]
-    l, dl = camera.specs["detector_midmask_dist"], 0.001             # mask-detector distance, error [mm]
+    l, dl = camera.specs["mask_detector_distance"], 0.001             # mask-detector distance, error [mm]
     dshiftx = np.abs(camera.bins_sky.x[0] - camera.bins_sky.x[1])/2  # shift error along x [mm]
     dshifty = np.abs(camera.bins_sky.y[0] - camera.bins_sky.y[1])/2  # shift error along y [mm]
 
