@@ -17,7 +17,7 @@ from reproject.mosaicking import reproject_and_coadd
 from mbloodmoon.io import SimulationDataLoader
 from mbloodmoon.mask import CodedMaskCamera
 
-from mbloodmoon.io import check_fits
+from mbloodmoon.io import _exists_valid
 from mbloodmoon.coords import pos2equatorial
 #from mbloodmoon.coords import shift2equatorial
 
@@ -271,7 +271,7 @@ def load_catalogs(
     """
     def load_cat(filepath: Path) -> np.recarray:
         """Loads the catalog data."""
-        if check_fits(filepath):
+        if _exists_valid(filepath):
             data = fits.getdata(filepath, ext=1)
         return data
 
@@ -313,7 +313,7 @@ def load_iros_output(filepath: str | Path) -> dict:
 
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
-    if check_fits(filepath):
+    if _exists_valid(filepath):
         print("# Loading data...")
         data = load_data(filepath)
         print("# Loading completed!")
@@ -353,7 +353,7 @@ def load_iros_data(filepath: str | Path) -> dict:
 
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
-    if check_fits(filepath):
+    if _exists_valid(filepath):
         print("# Loading data...")
         data = load_data(filepath)
         print("# Loading completed!")
@@ -380,7 +380,7 @@ def load_sky(filepath: str | Path) -> tuple[np.array]:
     
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
-    if check_fits(filepath):
+    if _exists_valid(filepath):
         print("# Loading data...")
         sky, snr = load_data(filepath)
         print("# Loading completed!")
