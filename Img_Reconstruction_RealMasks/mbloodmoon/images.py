@@ -23,157 +23,32 @@ from scipy.interpolate import RegularGridInterpolator
 from .types import BinsRectangular
 from .types import UpscaleFactor
 
-__all__ = [
-    "_enlarge", "upscale", "_reduce",
-    "downscale", "compose", "argmax",
-    "_rbilinear", "_rbilinear_relative",
-    "_interp", "_shift",
-    "_erosion", "_unframe",
-]
 
-
-def _enlarge(
+def _upscale(
     m: npt.NDArray,
-    upscale_f: UpscaleFactor,
+    upscale_x: int,
+    upscale_y: int,
 ) -> npt.NDArray:
     """
     Oversamples a 2D array by repeating elements along the axes.
 
     Args:
-        m (npt.NDArray): Input 2D array.
-        upscale_f (UpscaleFactor): Upscaling factors.
+        m: Input 2D array.
+        upscale_x: Upscaling factor along the x-axis.
+        upscale_y: Upscaling factor along the y-axis.
 
     Returns:
-        output (npt.NDArray): Oversampled array.
+        output: Oversampled array.
 
     Notes:
-        - the total sum is NOT conserved.
-    """    
-    for i, f in enumerate(upscale_f[::-1]):
-        m = np.repeat(m, f, axis=i)
+        - the total sum is NOT conserved. Hence the function name is somewhat
+          off, since there is no "scaling". A better name would be `enlarge` or
+          similar. However, we used it for naming variables and parameters in
+          many places so we are keeping it, for now.
+    """
+    for ax, factor in enumerate((upscale_y, upscale_x)):
+        m = np.repeat(m, factor, axis=ax)
     return m
-
-
-def upscale(
-    data: npt.NDArray,
-    upscale_y: int = 1,
-    upscale_x: int = 1,
-) -> npt.NDArray:
-    """
-    Upscales a 2D array by repeating elements along each axis and
-    by interpolating array values.
-
-    Args:
-        data (npt.NDArray): Input 2D array.
-        upscale_y (int): Upscaling factor over the y direction.
-        upscale_x (int): Upscaling factor over the x direction.
-
-    Returns:
-        output (npt.NDArray): Oversampled array.
-
-    Raises:
-        ValueError: if upscale factors are not positive integers.
-    
-    Notes:
-        - The array total sum is conserved through linear interpolation.
-        - For N-dim arrays, consider using `astropy.nndata.block_replicate()`.
-    """
-    if not (
-        (isinstance(upscale_y, int) and upscale_y > 0) and
-        (isinstance(upscale_x, int) and upscale_x > 0)
-    ):
-        raise ValueError("Upscaling factors must be positive integers.")
-    
-    upscaling = UpscaleFactor(upscale_x, upscale_y)
-    return _enlarge(data, upscaling) / np.prod(upscaling)
-
-
-def _reduce(
-    m: npt.NDArray,
-    downscaling: npt.NDArray,
-) -> npt.NDArray:
-    """
-    Downsamples a 2D array.
-
-    Args:
-        m (npt.NDArray): Input 2D array.
-        downscaling (npt.NDArray): Downscaling factors.
-
-    Returns:
-        output (npt.NDArray): Downsampled array.
-
-    Notes:
-        - the total sum is conserved.
-    """
-    def _handle_shape(
-        data: npt.NDArray,
-        factors: npt.NDArray,
-    ) -> npt.NDArray:
-        """Adjusts array for blocks subdivision by cutting extra-rows/columns."""
-
-        def _handle_axis(a: npt.NDArray, idx: int) -> npt.NDArray:
-            """Redistributes cutted values in the block-adjusted axis."""
-            return a[:idx] + a[idx:].sum(axis=0) / idx
-        
-        adj_shape = (np.array(data.shape) // factors) * factors
-        for ax in range(data.ndim):
-            if data.shape[ax] != adj_shape[ax]:
-                data = data.swapaxes(0, ax)
-                data = _handle_axis(data, adj_shape[ax])
-                data = data.swapaxes(0, ax)
-        return data
-
-    def _to_blocks(
-        data: npt.NDArray,
-        factors: npt.NDArray,
-    ) -> npt.NDArray:
-        """Reshapes input array into blocks."""
-        assert not np.any(np.mod(data.shape, factors) != 0)
-        nblocks = np.array(data.shape) // factors
-        reshaping = tuple(dim for dims in zip(nblocks, factors) for dim in dims)
-        return data.reshape(reshaping).transpose((0, 2, 1, 3))
-    
-    m = _handle_shape(m, downscaling)
-    m = _to_blocks(m, downscaling)
-    return m.sum(axis=(2, 3))
-
-
-def downscale(
-    data: npt.NDArray,
-    downscale_y: int = 1,
-    downscale_x: int = 1,
-) -> npt.NDArray:
-    """
-    Downscales a 2D array by dividing the input array in blocks
-    and adding over them to interpolate array values.
-
-    Args:
-        data (npt.NDArray): Input 2D array.
-        downscale_y (int): Downscaling factor over the y direction.
-        downscale_x (int): Downscaling factor over the x direction.
-
-    Returns:
-        output (npt.NDArray): Downsampled array.
-
-    Raises:
-        ValueError: if downscale factors are not positive integers.
-    
-    Notes:
-        - The downsampling is performed through blocks subdivision, which
-          represent the elements of the downsampled array. Each block is
-          reduced by adding its elements for linear interpolation.
-        - The total sum of the array is conserved.
-        - For N-dim arrays, consider using `astropy.nndata.block_reduce()`.
-    """
-    
-    if not (
-        (isinstance(downscale_y, int) and downscale_y > 0) and
-        (isinstance(downscale_x, int) and downscale_x > 0)
-    ):
-        raise ValueError("Downscaling factors must be positive integers.")
-    
-    downscaling = np.array((downscale_y, downscale_x))
-    return _reduce(data, downscaling)
 
 
 def compose(
@@ -208,8 +83,8 @@ def compose(
                    N+C+S ==  rotated(`b`)
 
     Args:
-        a (ndarray): First input matrix of shape (n,m) where n < m
-        b (ndarray): Second input matrix of same shape as `a`
+        a: First input matrix of shape (n,m) where n < m
+        b: Second input matrix of same shape as `a`
         strict: if True raises an error if matrices have odd rows and even columns,
                 or viceversa.
 
@@ -252,7 +127,10 @@ def compose(
         raise ValueError("Input matrices must have same shape")
 
     maxd, mind = max(a.shape), min(a.shape)
-    # if matrices have odd rows and even columns composition is ambiguous
+    # if matrices have odd rows and even columns, or viceversa, composition is ambiguous because
+    # we can't put one piece over the other at the dead center. we have to chose if putting one
+    # up or down a row. we solve this by silently cutting a column, or a row. We could pad
+    # but I feel it would end even worse.
     if maxd % 2 != mind % 2:
         if strict:
             raise ValueError("Input matrices must have rows and columns with same parity if `strict` is True")
@@ -273,7 +151,8 @@ def compose(
         b_embedding = np.pad(np.rot90(b, k=-1), pad_width=((delta, delta), (0, 0)))
     composed = a_embedding + b_embedding
 
-    def _rotb2b(i, j):
+    def _rotback2b(i, j):
+        """Given c_i, c_j indices !of the compose's output 'c'! returns b_i, b_j."""
         return mind - 1 - j, i
 
     def f(i: int, j: int) -> tuple[Optional[tuple[int, int]], Optional[tuple[int, int]]]:
@@ -304,13 +183,13 @@ def compose(
         elif j < mind + delta:
             if i < delta:
                 # N quadrant
-                return None, _rotb2b(i, j - delta)
+                return None, _rotback2b(i, j - delta)
             elif i < maxd - delta:
                 # C quadrant
-                return (i - delta, j), _rotb2b(i, j - delta)
+                return (i - delta, j), _rotback2b(i, j - delta)
             else:
                 # S quadrant
-                return None, _rotb2b(i, j - delta)
+                return None, _rotback2b(i, j - delta)
         else:
             # E quadrant
             if not (delta <= i < delta + mind):
@@ -369,7 +248,6 @@ def _rbilinear(
     To C we assign a weight (1 - dx) * dy.
     To D we assign a weight dx * dy.
 
-
     Args:
         cx: x-coordinate of the point
         cy: y-coordinate of the point
@@ -379,6 +257,24 @@ def _rbilinear(
     Returns:
         Ordered dictionary mapping grid point indices to their interpolation weights
         The first dictionary elements map to the bin whose midpoint is closest to the input.
+
+    Notes:
+        * Assumes uniform grid spacing.
+        * If the pivot falls on the grid (hence there is no unambiguous choice),
+          the cell with the largest indeces is selected as the pivot.
+          For example, in the next case, the pivot has index (4, 3):
+          ```
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.25, 0.25, 0.0],
+                [0.0, 0.0, 0.25, 0.25, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0, 0.0],
+            ]
+            ```
+            See tests for more details.
 
     Raises:
         ValueError: If grid is invalid or point lies outside
@@ -391,8 +287,17 @@ def _rbilinear(
         raise ValueError("Center lies outside grid.")
 
     i, j = (bisect(bins_y, cy) - 1), bisect(bins_x, cx) - 1
-    # this will take care of the pivots when it is falls on the border
+    # why the `-2`?
+    # ```
+    # bins_x = [0, 1, 2]
+    # cx = 1.99  # a value very close to the right border
+    # assert(bisect(bins_x, cx) == 2)
+    # i = bisect(bins_y, cy) - 1
+    # ```
+    # hence `i` should be 1 to fall on the border
     if i == 0 or j == 0 or i == len(bins_y) - 2 or j == len(bins_x) - 2:
+        i = max(0, min(i, len(bins_y) - 2))
+        j = max(0, min(j, len(bins_x) - 2))
         return OrderedDict([((i, j), 1.0)])
 
     mx, my = (bins_x[j] + bins_x[j + 1]) / 2, (bins_y[i] + bins_y[i + 1]) / 2
@@ -431,7 +336,8 @@ def _rbilinear_relative(
     bins_y: npt.NDArray,
 ) -> tuple[OrderedDict, tuple[int, int]]:
     """To avoid computing shifts many time, we create a slightly shadowgram and index over it.
-    This operation requires the results for rbilinear to be expressed relatively to the pivot."""
+    This operation requires the results for rbilinear to be expressed relatively to the pivot.
+    """
     results_rbilinear = _rbilinear(cx, cy, bins_x, bins_y)
     ((pivot_i, pivot_j), _), *__ = results_rbilinear.items()
     # noinspection PyTypeChecker
@@ -463,13 +369,17 @@ def _interp(
         mindim = min(min(xs.shape), min(ys.shape))
         if mindim > 3:
             return "cubic"
-        if mindim > 1:
+        elif mindim > 1:
             method = "linear"
+            warnings.warn(
+                f"Interpolator bins too small for method 'cubic', resorting to '{method}'. "
+                f"Consider upscaling your mask if you haven't yet."
+            )
         elif mindim > 0:
             method = "nearest"
             warnings.warn(
                 f"Interpolator bins too small for method 'cubic', resorting to '{method}'. "
-                f"Consider upscaling your mask."
+                f"Consider upscaling your mask if you haven't yet."
             )
         else:
             raise ValueError("Can not interpolate, interpolator grid is empty.")
@@ -477,8 +387,8 @@ def _interp(
 
     midpoints_x = (bins.x[1:] + bins.x[:-1]) / 2
     midpoints_y = (bins.y[1:] + bins.y[:-1]) / 2
-    midpoints_x_fine = np.linspace(midpoints_x[0], midpoints_x[-1], len(midpoints_x) * interp_f.x + 1)
-    midpoints_y_fine = np.linspace(midpoints_y[0], midpoints_y[-1], len(midpoints_y) * interp_f.y + 1)
+    midpoints_x_fine = np.linspace(midpoints_x[0], midpoints_x[-1], interp_f.x * (len(midpoints_x) - 1) + 1)
+    midpoints_y_fine = np.linspace(midpoints_y[0], midpoints_y[-1], interp_f.y * (len(midpoints_y) - 1) + 1)
     interp = RegularGridInterpolator(
         (midpoints_x, midpoints_y),
         tile.T,
@@ -538,11 +448,6 @@ def _erosion(
     """
     2D matrix erosion for simulating finite thickness effect in shadow projections.
     It takes a mask array and "thins" the mask elements across the columns' direction.
-    The erosion is performed only on the correct side of open mask elements:\n
-        - right side, if cut is negative (negative angle wrt camera optical axis)
-        - left side, if cut is positive (positive angle wrt camera optical axis)
-    The function erodes all integer bins (replacing 1s with 0s). If cut is not integer,
-    then the function applies a fractional transparency to the last eroded bin.
 
     Comes with NO safeguards: setting cuts larger than step may remove slits or make them negative.
 
@@ -578,10 +483,13 @@ def _erosion(
 
     Returns:
         Modified array with shadow effects applied
+
+    Notes:
+        * See tests for usage examples.
     """
     if not np.issubdtype(arr.dtype, np.integer):
         raise ValueError("Input array must be of integer type.")
-    
+
     # number of bins to cut
     ncuts = int(cut / step)
     cutted = arr * (arr & _shift(arr, (0, ncuts))) if ncuts else arr
@@ -590,10 +498,7 @@ def _erosion(
     #   - the bin with the decimal values is the one
     #     to the left or right wrt the cutted bins
     erosion_value = abs(cut / step - ncuts)
-    border = (
-        (cutted - _shift(cutted, (0, int(np.sign(cut))))) > 0
-    )
-    
+    border = (cutted - _shift(cutted, (0, int(np.sign(cut))))) > 0
     return cutted - border * erosion_value
 
 

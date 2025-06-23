@@ -8,7 +8,6 @@ This module provides dataclasses and utilities for:
 - Parsing configuration data from FITS headers
 """
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -17,60 +16,51 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
-from .types import CoordEquatorial
-from .types import CoordHorizontal
-from .filtering import filter_data
-
-__all__ = [
-    "_validate_fits", "check_fits",
-    "simulation_files", "SimulationDataLoader",
-    "MaskDataLoader", "fetch_mask",
-]
+from bloodmoon.types import CoordEquatorial
+from bloodmoon.types import CoordHorizontal
 
 
-def _validate_fits(filepath: Path) -> bool:
+def _exists_valid(filepath: Path) -> bool:
     """
-    Following astropy's approach, reads the first FITS card (80 bytes)
-    and checks for the SIMPLE keyword signature.
-
+    Checks presence and validity of the FITS file.
     Args:
-        filepath: Path object pointing to the file to validate
+        filepath: Path to the FITS file.
 
     Returns:
-        bool: True if file has a valid FITS signature, False otherwise
-    """
-    try:
-        with open(filepath, "rb") as file:
-            # FITS signature is supposed to be in the first 30 bytes, but to
-            # allow reading various invalid files we will check in the first
-            # card (80 bytes).
-            simple = file.read(80)
-    except OSError:
-        return False
-
-    fits_signature = b"SIMPLE  =                    T"
-
-    match_sig = simple[:29] == fits_signature[:-1] and simple[29:30] in (b"T", b"F")
-    return match_sig
-
-
-def check_fits(filepath: Path) -> bool:
-    """
-    Check presence and validity of the FITS file.
-
-    Args:
-        filepath (str | Path): Path to the FITS file.
-    
-    Returns:
-        output (bool): True if FITS exists and in valid format.
-
+        output: True if FITS exists and in valid format.
     Raises:
         FileNotFoundError: If FITS file does not exist.
         ValueError: If file not in valid FITS format.
     """
-    if not filepath.is_file():
+
+    def validate_signature(filepath: Path) -> bool:
+        """
+        Following astropy's approach, reads the first FITS card (80 bytes)
+        and checks for the SIMPLE keyword signature.
+
+        Args:
+            filepath: Path object pointing to the file to validate
+
+        Returns:
+            bool: True if file has a valid FITS signature, False otherwise
+        """
+        try:
+            with open(filepath, "rb") as file:
+                # FITS signature is supposed to be in the first 30 bytes, but to
+                # allow reading various invalid files we will check in the first
+                # card (80 bytes).
+                simple = file.read(80)
+        except OSError:
+            return False
+
+        fits_signature = b"SIMPLE  =                    T"
+
+        match_sig = simple[:29] == fits_signature[:-1] and simple[29:30] in (b"T", b"F")
+        return match_sig
+
+    if not Path(filepath).is_file():
         raise FileNotFoundError(f"FITS file '{filepath}' does not exist.")
-    elif not _validate_fits(filepath):
+    elif not validate_signature(Path(filepath)):
         raise ValueError("File not in valid FITS format.")
     return True
 
@@ -78,6 +68,9 @@ def check_fits(filepath: Path) -> bool:
 def simulation_files(dirpath: str | Path) -> dict[str, dict[str, Path]]:
     """
     Locate and validate all required FITS files in the root directory.
+
+    Args:
+        dirpath: Path to the FITS file.
 
     Returns:
         Nested dictionary mapping camera IDs to their respective file paths
@@ -123,16 +116,11 @@ class SimulationDataLoader:
     FITS file containing WFM simulation data for a single camera.
 
     Attributes:
-        filepath (Path):
-            Path to the FITS file.
-        energy_range (int | float | tuple[int | float, int | float] | None):
-            Energy range in keV for the data filtering.
-        coords (CoordEquatorial | Sequence[CoordEquatorial] | None):
-            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
+        filepath (Path): Path to the FITS file
 
     Properties:
-        data: Photon event data from FITS extension 1.
-        header: Primary FITS header.
+        data: Photon event data from FITS extension 1
+        header: Primary FITS header
         pointings (dict[str, CoordEquatorial]): Camera axis directions in equatorial frame
             - 'z': Optical axis pointing (RA/Dec)
             - 'x': Camera x-axis pointing (RA/Dec)
@@ -142,20 +130,10 @@ class SimulationDataLoader:
     """
 
     filepath: Path
-    energy_range: int | tuple[int, int] | None
-    coords: CoordEquatorial | Sequence[CoordEquatorial] | None
 
     @cached_property
     def data(self) -> FITS_rec:
-        rec = fits.getdata(self.filepath, ext=1, header=False)
-        if self.energy_range or self.coords:
-            rec = filter_data(
-                data=rec,
-                E_min=self.energy_range[0],
-                E_max=self.energy_range[1],
-                coords=self.coords,
-            )
-        return rec
+        return fits.getdata(self.filepath, ext=1, header=False)
 
     @cached_property
     def header(self) -> Header:
@@ -192,29 +170,18 @@ class SimulationDataLoader:
         }
 
 
-def simulation(
-    filepath: str | Path,
-    energy_range: int | tuple[int, int] | None = None,
-    coords: CoordEquatorial | Sequence[CoordEquatorial] | None = None,
-) -> SimulationDataLoader:
+def simulation(filepath: str | Path) -> SimulationDataLoader:
     """
     Checks validity of filepath and intializes SimulationDataLoader.
 
     Args:
-        filepath:
-            Path to FITS file.
-        energy_range (int | float | tuple[int | float, int | float] | None, optional (default=None)):
-            Energy range in keV for the data filtering. If a specific energy
-            is given, this will be considered as the maximum filter value.
-            If a tuple is given, it's interpreted as (`E_min`, `E_max`).
-        coords (CoordEquatorial | Sequence[CoordEquatorial] | None, optional (default=None)):
-            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
+        filepath: path to FITS file.
 
     Returns:
         a SimulationDataLoader dataclass.
     """
-    if check_fits(Path(filepath)):
-        sdl = SimulationDataLoader(filepath, energy_range, coords)
+    if _exists_valid(Path(filepath)):
+        sdl = SimulationDataLoader(filepath)
     return sdl
 
 
@@ -262,19 +229,12 @@ class MaskDataLoader:
                 - "detector_maxx": bottom physical detector edge along y-axis [mm]
                 - "detector_miny": right physical detector edge along x-axis [mm]
                 - "detector_maxy": top physical detector edge along y-axis [mm]
-                - "detector_bmmask_dist": detector - bottom mask distance [mm] (with detector median absorption)
-                - "detector_midmask_dist": detector - mid mask plate distance [mm] (with detector median absorption)
-                - "detector_topmask_dist": detector - top mask distance [mm] (with detector median absorption)
+                - "mask_detector_distance": detector - bottom mask distance [mm]
                 - "open_fraction": mask open fraction
                 - "real_open_fraction": mask open fraction with ribs correction
-        
-        Notes:
-            - The detector median absorption for the incident photons is set to 0.01 mm.
         """
         h1 = dict(fits.getheader(self.filepath, ext=0)) | dict(fits.getheader(self.filepath, ext=2))
         h2 = dict(fits.getheader(self.filepath, ext=3))
-
-        detector_absorption = 0.0     # median photon length absorption in the detector [mm]
 
         info = {
             "mask_minx": h1["MINX"],
@@ -290,11 +250,9 @@ class MaskDataLoader:
             "detector_maxx": h1["PLNXMAX"],
             "detector_miny": h1["PLNYMIN"],
             "detector_maxy": h1["PLNYMAX"],
-            "detector_bmmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
-            "detector_midmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
-            "detector_topmask_dist": h1["MDDIST"] + h1["MASKTHK"] + detector_absorption,
+            "mask_detector_distance": h1["MDDIST"],
             "open_fraction": h2["OPENFR"],
-            "real_open_fraction": h2["RLOPENFR"]
+            "real_open_fraction": h2["RLOPENFR"],
         }
 
         return {k: float(v) for k, v in info.items()}
@@ -340,7 +298,7 @@ def fetch_mask(filepath: str | Path) -> MaskDataLoader:
     Returns:
         a MaskDataLoader dataclass.
     """
-    if check_fits(Path(filepath)):
+    if _exists_valid(Path(filepath)):
         mdl = MaskDataLoader(Path(filepath))
     return mdl
 
