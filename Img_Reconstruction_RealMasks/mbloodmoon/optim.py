@@ -375,7 +375,7 @@ def optimize(
         - Initial position is refined using interpolation
         - Bounds are set based on initial guess and physical constraints
     """
-    from bloodmoon.images import argmax
+    from mbloodmoon.images import argmax
 
     sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
     fluence_start = sky.max()
