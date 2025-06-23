@@ -266,7 +266,7 @@ def initialize_pipeline(
         test_name=testID,
     )
 
-    # detector corrections
+    # mask/detector corrections
     vignetting, psfy = handle_simul_corrections(ideal_mask, dataset_type)
     
     # output files names (simul skies, iros output DB and sky residuals, sources and catalog-compared DB, IROS skies)

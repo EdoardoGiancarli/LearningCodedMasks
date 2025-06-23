@@ -10,14 +10,15 @@ from _IROS_support import PipelineParams
 from _IROS_support import output_pipeline_files
 
 from mbloodmoon.io import simulation_files, simulation
-from mbloodmoon.mask import decode, count, variance, snratio #, codedmask
-from mbloodmoon.utils import timer
+from mbloodmoon.mask import decode, count, variance, snratio, codedmask
 from mbloodmoon.filtering import filter_catalog
 # from mbloodmoon.images import upscale #, downscale
 import mbloodmoon.iros_management as iros
 
-from temp_camera import codedmask
-print("\n###___using temp_camera binning___###\n")
+from timing import timer
+
+#from temp_camera import codedmask
+#print("\n###___using temp_camera binning___###\n")
 
 
 def run_pipeline(params: PipelineParams) -> None:
