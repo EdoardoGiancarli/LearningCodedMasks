@@ -24,7 +24,7 @@ from scipy.signal import convolve
 from scipy.signal import correlate
 from scipy.stats import binned_statistic_2d
 
-from bloodmoon.coords import pos2shift
+from .coords import pos2shift
 
 from .images import _erosion
 from .images import _interp

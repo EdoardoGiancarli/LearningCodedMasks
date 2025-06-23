@@ -20,8 +20,8 @@ import numpy.typing as npt
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from bloodmoon.coords import pos2shift
-from bloodmoon.coords import shift2pos
+from .coords import pos2shift
+from .coords import shift2pos
 
 from .images import _rbilinear
 from .images import _rbilinear_relative

@@ -5,7 +5,7 @@ Data filters for photons energy range, sources flux and sources positions.
 from collections.abc import Sequence
 
 import numpy as np
-from mbloodmoon.types import CoordEquatorial
+from .types import CoordEquatorial
 
 
 def filter_data(
