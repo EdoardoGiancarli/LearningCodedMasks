@@ -70,7 +70,7 @@ UPSX_FINAL: int = 1               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "test_s4_bmresiduals_upx1y1_detected"
+TEST_ID: str = "BMRESIDUALS_test_s4_upx1y1_detected"
 
 ## IROS set-up
 max_iterations: int = 1
