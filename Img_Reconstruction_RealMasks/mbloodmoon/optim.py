@@ -208,7 +208,7 @@ def ModelShiftFluence(
             # TODO: is it possible to obtain the same behaviour without four decodings?
             decoded_components = tuple(
                 map(
-                    lambda x: decode(camera, x),
+                    lambda x: decode(camera, x * camera.bulk),
                     (normalized_component(sg_f, rpos) for rpos in relative_positions),
                 )
             )
@@ -286,6 +286,8 @@ def ModelShiftFluenceUncached(  # noqa
             mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
             sg = _shift(mask_p, (r, c))  # mask shifted processed
             detector += sg[i_min:i_max, j_min:j_max] * weight
+        
+        detector *= camera.bulk
         detector /= np.sum(detector)
         return decode(camera, detector) * fluence
 
@@ -332,8 +334,8 @@ def Loss(model_f: Callable) -> Callable:  # noqa
             - Only computes error within the local window to improve robustness
         """
         model = model_f(*args)
-        mae = np.mean(np.square(model - truth))
-        return float(mae)
+        mse = np.mean(np.square(model - truth))
+        return float(mse)
 
     return f
 

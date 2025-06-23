@@ -204,6 +204,7 @@ def plot_sequence(
         ax.tick_params(which='both', direction='in', width=2, length=7 if 'major' else 4)
         ax.xaxis.set_ticks_position('both')
         ax.yaxis.set_ticks_position('both')
+        ax.ticklabel_format(scilimits=(-3, 4))
 
     nplots = len(input_sequence)
     x = x or [None] * nplots
