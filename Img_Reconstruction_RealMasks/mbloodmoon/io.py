@@ -8,6 +8,7 @@ This module provides dataclasses and utilities for:
 - Parsing configuration data from FITS headers
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -16,8 +17,9 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
-from bloodmoon.types import CoordEquatorial
-from bloodmoon.types import CoordHorizontal
+from .filtering import filter_data
+from .types import CoordEquatorial
+from .types import CoordHorizontal
 
 
 def _exists_valid(filepath: Path) -> bool:
@@ -130,10 +132,20 @@ class SimulationDataLoader:
     """
 
     filepath: Path
+    energy_range: int | tuple[int, int] | None
+    coords: CoordEquatorial | Sequence[CoordEquatorial] | None
 
     @cached_property
     def data(self) -> FITS_rec:
-        return fits.getdata(self.filepath, ext=1, header=False)
+        rec = fits.getdata(self.filepath, ext=1, header=False)
+        if self.energy_range or self.coords:
+            rec = filter_data(
+                data=rec,
+                E_min=self.energy_range[0],
+                E_max=self.energy_range[1],
+                coords=self.coords,
+            )
+        return rec
 
     @cached_property
     def header(self) -> Header:

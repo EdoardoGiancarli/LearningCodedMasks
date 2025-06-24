@@ -17,7 +17,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from bloodmoon.coords import shift2pos
+from .coords import shift2pos
 
 from .images import _erosion
 from .images import _rbilinear
@@ -542,7 +542,7 @@ def optimize(
         - Initial position is refined using interpolation
         - Bounds are set based on initial guess and physical constraints
     """
-    from bloodmoon.images import argmax
+    from .images import argmax
 
     sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
     fluence_start = sky.max()
