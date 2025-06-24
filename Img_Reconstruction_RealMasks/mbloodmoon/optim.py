@@ -2,65 +2,269 @@
 Optimization routines for source parameter estimation.
 
 This module provides algorithms for:
-- Source position refinement
+- Source position estimation
 - Flux estimation
-- Two-stage optimization process
+- Two-stage combined direction/flux estimation
 - Model fitting with instrumental effects
-- Caching strategies for performance
-
-The optimization handles both spatial and intensity parameters simultaneously.
 """
 
 from functools import lru_cache
 from typing import Callable, Iterable, Literal
 import warnings
 
+from numpy import typing as npt
 import numpy as np
-import numpy.typing as npt
 from scipy.optimize import minimize
 from scipy.signal import convolve
 
-from .coords import pos2shift
-from .coords import shift2pos
+from bloodmoon.coords import shift2pos
 
+from .images import _erosion
 from .images import _rbilinear
 from .images import _rbilinear_relative
 from .images import _shift
 from .io import SimulationDataLoader
-from .mask import _convolution_kernel_psfy
+from .mask import _bisect_interval
 from .mask import _detector_footprint
-from .mask import apply_vignetting
 from .mask import CodedMaskCamera
 from .mask import count
 from .mask import cutout
 from .mask import decode
 from .mask import interpmax
-from .mask import model_shadowgram
-from .mask import model_sky
 from .mask import snratio
 from .mask import variance
 
 
+
+def _modsech(
+    x: npt.NDArray,
+    norm: float,
+    center: float,
+    alpha: float,
+    beta: float,
+) -> npt.NDArray:
+    """
+    PSF fitting function template.
+
+    Args:
+        x: a numpy array or value, in millimeters
+        norm: normalization parameter
+        center: center parameter
+        alpha: alpha shape parameter
+        beta: beta shape parameter
+
+    Returns:
+        numpy array or value, depending on the input
+    """
+    return norm / np.cosh(np.abs((x - center) / alpha) ** beta)
+
+
+def _wfm_psfy(x: npt.NDArray) -> npt.NDArray:
+    """
+    PSF function in y direction as fitted from WFM simulations.
+
+    Args:
+        x: a numpy array or value, in millimeters
+
+    Returns:
+        numpy array or value
+    """
+    PSFY_WFM_PARAMS = {
+        "center": 0,
+        "alpha": 0.3214,
+        "beta": 0.6246,
+    }
+    return _modsech(x, norm=1, **PSFY_WFM_PARAMS)
+
+
+def _wfm_psfy_kernel(camera: CodedMaskCamera) -> npt.NDArray:
+    """
+    Returns PSF convolution kernel.
+    At present, it ignores the `x` direction, since PSF characteristic lenght is much shorter
+    than typical bin size, even at moderately large upscales.
+
+    Args:
+        camera: a CodedMaskCamera object.
+
+    Returns:
+        A column array convolution kernel.
+    """
+    bins = camera.bins_detector
+    min_bin, max_bin = _bisect_interval(bins.y, -camera.mdl["slit_deltay"], camera.mdl["slit_deltay"])
+    bin_edges = bins.y[min_bin : max_bin + 1]
+    midpoints = (bin_edges[1:] + bin_edges[:-1]) / 2
+    kernel = _wfm_psfy(midpoints).reshape(len(midpoints), -1)
+    kernel = kernel / np.sum(kernel)
+    return kernel
+
+
 @lru_cache(maxsize=1)
-def _convolution_kernel_psfy_cached(camera: CodedMaskCamera):
-    """Cached helper."""
-    return _convolution_kernel_psfy(camera)
+def _wfm_psfy_kernel_cached(camera: CodedMaskCamera):
+    """Caching helper."""
+    return _wfm_psfy_kernel(camera)
+
+
+def apply_vignetting(
+    camera: CodedMaskCamera,
+    shadowgram: npt.NDArray,
+    shift_x: float,
+    shift_y: float,
+) -> npt.NDArray:
+    """
+    Apply vignetting effects to a shadowgram based on source position.
+    Vignetting occurs when mask thickness causes partial shadowing at off-axis angles.
+    This function models this effect by applying erosion operations in both x and y
+    directions based on the source's angular displacement from the optical axis.
+
+    Args:
+        camera: CodedMaskCamera instance containing mask and detector geometry
+        shadowgram: 2D array representing the detector shadowgram before vignetting
+        shift_x: Source displacement from optical axis in x direction (mm)
+        shift_y: Source displacement from optical axis in y direction (mm)
+
+    Returns:
+        2D array representing the detector shadowgram with vignetting effects applied.
+        Values are float between 0 and 1, where lower values indicate stronger vignetting.
+
+    Notes:
+        - The vignetting effect increases with larger off-axis angles
+        - The effect is calculated separately for x and y directions then combined
+        - The mask thickness parameter from the camera model determines the strength
+          of the effect
+    """
+    bins = camera.bins_detector
+
+    angle_x_rad = np.arctan(shift_x / camera.mdl["mask_detector_distance"])
+    red_factor = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
+    # since the mask detector distance is assumed to be the distance between the
+    # detector top and the mask bottom, erosion shall cut on the right-side of the
+    # shadowgram when sources have negative `angle_x_rad`.
+    # given the implementation of `erosion` we have presently to multiply `red_factor`
+    # by -1 to achieve a cut on the right direction.
+    # TODO: change `erosion` and its tests so that multiplying by -1 isn't needed
+    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], -red_factor)
+
+    angle_y_rad = np.arctan(shift_y / camera.mdl["mask_detector_distance"])
+    red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
+    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], -red_factor)
+    return sg1 * sg2.T
 
 
 @lru_cache(maxsize=1)
 def _detector_footprint_cached(camera: CodedMaskCamera):
-    """Cached helper"""
+    """Caching helper"""
     return _detector_footprint(camera)
 
 
-def ModelFluence(  # noqa
+def model_shadowgram(
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> npt.NDArray:
+    """
+    Generates a normalized shadowgram for a point source.
+
+    The model may feature:
+    - Mask pattern projection
+    - Vignetting effects
+    - PSF convolution over y axis
+
+    Args:
+        shift_x: Source position x-coordinate in sky-shift space (mm)
+        shift_y: Source position y-coordinate in sky-shift space (mm)
+        camera: CodedMaskCamera instance containing all geometric parameters
+        vignetting: simulates vignetting effects
+        psfy: simulates detector reconstruction effects
+
+    Returns:
+        2D array representing the modeled detector image from the source
+
+    Notes:
+        * Results are normalized, i.e. sums up to one.
+    """
+
+    def process_mask(shift_x, shift_y):
+        mask_maybe_vignetted = (
+            apply_vignetting(
+                camera,
+                camera.mask,
+                shift_x,
+                shift_y,
+            )
+            if vignetting
+            else camera.mask
+        )
+        mask_maybe_vignetted_maybe_psfy = (
+            convolve(
+                mask_maybe_vignetted,
+                _wfm_psfy_kernel_cached(camera),
+                mode="same",
+            )
+            if psfy
+            else mask_maybe_vignetted
+        )
+        return mask_maybe_vignetted_maybe_psfy
+
+    # relative component map
+    components = _rbilinear(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
+    n, m = camera.shape_sky
+    detector = np.zeros(camera.shape_detector)
+    i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
+    for (c_i, c_j), weight in components.items():
+        r, c = (n // 2 - c_i), (m // 2 - c_j)
+        mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
+        sg = _shift(mask_p, (r, c))  # mask shifted processed
+        detector += sg[i_min:i_max, j_min:j_max] * weight
+    detector *= camera.bulk
+    detector /= np.sum(detector)
+    return detector
+
+
+def model_sky(
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+    fluence: float,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> npt.NDArray:
+    """
+    Generate a model of the reconstructed sky image for a point source.
+
+    The model may feature:
+    - Mask pattern projection
+    - Vignetting effects
+    - PSF convolution over y axis
+    - Flux scaling
+
+    Args:
+        shift_x: Source position x-coordinate in sky-shift space (mm)
+        shift_y: Source position y-coordinate in sky-shift space (mm)
+        fluence: Source intensity/fluence value
+        camera: CodedMaskCamera instance containing all geometric parameters
+        vignetting: simulates vignetting effects
+        psfy: simulates detector reconstruction effects
+
+    Returns:
+        2D array representing the modeled sky reconstruction after all effects
+        and processing steps have been applied
+
+    Notes:
+        - For optimization, consider using the dedicated, cached function of `optim.py`
+    """
+    return decode(camera, model_shadowgram(camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy)) * fluence
+
+
+def _ModelFluence(  # noqa
     camera: CodedMaskCamera,
     vignetting: bool = True,
     psfy: bool = True,
 ) -> tuple[Callable, Callable]:
     """
-    A fast caching version of the model, leveraging correlation linearity.
-    Intended for fluence optimization (not for optimizing source direction).
+    A fast caching version of the model for optimization, leveraging correlation linearity.
+    Intended for fluence optimization, not for optimizing source direction.
 
     Args:
         camera: CodedMaskCamera instance containing all geometric parameters
@@ -111,7 +315,54 @@ def ModelFluence(  # noqa
     return f, cache_clear
 
 
-def ModelShiftFluence(
+# this is essentially a wrapper to `mask.model_sky`,i am creating it because it's interface
+# follows the rules required by `optimize`.
+def _ModelShiftFluenceUncached(  # noqa
+    camera: CodedMaskCamera,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> tuple[Callable, Callable]:
+    """
+    A slow, vanilla implementation of the model for both direction and fluence optimization.
+    Intended for debugging and benchmarking.
+
+    Args:
+        camera: CodedMaskCamera instance containing all geometric parameters
+        vignetting: If true, shadowgram model simulates vignetting.
+        psfy: If true, the model used for optimization will simulate detector position
+        reconstruction effects.
+
+    Returns:
+        Two callables. The first is the routine for computing the model, the second
+        is a routine for freeing the cache.
+
+    Notes:
+        * Although we label this as `Uncached` because it is not using the leveraging
+          correlation linearity as `_ModelShiftFluence` and `_ModelShift` do, this model
+          is still using some caching to speed up dumb computes such as detector footprint
+          and psfy kernel evaluation.
+    """
+
+    def f(shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
+        """
+        A simple, slow version of the model for both direction and fluence optimization.
+
+        Args:
+            shift_x: Source position x-coordinate in sky-shift space (mm)
+            shift_y: Source position y-coordinate in sky-shift space (mm)
+            fluence: Source intensity/fluence value
+
+        Returns:
+            2D array representing the modeled sky reconstruction
+        """
+        return model_sky(camera, shift_x, shift_y, fluence, vignetting=vignetting, psfy=psfy)
+
+    # there is no cache here, hence no need to clean anything.
+    # we return a lambda anyway for compatibility with the other models
+    return f, lambda: None
+
+
+def _ModelShiftFluence(
     camera: CodedMaskCamera,
     vignetting: bool = True,
     psfy: bool = True,
@@ -159,7 +410,7 @@ def ModelShiftFluence(
         mask_maybe_vignetted_maybe_psfy = (
             convolve(
                 mask_maybe_vignetted,
-                _convolution_kernel_psfy_cached(camera),
+                _wfm_psfy_kernel_cached(camera),
                 mode="same",
             )
             if psfy
@@ -208,7 +459,7 @@ def ModelShiftFluence(
             # TODO: is it possible to obtain the same behaviour without four decodings?
             decoded_components = tuple(
                 map(
-                    lambda x: decode(camera, x * camera.bulk),
+                    lambda x: decode(camera, x),
                     (normalized_component(sg_f, rpos) for rpos in relative_positions),
                 )
             )
@@ -219,90 +470,12 @@ def ModelShiftFluence(
     return f, cache_clear
 
 
-def ModelShiftFluenceUncached(  # noqa
-    camera: CodedMaskCamera,
-    vignetting: bool = True,
-    psfy: bool = True,
-) -> tuple[Callable, Callable]:
+def _Loss(model_f: Callable) -> Callable:  # noqa
     """
-    A slow, vanilla implementation of the model for both direction and fluence optimization.
-    Intended for debugging and benchmarking.
+    Returns a loss function for source parameter optimization, given a routine for computing models.
 
     Args:
-        camera: CodedMaskCamera instance containing all geometric parameters
-        vignetting: If true, shadowgram model simulates vignetting.
-        psfy: If true, the model used for optimization will simulate detector position
-        reconstruction effects.
-
-    Returns:
-        Two callables. The first is the routine for computing the model, the second
-        is a routine for freeing the cache.
-    """
-
-    def process_mask(shift_x, shift_y):
-        mask_maybe_vignetted = (
-            apply_vignetting(
-                camera,
-                camera.mask,
-                shift_x,
-                shift_y,
-            )
-            if vignetting
-            else camera.mask
-        )
-        mask_maybe_vignetted_maybe_psfy = (
-            convolve(
-                mask_maybe_vignetted,
-                _convolution_kernel_psfy_cached(camera),
-                mode="same",
-            )
-            if psfy
-            else mask_maybe_vignetted
-        )
-        return mask_maybe_vignetted_maybe_psfy
-
-    def f(shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
-        """
-        A simple, slow version of the model for both direction and fluence optimization.
-
-        Args:
-            shift_x: Source position x-coordinate in sky-shift space (mm)
-            shift_y: Source position y-coordinate in sky-shift space (mm)
-            fluence: Source intensity/fluence value
-
-        Returns:
-            2D array representing the modeled sky reconstruction
-
-        Notes:
-            - Caches individual spatial components
-            - Suitable for source position optimization
-        """
-        components = _rbilinear(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
-        n, m = camera.shape_sky
-        detector = np.zeros(camera.shape_detector)
-        i_min, i_max, j_min, j_max = _detector_footprint(camera)
-        for (c_i, c_j), weight in components.items():
-            r, c = (n // 2 - c_i), (m // 2 - c_j)
-            mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
-            sg = _shift(mask_p, (r, c))  # mask shifted processed
-            detector += sg[i_min:i_max, j_min:j_max] * weight
-        
-        detector *= camera.bulk
-        detector /= np.sum(detector)
-        return decode(camera, detector) * fluence
-
-    # there is no cache here, hence no need to clean anything.
-    # we return a lambda anyway for compatibility with the other models
-    return f, lambda: None
-
-
-def Loss(model_f: Callable) -> Callable:  # noqa
-    """
-    Returns a loss function for source parameter optimization with a given strategy
-    for computing models.
-
-    Args:
-        model_f: Callable that generates model predictions. Should have signature:
+        model_f: Callable that generates model predictions. Expected to have signature:
             model_f(shift_x: float, shift_y: float, fluence: float, camera: CodedMaskCamera) -> np.array
 
     Returns:
@@ -311,7 +484,6 @@ def Loss(model_f: Callable) -> Callable:  # noqa
         where:
             - args is [shift_x, shift_y, fluence]
             - truth is the observed sky image
-            - camera is the CodedMaskCamera instance
     """
 
     def f(args: npt.NDArray, truth: npt.NDArray, camera: CodedMaskCamera) -> float:
@@ -327,15 +499,10 @@ def Loss(model_f: Callable) -> Callable:  # noqa
 
         Returns:
             float: Mean Squared Error between model and truth in local window
-
-        Notes:
-            - Window size is determined by camera.mdl["slit_delta{x,y}"]
-            - Model is generated using the provided model_f function
-            - Only computes error within the local window to improve robustness
         """
         model = model_f(*args)
-        mse = np.mean(np.square(model - truth))
-        return float(mse)
+        mae = np.mean(np.square(model - truth))
+        return float(mae)
 
     return f
 
@@ -346,7 +513,6 @@ def optimize(
     arg_sky: tuple[int, int],
     vignetting: bool = True,
     psfy: bool = True,
-    verbose: bool = True,
     model: Literal["fast", "accurate"] = "fast",
 ) -> tuple[float, float, float]:
     """
@@ -366,7 +532,6 @@ def optimize(
         vignetting: If true, the model used for optimization will simulate vignetting.
         psfy: If true, the model used for optimization will simulate detector position
         reconstruction effects.
-        verbose: If true, prints the output from the optimizer.
 
     Returns:
         Tuple containing the best-fit parameters `(x, y, fluence)` where:
@@ -377,7 +542,7 @@ def optimize(
         - Initial position is refined using interpolation
         - Bounds are set based on initial guess and physical constraints
     """
-    from mbloodmoon.images import argmax
+    from bloodmoon.images import argmax
 
     sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
     fluence_start = sky.max()
@@ -386,8 +551,8 @@ def optimize(
     # to reduce the number of cross-correlation the function is cached. it is our
     # responsibility to clear cache, freeing memory, after we will be done with the
     # the coarse fluence step.
-    model_fluence, model_fluence_clear = ModelFluence(camera, vignetting, psfy)
-    loss = Loss(model_fluence)
+    model_fluence, model_fluence_clear = _ModelFluence(camera, vignetting, psfy)
+    loss = _Loss(model_fluence)
     results = minimize(
         lambda args: loss((sx_start, sy_start, args[0]), sky, camera),
         x0=np.array((fluence_start,)),
@@ -397,7 +562,6 @@ def optimize(
         ],
         options={
             "maxiter": 10,
-            "iprint": 1 if verbose else -1,
             "ftol": 1e-4,
         },
     )
@@ -411,13 +575,13 @@ def optimize(
     # the number of cross-correlation computations, and it is our responsibility to free
     # memory after we will be done.
     if model == "fast":
-        model_shift_flux, model_shift_flux_clear = ModelShiftFluence(camera, vignetting, psfy)
+        model_shift_flux, model_shift_flux_clear = _ModelShiftFluence(camera, vignetting, psfy)
     elif model == "accurate":
-        model_shift_flux, model_shift_flux_clear = ModelShiftFluenceUncached(camera, vignetting, psfy)
+        model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     else:
         raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
 
-    loss = Loss(model_shift_flux)
+    loss = _Loss(model_shift_flux)
     results = minimize(
         lambda args: loss((args[0], args[1], args[2]), sky, camera),
         x0=np.array((sx_start, sy_start, fluence)),

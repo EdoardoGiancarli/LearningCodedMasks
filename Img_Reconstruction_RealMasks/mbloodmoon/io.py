@@ -8,7 +8,6 @@ This module provides dataclasses and utilities for:
 - Parsing configuration data from FITS headers
 """
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -17,9 +16,8 @@ from astropy.io import fits
 from astropy.io.fits.fitsrec import FITS_rec
 from astropy.io.fits.header import Header
 
-from .types import CoordEquatorial
-from .types import CoordHorizontal
-from .filtering import filter_data
+from bloodmoon.types import CoordEquatorial
+from bloodmoon.types import CoordHorizontal
 
 
 def _exists_valid(filepath: Path) -> bool:
@@ -118,16 +116,11 @@ class SimulationDataLoader:
     FITS file containing WFM simulation data for a single camera.
 
     Attributes:
-        filepath (Path):
-            Path to the FITS file.
-        energy_range (int | float | tuple[int | float, int | float] | None):
-            Energy range in keV for the data filtering.
-        coords (CoordEquatorial | Sequence[CoordEquatorial] | None):
-            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
+        filepath (Path): Path to the FITS file
 
     Properties:
-        data: Photon event data from FITS extension 1.
-        header: Primary FITS header.
+        data: Photon event data from FITS extension 1
+        header: Primary FITS header
         pointings (dict[str, CoordEquatorial]): Camera axis directions in equatorial frame
             - 'z': Optical axis pointing (RA/Dec)
             - 'x': Camera x-axis pointing (RA/Dec)
@@ -137,20 +130,10 @@ class SimulationDataLoader:
     """
 
     filepath: Path
-    energy_range: int | tuple[int, int] | None
-    coords: CoordEquatorial | Sequence[CoordEquatorial] | None
 
     @cached_property
     def data(self) -> FITS_rec:
-        rec = fits.getdata(self.filepath, ext=1, header=False)
-        if self.energy_range or self.coords:
-            rec = filter_data(
-                data=rec,
-                E_min=self.energy_range[0],
-                E_max=self.energy_range[1],
-                coords=self.coords,
-            )
-        return rec
+        return fits.getdata(self.filepath, ext=1, header=False)
 
     @cached_property
     def header(self) -> Header:
@@ -187,29 +170,18 @@ class SimulationDataLoader:
         }
 
 
-def simulation(
-    filepath: str | Path,
-    energy_range: int | tuple[int, int] | None = None,
-    coords: CoordEquatorial | Sequence[CoordEquatorial] | None = None,
-) -> SimulationDataLoader:
+def simulation(filepath: str | Path) -> SimulationDataLoader:
     """
     Checks validity of filepath and intializes SimulationDataLoader.
 
     Args:
-        filepath:
-            Path to FITS file.
-        energy_range (int | float | tuple[int | float, int | float] | None, optional (default=None)):
-            Energy range in keV for the data filtering. If a specific energy
-            is given, this will be considered as the maximum filter value.
-            If a tuple is given, it's interpreted as (`E_min`, `E_max`).
-        coords (CoordEquatorial | Sequence[CoordEquatorial] | None, optional (default=None)):
-            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
+        filepath: path to FITS file.
 
     Returns:
         a SimulationDataLoader dataclass.
     """
     if _exists_valid(Path(filepath)):
-        sdl = SimulationDataLoader(filepath, energy_range, coords)
+        sdl = SimulationDataLoader(filepath)
     return sdl
 
 

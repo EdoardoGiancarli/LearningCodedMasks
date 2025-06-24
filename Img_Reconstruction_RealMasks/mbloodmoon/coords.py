@@ -135,7 +135,7 @@ def pos2equatorial(
         - resulting RA/Dec refer to the center of the pixel.
         - negative indexes are allowed.
     """
-    return shift2equatorial(sdl, camera, *pos2shift(camera, y, x))
+    return shift2equatorial(sdl, camera, *pos2shift(camera, x, y))
 
 
 def shift2equatorial(
