@@ -182,18 +182,29 @@ class SimulationDataLoader:
         }
 
 
-def simulation(filepath: str | Path) -> SimulationDataLoader:
+def simulation(
+    filepath: str | Path,
+    energy_range: int | tuple[int, int] | None = None,
+    coords: CoordEquatorial | Sequence[CoordEquatorial] | None = None,
+) -> SimulationDataLoader:
     """
     Checks validity of filepath and intializes SimulationDataLoader.
 
     Args:
-        filepath: path to FITS file.
+        filepath:
+            Path to FITS file.
+        energy_range (int | float | tuple[int | float, int | float] | None, optional (default=None)):
+            Energy range in keV for the data filtering. If a specific energy
+            is given, this will be considered as the maximum filter value.
+            If a tuple is given, it's interpreted as (`E_min`, `E_max`).
+        coords (CoordEquatorial | Sequence[CoordEquatorial] | None, optional (default=None)):
+            Input photons RA/Dec (or sequence of RA/Dec) to filter out.
 
     Returns:
         a SimulationDataLoader dataclass.
     """
     if _exists_valid(Path(filepath)):
-        sdl = SimulationDataLoader(filepath)
+        sdl = SimulationDataLoader(filepath, energy_range, coords)
     return sdl
 
 
