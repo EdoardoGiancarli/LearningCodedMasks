@@ -185,16 +185,18 @@ def model_shadowgram(
         * Results are normalized, i.e. sums up to one.
     """
 
-    def process_mask(shift_x, shift_y):
+    def process_mask(shift_x, shift_y, sd):
+        sd[(sd > 0)] = 1
+        sd = np.int32(sd)
         mask_maybe_vignetted = (
             apply_vignetting(
                 camera,
-                camera.mask,
+                sd,
                 shift_x,
                 shift_y,
             )
             if vignetting
-            else camera.mask
+            else sd
         )
         mask_maybe_vignetted_maybe_psfy = (
             convolve(
@@ -214,9 +216,11 @@ def model_shadowgram(
     i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
     for (c_i, c_j), weight in components.items():
         r, c = (n // 2 - c_i), (m // 2 - c_j)
-        mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
-        sg = _shift(mask_p, (r, c))  # mask shifted processed
+        #mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
+        sg = _shift(camera.mask, (r, c))  # mask shifted processed
         detector += sg[i_min:i_max, j_min:j_max] * weight
+    
+    detector = detector * process_mask(shift_x, shift_y, detector)
     detector *= camera.bulk
     detector /= np.sum(detector)
     return detector
@@ -396,16 +400,18 @@ def _ModelShiftFluence(
     def cache_clear():
         cache.clear()
 
-    def process_mask(shift_x, shift_y):
+    def process_mask(shift_x, shift_y, sd):
+        sd[(sd > 0)] = 1
+        sd = np.int32(sd)
         mask_maybe_vignetted = (
             apply_vignetting(
                 camera,
-                camera.mask,
+                sd,
                 shift_x,
                 shift_y,
             )
             if vignetting
-            else camera.mask
+            else sd
         )
         mask_maybe_vignetted_maybe_psfy = (
             convolve(
@@ -420,7 +426,11 @@ def _ModelShiftFluence(
 
     def normalized_component(framed_shadowgram, relative_position):
         pos_i, pos_j = relative_position
-        return (s := framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * camera.bulk) / np.sum(s)
+        return framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]]
+    
+    #def normalized_component(framed_shadowgram, relative_position):
+    #    pos_i, pos_j = relative_position
+    #    return (s := framed_shadowgram[RCMAP[pos_i], RCMAP[pos_j]] * camera.bulk) / np.sum(s)
 
     def f(shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
         """
@@ -442,8 +452,10 @@ def _ModelShiftFluence(
         """
         components, pivot = _rbilinear_relative(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
         relative_positions = tuple(components.keys())
+
+        
         if (pivot, *relative_positions) in cache:
-            decoded_components = cache[(pivot, *relative_positions)]
+            shadowgrams = cache[(pivot, *relative_positions)]
         else:
             n, m = camera.shape_sky
             pivot_i, pivot_j = pivot
@@ -451,10 +463,36 @@ def _ModelShiftFluence(
             r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
 
             # we call with pivot because calling with shifts to ensure consistent cached/vignetting combos
+            mask_sp = _shift(camera.mask, (r, c))  # mask shifted
+            sg_f = mask_sp[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]  # shadowgram framed
+
+            # this makes me suffer, there should be a way to not compute decode four times..
+            # TODO: is it possible to obtain the same behaviour without four decodings?
+            shadowgrams = tuple(
+                normalized_component(sg_f, rpos) for rpos in relative_positions
+            )
+            cache[(pivot, *relative_positions)] = shadowgrams
+        
+        detector = sum(sd * w for sd, w in zip(shadowgrams, components.values()))
+        detector = detector * process_mask(shift_x, shift_y, detector)
+        detector *= camera.bulk
+        detector /= np.sum(detector)
+        return decode(camera, detector) * fluence
+
+
+        if (pivot, *relative_positions) in cache:
+            decoded_components = cache[(pivot, *relative_positions)]
+        else:
+            n, m = camera.shape_sky
+            pivot_i, pivot_j = pivot
+            i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
+            r, c = (n // 2 - pivot_i), (m // 2 - pivot_j)
+        
+            # we call with pivot because calling with shifts to ensure consistent cached/vignetting combos
             mask_p = process_mask(camera.bins_sky.x[pivot_j], camera.bins_sky.y[pivot_i])  # mask processed
             mask_sp = _shift(mask_p, (r, c))  # mask shifted processed
             sg_f = mask_sp[i_min - 1 : i_max + 1, j_min - 1 : j_max + 1]  # shadowgram framed
-
+        
             # this makes me suffer, there should be a way to not compute decode four times..
             # TODO: is it possible to obtain the same behaviour without four decodings?
             decoded_components = tuple(
