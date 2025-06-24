@@ -10,7 +10,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from mbloodmoon.mask import CodedMaskCamera
-from mbloodmoon.mask import model_sky
+from mbloodmoon.optim import model_sky
 
 __all__ = [
     "crop", "plot_distr", "plot_sequence",
