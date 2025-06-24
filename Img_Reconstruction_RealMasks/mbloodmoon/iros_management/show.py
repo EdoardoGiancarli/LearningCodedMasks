@@ -369,12 +369,13 @@ def make_sky(
         return crop(model, pos, cropping, strict=False)
 
     if background is None:
-        sky = np.zeros(camera.shape_sky)
+        sky = np.zeros(camera.shape_sky, dtype=np.int32)
     elif valid_BG(background):
-        sky = background
+        sky = np.int32(background)
     
     upx, upy = camera.upscale_f
     cropx, cropy = int(10 * (1 + upx / 3)), int(50 * (1 + upy))
+    #cropx, cropy = 15, 40
     
     for shiftx, shifty, fluence, x, y in zip(
         data[cameraID]["shift_x"]["data"],
@@ -391,7 +392,7 @@ def make_sky(
             cropping=(cropy, cropx)
         )
         p, q = modeled.shape
-        sky[y - p // 2 : y + p // 2 + 1, x - q // 2 : x + q // 2 + 1] = modeled
+        sky[y - p // 2 : y + p // 2 + 1, x - q // 2 : x + q // 2 + 1] += np.int32(modeled)
     
     return sky
 

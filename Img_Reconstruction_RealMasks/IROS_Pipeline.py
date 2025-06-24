@@ -72,7 +72,21 @@ UPSX_FINAL: int = 1               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "BMRESIDUALS_test_s6_upx1y1_detected"
+TEST_ID: str = "BMRESIDUALS_test_s6_upx1y1_oncedvignetting_detected"
+
+s0 = CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417)
+s1 = CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622)
+s2 = CoordEquatorial(ra=241.426574413659, dec=-26.6219960573764)
+s3 = CoordEquatorial(ra=253.284954989872, dec=-28.3032728404397)
+s4 = CoordEquatorial(ra=266.4, dec=-28.94)
+s5 = CoordEquatorial(ra=266.4, dec=-17.3775096005863)
+s6 = CoordEquatorial(ra=266.4, dec=-6.63642699386322)
+s7 = CoordEquatorial(ra=266.4, dec=2.68547284486862)
+s8 = CoordEquatorial(ra=266.4, dec=10.4607609542733)
+coords = (
+    s0, s1, s2, s3, s4, s5, s7, s8,
+)
+assert (s6 not in coords) and (len(coords) == 8)
 
 ## IROS set-up
 max_iterations: int = 1
@@ -84,18 +98,7 @@ sky_compositions: bool = True    # if True, the WFM cameras will be joined to ge
 # - photons energy filter - [keV]
 photons_energy_range: int | tuple[int, int] | None = (None, None)
 # - RA/Dec filter (sources to filter out) - [deg]
-s0 = CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417)
-s1 = CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622)
-s2 = CoordEquatorial(ra=241.426574413659, dec=-26.6219960573764)
-s3 = CoordEquatorial(ra=253.284954989872, dec=-28.3032728404397)
-s4 = CoordEquatorial(ra=266.4, dec=-28.94)
-s5 = CoordEquatorial(ra=266.4, dec=-17.3775096005863)
-s6 = CoordEquatorial(ra=266.4, dec=-6.63642699386322)
-s7 = CoordEquatorial(ra=266.4, dec=2.68547284486862)
-s8 = CoordEquatorial(ra=266.4, dec=10.4607609542733)
-photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = (
-    s0, s1, s2, s3, s4, s5, s7, s8,
-)
+photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = coords
 
 # - number of sources in the catalog for comparison
 n_sources: int | tuple[int, int] | None = None
