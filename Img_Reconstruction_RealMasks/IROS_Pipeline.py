@@ -65,14 +65,14 @@ cam_b: str = "cam1b"
 dataset: str = "detected"
 
 ## upscaling
-UPSX_0: int = 5                   # initial upscaling (with which IROS is performed)
+UPSX_0: int = 1                   # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 5               # final upscaling for skies and visualisation
+UPSX_FINAL: int = 1               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "BMRESIDUALS_test_s6_upx5y1_detected"
+TEST_ID: str = "BMRESIDUALS_test_s6_upx1y1_detected"
 
 ## IROS set-up
 max_iterations: int = 1
