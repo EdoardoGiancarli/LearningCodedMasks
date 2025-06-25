@@ -72,7 +72,7 @@ UPSX_FINAL: int = 1               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "BMRESIDUALS_test_s6_upx1y1_oncedvignetting_detected"
+TEST_ID: str = "BMRESIDUALS_test_s8_upx1y1_detected"
 
 s0 = CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417)
 s1 = CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622)
@@ -84,15 +84,15 @@ s6 = CoordEquatorial(ra=266.4, dec=-6.63642699386322)
 s7 = CoordEquatorial(ra=266.4, dec=2.68547284486862)
 s8 = CoordEquatorial(ra=266.4, dec=10.4607609542733)
 coords = (
-    s0, s1, s2, s3, s4, s5, s7, s8,
+    s0, s1, s2, s3, s4, s5, s6, s7,
 )
-assert (s6 not in coords) and (len(coords) == 8)
+assert (s8 not in coords) and (len(coords) == 8)
 
 ## IROS set-up
 max_iterations: int = 1
 snr_threshold: int | float = 5
 
-sky_compositions: bool = True    # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = False    # if True, the WFM cameras will be joined to get the composed sky
 
 ## setup filters
 # - photons energy filter - [keV]
