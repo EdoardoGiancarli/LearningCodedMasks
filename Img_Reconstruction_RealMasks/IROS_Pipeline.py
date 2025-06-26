@@ -58,7 +58,7 @@ THIN_MASK: bool = False           # infinitely opaque and/or thin mask
 #data_FITS = "20250227_crab_cxb_2-50keV_1ks"
 
 skyfield: str = "IROSDummy"
-data_FITS = "catalog_noCXB_1Crab_infdet_2-50keV_1ks"
+data_FITS: str = "catalog_noCXB_1Crab_infdet_2-50keV_1ks"
 
 cam_a: str = "cam1a"
 cam_b: str = "cam1b"
@@ -72,7 +72,7 @@ UPSX_FINAL: int = 1               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "BMRESIDUALS_test_s8_upx1y1_detected"
+TEST_ID: str = "BMRESIDUALS_test_s4_upx1y1_detected"
 
 s0 = CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417)
 s1 = CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622)
@@ -83,10 +83,10 @@ s5 = CoordEquatorial(ra=266.4, dec=-17.3775096005863)
 s6 = CoordEquatorial(ra=266.4, dec=-6.63642699386322)
 s7 = CoordEquatorial(ra=266.4, dec=2.68547284486862)
 s8 = CoordEquatorial(ra=266.4, dec=10.4607609542733)
-coords = (
-    s0, s1, s2, s3, s4, s5, s6, s7,
+coords_to_exclude = (
+    s0, s1, s2, s3, s5, s6, s7, s8,
 )
-assert (s8 not in coords) and (len(coords) == 8)
+assert (s4 not in coords_to_exclude) and (len(coords_to_exclude) == 8)
 
 ## IROS set-up
 max_iterations: int = 1
@@ -98,7 +98,7 @@ sky_compositions: bool = False    # if True, the WFM cameras will be joined to g
 # - photons energy filter - [keV]
 photons_energy_range: int | tuple[int, int] | None = (None, None)
 # - RA/Dec filter (sources to filter out) - [deg]
-photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = coords
+photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = coords_to_exclude
 
 # - number of sources in the catalog for comparison
 n_sources: int | tuple[int, int] | None = None

@@ -138,6 +138,30 @@ def pos2equatorial(
     return shift2equatorial(sdl, camera, *pos2shift(camera, y, x))
 
 
+def equatorial2pos(
+    sdl: SimulationDataLoader,
+    camera: "CodedMaskCamera",
+    ra: float,
+    dec: float,
+) -> tuple[int, int]:
+    """
+    Convert equatorial coordinates (RA/Dec) to sky pixel position.
+
+    Args:
+        sdl: SimulationDataLoader containing camera pointings
+        camera: A CodedMaskCamera object containing sky shape and binning information.
+        ra: Right ascension in degrees [0, 360].
+        dec: Declination in degrees [-90, 90].
+
+    Returns:
+        Tuple of (row, column) indices in the discrete sky image grid.
+
+    Notes:
+        - RA must be normalized to [0, 360) degree range.
+    """
+    return shift2pos(camera, *equatorial2shift(sdl, camera, ra, dec))
+
+
 def shift2equatorial(
     sdl: SimulationDataLoader,
     camera: "CodedMaskCamera",

@@ -23,6 +23,7 @@ from .images import _erosion
 from .images import _rbilinear
 from .images import _rbilinear_relative
 from .images import _shift
+from .images import argmax
 from .io import SimulationDataLoader
 from .mask import _bisect_interval
 from .mask import _detector_footprint
@@ -756,13 +757,13 @@ def iros(
                 return a, latest_b
         return tuple()
 
-    def init_get_arg(snrs: tuple, batchsize: int = 1000) -> Callable:
+    def init_get_arg(skies: tuple, snrs: tuple, batchsize: int = 1000) -> Callable:
         """This hides a reservoirs-batch mechanism for quickly selecting candidates,
         and initializes the data structures it relies on."""
         # we sort source directions by significance.
         # this is kind of costly because the sky arrays may be very large.
         # sorted directions are moved to a reservoir.
-        reservoirs = [np.argsort(snr, axis=None) for snr in snrs]
+        reservoirs = [np.argsort(sky, axis=None) for sky in skies]
 
         # integrating source intensities over aperture for all matrix elements is
         # computationally unfeasable. To avoid this, we execute this computation over small batches.
@@ -771,14 +772,14 @@ def iros(
         def slit_intensity():
             """Integrates source intensity over mask's aperture."""
             intensities = ([], [])
-            for int_, snr, batch in zip(
+            for int_, sky, batch in zip(
                 intensities,
-                snrs,
+                skies,
                 batches,
             ):
                 for arg in batch:
                     (min_i, max_i, min_j, max_j), _ = cutout(camera, arg)
-                    slit = snr[min_i:max_i, min_j:max_j]
+                    slit = sky[min_i:max_i, min_j:max_j]
                     int_.append(np.sum(slit))
             return intensities
 
@@ -786,7 +787,7 @@ def iros(
             """Fill the batches with sorted candidates"""
             for i, _ in enumerate(sdls):
                 tail, head = reservoirs[i][:-batchsize], reservoirs[i][-batchsize:]
-                batches[i] = np.array([np.unravel_index(id, snrs[i].shape) for id in head])
+                batches[i] = np.array([np.unravel_index(id, skies[i].shape) for id in head])
                 reservoirs[i] = tail
 
             # integrates over mask element aperture and sum between cameras
@@ -812,12 +813,12 @@ def iros(
                 batches[i] = batches[i][:-1]
             return out
 
-        return get if max(map(np.max, snrs)) > snr_threshold else lambda: None
+        return get if max(tuple(snr[argmax(sky)] for sky, snr in zip(skies, snrs))) > snr_threshold else lambda: None
 
-    def find_candidates(snrs: tuple, max_pending=6666) -> tuple:
+    def find_candidates(skies: tuple, snrs: tuple, max_pending=6666) -> tuple:
         """Returns candidate, compatible sources for the two cameras.
         Worst case complexity is O(n^2) but amortized costs are much smaller."""
-        get_arg = init_get_arg(snrs)
+        get_arg = init_get_arg(skies, snrs)
         pending = ([], [])
 
         while not (matches := match(pending)):
@@ -875,7 +876,7 @@ def iros(
     skies = tuple(decode(camera, d) for d in detectors)
     for i in range(max_iterations):
         snrs = compute_snratios(skies, variances)
-        candidates = find_candidates(snrs)
+        candidates = find_candidates(skies, snrs)
         if not candidates:
             break
         try:
