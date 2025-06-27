@@ -65,14 +65,14 @@ cam_b: str = "cam1b"
 dataset: str = "detected"
 
 ## upscaling
-UPSX_0: int = 1                   # initial upscaling (with which IROS is performed)
+UPSX_0: int = 5                   # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 1               # final upscaling for skies and visualisation
+UPSX_FINAL: int = 5               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "BMRESIDUALS_test_s4_upx1y1_detected"
+TEST_ID: str = "BMRESIDUALS_test_sky_upx5y1_detected"
 
 s0 = CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417)
 s1 = CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622)
@@ -83,16 +83,17 @@ s5 = CoordEquatorial(ra=266.4, dec=-17.3775096005863)
 s6 = CoordEquatorial(ra=266.4, dec=-6.63642699386322)
 s7 = CoordEquatorial(ra=266.4, dec=2.68547284486862)
 s8 = CoordEquatorial(ra=266.4, dec=10.4607609542733)
-coords_to_exclude = (
-    s0, s1, s2, s3, s5, s6, s7, s8,
-)
-assert (s4 not in coords_to_exclude) and (len(coords_to_exclude) == 8)
+#coords_to_exclude = (
+#    s0, s1, s2, s3, s4, s5, s6, s8,
+#)
+#assert (s7 not in coords_to_exclude) and (len(coords_to_exclude) == 8)
+coords_to_exclude = None
 
 ## IROS set-up
-max_iterations: int = 1
+max_iterations: int = 10
 snr_threshold: int | float = 5
 
-sky_compositions: bool = False    # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = True    # if True, the WFM cameras will be joined to get the composed sky
 
 ## setup filters
 # - photons energy filter - [keV]
