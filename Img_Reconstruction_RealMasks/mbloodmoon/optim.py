@@ -547,6 +547,7 @@ def optimize(
 
     sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
     fluence_start = sky.max()
+    print(f"FLUENCE START: {fluence_start}")
 
     # initialize the function to compute coarse, fluence-dependent shadowgram model.
     # to reduce the number of cross-correlation the function is cached. it is our
@@ -568,6 +569,7 @@ def optimize(
     )
     # we use the best fluence value as the initial value for the next step.
     fluence = results.x[0]
+    print(f"1st OPTIMIZED FLUENCE: {fluence}")
     # releases model cache memory.
     model_fluence_clear()
 
@@ -604,6 +606,7 @@ def optimize(
     )
     # store the final optimized positions and fluence.
     sx, sy, fluence = map(float, results.x[:3])
+    print(f"FINAL OPTIMIZED FLUENCE: {fluence}")
     # releases model cache memory.
     model_shift_flux_clear()
     return sx, sy, fluence

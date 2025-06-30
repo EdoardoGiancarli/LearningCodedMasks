@@ -72,7 +72,7 @@ UPSX_FINAL: int = 5               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "BMRESIDUALS_test_sky_upx5y1_detected"
+TEST_ID: str = "testing_fluence"
 
 s0 = CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417)
 s1 = CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622)
@@ -93,7 +93,7 @@ coords_to_exclude = None
 max_iterations: int = 10
 snr_threshold: int | float = 5
 
-sky_compositions: bool = True    # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = False    # if True, the WFM cameras will be joined to get the composed sky
 
 ## setup filters
 # - photons energy filter - [keV]

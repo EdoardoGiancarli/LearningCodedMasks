@@ -77,13 +77,13 @@ def _reduce(
     Notes:
         - the total sum is conserved.
     """
-    def _handle_shape(
+    def handle_shape(
         data: npt.NDArray,
         factors: npt.NDArray,
     ) -> npt.NDArray:
         """Adjusts array for blocks subdivision by cutting extra-rows/columns."""
 
-        def _handle_axis(a: npt.NDArray, idx: int) -> npt.NDArray:
+        def handle_axis(a: npt.NDArray, idx: int) -> npt.NDArray:
             """Redistributes cutted values in the block-adjusted axis."""
             return a[:idx] + a[idx:].sum(axis=0) / idx
         
@@ -91,11 +91,11 @@ def _reduce(
         for ax in range(data.ndim):
             if data.shape[ax] != adj_shape[ax]:
                 data = data.swapaxes(0, ax)
-                data = _handle_axis(data, adj_shape[ax])
+                data = handle_axis(data, adj_shape[ax])
                 data = data.swapaxes(0, ax)
         return data
 
-    def _to_blocks(
+    def to_blocks(
         data: npt.NDArray,
         factors: npt.NDArray,
     ) -> npt.NDArray:
@@ -105,8 +105,8 @@ def _reduce(
         reshaping = tuple(dim for dims in zip(nblocks, factors) for dim in dims)
         return data.reshape(reshaping).transpose((0, 2, 1, 3))
     
-    m = _handle_shape(m, downscaling)
-    m = _to_blocks(m, downscaling)
+    m = handle_shape(m, downscaling)
+    m = to_blocks(m, downscaling)
     return m.sum(axis=(2, 3))
 
 
