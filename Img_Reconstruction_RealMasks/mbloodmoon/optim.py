@@ -543,35 +543,37 @@ def optimize(
         - Initial position is refined using interpolation
         - Bounds are set based on initial guess and physical constraints
     """
-    from .images import argmax
-
-    sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
-    fluence_start = sky.max()
-    print(f"FLUENCE START: {fluence_start}")
-
-    # initialize the function to compute coarse, fluence-dependent shadowgram model.
-    # to reduce the number of cross-correlation the function is cached. it is our
-    # responsibility to clear cache, freeing memory, after we will be done with the
-    # the coarse fluence step.
-    model_fluence, model_fluence_clear = _ModelFluence(camera, vignetting, psfy)
-    loss = _Loss(model_fluence)
-    results = minimize(
-        lambda args: loss((sx_start, sy_start, args[0]), sky, camera),
-        x0=np.array((fluence_start,)),
-        method="L-BFGS-B",
-        bounds=[
-            (0.75 * fluence_start, 1.5 * fluence_start),
-        ],
-        options={
-            "maxiter": 10,
-            "ftol": 1e-4,
-        },
-    )
-    # we use the best fluence value as the initial value for the next step.
-    fluence = results.x[0]
-    print(f"1st OPTIMIZED FLUENCE: {fluence}")
-    # releases model cache memory.
-    model_fluence_clear()
+    #TODO: this section is commented since the fluence coarse optimisation does not influence the fluence value
+    
+#    from .images import argmax
+#
+#    sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
+#    fluence_start = sky.max()
+#    print(f"FLUENCE START: {fluence_start}")
+#
+#    # initialize the function to compute coarse, fluence-dependent shadowgram model.
+#    # to reduce the number of cross-correlation the function is cached. it is our
+#    # responsibility to clear cache, freeing memory, after we will be done with the
+#    # the coarse fluence step.
+#    model_fluence, model_fluence_clear = _ModelFluence(camera, vignetting, psfy)
+#    loss = _Loss(model_fluence)
+#    results = minimize(
+#        lambda args: loss((sx_start, sy_start, args[0]), sky, camera),
+#        x0=np.array((fluence_start,)),
+#        method="L-BFGS-B",
+#        bounds=[
+#            (0.75 * fluence_start, 1.5 * fluence_start),
+#        ],
+#        options={
+#            "maxiter": 10,
+#            "ftol": 1e-4,
+#        },
+#    )
+#    # we use the best fluence value as the initial value for the next step.
+#    fluence = results.x[0]
+#    print(f"1st OPTIMIZED FLUENCE: {fluence}")
+#    # releases model cache memory.
+#    model_fluence_clear()
 
     # initialize the function to fine coarse, fluence and position dependent shadowgram model.
     # this is slower to compute and requires more memory. again it leverages caches to reduce
@@ -583,11 +585,17 @@ def optimize(
         model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     else:
         raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
-
+    
+    sx_start, sy_start = interpmax(camera, arg_sky, sky)
+    fluence_start = sky[*arg_sky] # sky.max()
+    print(
+        f"\nFLUENCE START: {fluence_start}\n"
+        f"SHIFTS START: {sx_start, sy_start}\n"
+    )
     loss = _Loss(model_shift_flux)
     results = minimize(
         lambda args: loss((args[0], args[1], args[2]), sky, camera),
-        x0=np.array((sx_start, sy_start, fluence)),
+        x0=np.array((sx_start, sy_start, fluence_start)),
         method="Nelder-Mead",
         bounds=[
             (
@@ -598,7 +606,7 @@ def optimize(
                 max(sy_start - camera.mdl["slit_deltay"], camera.bins_sky.y[0]),
                 min(sy_start + camera.mdl["slit_deltay"], camera.bins_sky.y[-1]),
             ),
-            (0.9 * fluence, 1.1 * fluence),
+            (0.9 * fluence_start, 1.1 * fluence_start),
         ],
         options={
             "xatol": 1e-6,
@@ -606,7 +614,13 @@ def optimize(
     )
     # store the final optimized positions and fluence.
     sx, sy, fluence = map(float, results.x[:3])
-    print(f"FINAL OPTIMIZED FLUENCE: {fluence}")
+    print(
+        f"FINAL OPTIMIZED FLUENCE: {fluence}\n"
+        f"FLUENCE GAIN: {(fluence - fluence_start) * 100 / fluence_start:.3f}%\n"
+        f"FINAL OPTIMIZED SHIFTS: {sx, sy}\n"
+        f"SHIFTX GAIN: {(sx - sx_start) * 100 / sx_start:.3f}%\n"
+        f"SHIFTY GAIN: {(sy - sy_start) * 100 / sy_start:.3f}%\n"
+    )
     # releases model cache memory.
     model_shift_flux_clear()
     return sx, sy, fluence
