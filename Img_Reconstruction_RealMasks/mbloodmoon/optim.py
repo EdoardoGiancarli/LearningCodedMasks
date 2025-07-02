@@ -528,14 +528,14 @@ def optimize(
     model: Literal["fast", "accurate"] = "fast",
 ) -> tuple[float, float, float]:
     """
-    Perform two-stage optimization to fit a point source model to sky image data.
+    Perform two-stage optimization to fit a point source model to sky image data.    # - TO UPDATE
 
-    This function performs a two-stage optimization:
-    1. Coarse optimization of fluence only, keeping position fixed
-    2. Fine, simultaneous optimization of position and fluence.
-       This step is warm-started with the flux value inferred from the coarse step.
+    This function performs a two-stage optimization:                                 # - TO UPDATE
+    1. Coarse optimization of fluence only, keeping position fixed                   # - TO UPDATE
+    2. Fine, simultaneous optimization of position and fluence.                      # - TO UPDATE
+       This step is warm-started with the flux value inferred from the coarse step.  # - TO UPDATE
 
-    The process uses different model at each stage to balance speed and accuracy.
+    The process uses different model at each stage to balance speed and accuracy.    # - TO UPDATE
 
     Args:
         camera: CodedMaskCamera instance containing detector and mask parameters
@@ -554,42 +554,9 @@ def optimize(
         - Initial position is refined using interpolation
         - Bounds are set based on initial guess and physical constraints
     """
-    #TODO: this section is commented since the fluence coarse optimisation does not influence the fluence value
-    
-#    from .images import argmax
-#
-#    sx_start, sy_start = interpmax(camera, arg_sky, sky)  # pos2shift(camera, *argmax(sky))
-#    fluence_start = sky.max()
-#    print(f"FLUENCE START: {fluence_start}")
-#
-#    # initialize the function to compute coarse, fluence-dependent shadowgram model.
-#    # to reduce the number of cross-correlation the function is cached. it is our
-#    # responsibility to clear cache, freeing memory, after we will be done with the
-#    # the coarse fluence step.
-#    model_fluence, model_fluence_clear = _ModelFluence(camera, vignetting, psfy)
-#    loss = _Loss(model_fluence)
-#    results = minimize(
-#        lambda args: loss((sx_start, sy_start, args[0]), sky, camera),
-#        x0=np.array((fluence_start,)),
-#        method="L-BFGS-B",
-#        bounds=[
-#            (0.75 * fluence_start, 1.5 * fluence_start),
-#        ],
-#        options={
-#            "maxiter": 10,
-#            "ftol": 1e-4,
-#        },
-#    )
-#    # we use the best fluence value as the initial value for the next step.
-#    fluence = results.x[0]
-#    print(f"1st OPTIMIZED FLUENCE: {fluence}")
-#    # releases model cache memory.
-#    model_fluence_clear()
-
-    # initialize the function to fine coarse, fluence and position dependent shadowgram model.
-    # this is slower to compute and requires more memory. again it leverages caches to reduce
-    # the number of cross-correlation computations, and it is our responsibility to free
-    # memory after we will be done.
+    # - initialize the function to fluence and position dependent shadowgram model.
+    # - it leverages caches to reduce the number of cross-correlation computations,
+    #   and it is our responsibility to free memory after we will be done.
     if model == "fast":
         model_shift_flux, model_shift_flux_clear = _ModelShiftFluence(camera, vignetting, psfy)
     elif model == "accurate":
@@ -602,12 +569,6 @@ def optimize(
     print(
         f"\nFLUENCE START: {fluence_start}\n"
         f"SHIFTS START: {sx_start, sy_start}\n"
-    )
-    print(
-        f"## - starting fluence value\n"
-        f"max counts: {sky.max()}\n"
-        f"cand pos counts: {sky[*arg_sky]}\n"
-        f"corrected fluence: {fluence_start}\n"
     )
     loss = _Loss(model_shift_flux)
     results = minimize(
