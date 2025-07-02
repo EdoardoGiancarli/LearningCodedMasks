@@ -93,7 +93,7 @@ coords_to_exclude = None
 max_iterations: int = 9
 snr_threshold: int | float = 5
 
-sky_compositions: bool = False    # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = True    # if True, the WFM cameras will be joined to get the composed sky
 
 ## setup filters
 # - photons energy filter - [keV]
