@@ -273,7 +273,7 @@ class MaskDataLoader:
             "detector_maxx": h1["PLNXMAX"],
             "detector_miny": h1["PLNYMIN"],
             "detector_maxy": h1["PLNYMAX"],
-            "mask_detector_distance": h1["MDDIST"],
+            "mask_detector_distance": h1["MDDIST"] + h1["MASKTHK"],
             "open_fraction": h2["OPENFR"],
             "real_open_fraction": h2["RLOPENFR"],
         }

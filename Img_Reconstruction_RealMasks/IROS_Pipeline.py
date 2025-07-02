@@ -72,7 +72,7 @@ UPSX_FINAL: int = 5               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "testing_vignetting_distance"
+TEST_ID: str = "testing_fluence_vign_crloss_smallercrop"
 
 s0 = CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417)
 s1 = CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622)

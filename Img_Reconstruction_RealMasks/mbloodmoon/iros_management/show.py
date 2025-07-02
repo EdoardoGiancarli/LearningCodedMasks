@@ -374,8 +374,10 @@ def make_sky(
         sky = np.int32(background)
     
     upx, upy = camera.upscale_f
-    cropx, cropy = int(10 * (1 + upx / 3)), int(50 * (1 + upy))
-    #cropx, cropy = 15, 40
+    cropx, cropy = (
+        int(camera.specs["slit_deltax"] * upx / camera.specs["mask_deltax"] + 5),
+        int(camera.specs["slit_deltay"] * upy / camera.specs["mask_deltay"] + 5),
+    )
     
     for shiftx, shifty, fluence, x, y in zip(
         data[cameraID]["shift_x"]["data"],

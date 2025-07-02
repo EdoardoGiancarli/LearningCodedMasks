@@ -143,11 +143,11 @@ def apply_vignetting(
     # given the implementation of `erosion` we have presently to multiply `red_factor`
     # by -1 to achieve a cut on the right direction.
     # TODO: change `erosion` and its tests so that multiplying by -1 isn't needed
-    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], -red_factor)
+    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factor)
 
     angle_y_rad = np.arctan(shift_y / camera.mdl["mask_detector_distance"])
     red_factor = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
-    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], -red_factor)
+    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factor)
     return sg1 * sg2.T
 
 
@@ -487,7 +487,7 @@ def _Loss(model_f: Callable) -> Callable:  # noqa
             - truth is the observed sky image
     """
 
-    def f(args: npt.NDArray, truth: npt.NDArray, camera: CodedMaskCamera) -> float:
+    def f(args: npt.NDArray, truth: npt.NDArray, pos: tuple[int, int], camera: CodedMaskCamera) -> float:
         """
         Compute MSE loss between model prediction and truth.
 
@@ -501,9 +501,20 @@ def _Loss(model_f: Callable) -> Callable:  # noqa
         Returns:
             float: Mean Squared Error between model and truth in local window
         """
+        from mbloodmoon.iros_management.show import crop
+        upx, upy = camera.upscale_f
+        cutx, cuty = (
+            int(camera.specs["slit_deltax"] * upx / camera.specs["mask_deltax"] + 5),
+            int(camera.specs["slit_deltay"] * upy / camera.specs["mask_deltay"] + 5),
+        )
+
         model = model_f(*args)
-        mae = np.mean(np.square(model - truth))
-        return float(mae)
+        mse = np.mean(
+            np.square(
+                crop(model - truth, pos, (cuty, cutx), False)
+            )
+        )
+        return float(mse)
 
     return f
 
@@ -587,14 +598,20 @@ def optimize(
         raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
     
     sx_start, sy_start = interpmax(camera, arg_sky, sky)
-    fluence_start = sky[*arg_sky] # sky.max()
+    fluence_start = sky[*arg_sky]
     print(
         f"\nFLUENCE START: {fluence_start}\n"
         f"SHIFTS START: {sx_start, sy_start}\n"
     )
+    print(
+        f"## - starting fluence value\n"
+        f"max counts: {sky.max()}\n"
+        f"cand pos counts: {sky[*arg_sky]}\n"
+        f"corrected fluence: {fluence_start}\n"
+    )
     loss = _Loss(model_shift_flux)
     results = minimize(
-        lambda args: loss((args[0], args[1], args[2]), sky, camera),
+        lambda args: loss((args[0], args[1], args[2]), sky, arg_sky, camera),
         x0=np.array((sx_start, sy_start, fluence_start)),
         method="Nelder-Mead",
         bounds=[
