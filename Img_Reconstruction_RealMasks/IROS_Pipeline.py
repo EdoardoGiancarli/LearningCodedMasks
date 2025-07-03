@@ -58,7 +58,7 @@ THIN_MASK: bool = False           # infinitely opaque and/or thin mask
 #data_FITS = "20250227_crab_cxb_2-50keV_1ks"
 
 skyfield: str = "IROSDummy"
-data_FITS: str = "catalog_noCXB_1Crab_infdet_2-50keV_1ks"
+data_FITS: str = "catalog_withCXB_1Crab_infdet_2-50keV_1ks"
 
 cam_a: str = "cam1a"
 cam_b: str = "cam1b"
@@ -72,7 +72,7 @@ UPSX_FINAL: int = 5               # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 ## test ID
-TEST_ID: str = "testing_fluence_vign_crloss_smallercrop"
+TEST_ID: str = "wCXB"
 
 s0 = CoordEquatorial(ra=223.438453172364, dec=-22.0306369561417)
 s1 = CoordEquatorial(ra=231.465619039524, dec=-24.3850523670622)
@@ -93,7 +93,7 @@ coords_to_exclude = None
 max_iterations: int = 9
 snr_threshold: int | float = 5
 
-sky_compositions: bool = True    # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = False    # if True, the WFM cameras will be joined to get the composed sky
 
 ## setup filters
 # - photons energy filter - [keV]

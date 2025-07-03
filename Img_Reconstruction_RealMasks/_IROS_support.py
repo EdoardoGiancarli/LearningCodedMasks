@@ -18,25 +18,33 @@ def _handle_dirpaths(
     mask: str,
     skyfield: str,
     simul: str,
-    test_name: str,
+    test_name: str | None = None,
 ) -> tuple[str]:
     """Handles paths depending on the OS."""
 
     if Path(base_path := "/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/").is_dir():
         mask_path = base_path + "Simulations/" + mask                                  # dirpath to WFM mask file 
         data_path = base_path + "Simulations/" + skyfield + "/" + simul + "/"          # dirpath with simul files
-        save_path = base_path + "Outputs/" + "Out" + skyfield + "/" + simul + "/"      # dirpath to save output data
-        if not Path(save_path + test_name).is_dir():
-            os.mkdir(save_path + test_name)
-        save_path += test_name + "/"
+
+        if test_name:
+            save_path = base_path + "Outputs/" + "Out" + skyfield + "/" + simul + "/"  # dirpath to save output data
+            if not Path(save_path + test_name).is_dir():
+                os.mkdir(save_path + test_name)
+            save_path += test_name + "/"
+        else:
+            save_path = None
         
     elif Path(base_path := "/mnt/d/PhD_AASS/Coding/Images_fits/").is_dir():
         mask_path = base_path + mask
         data_path = base_path + skyfield + "/" + simul + "/"
-        save_path = base_path
-        if not Path(save_path + test_name).is_dir():
-            os.mkdir(save_path + test_name)
-        save_path += test_name + "/"
+
+        if test_name:
+            save_path = base_path
+            if not Path(save_path + test_name).is_dir():
+                os.mkdir(save_path + test_name)
+            save_path += test_name + "/"
+        else:
+            save_path = None
 
     else:
         raise ValueError("A0, ma ndo sei finit*?")
@@ -47,7 +55,7 @@ def _handle_dirpaths(
             ("data_path", "save_path"),
             (data_path, save_path),
         ):
-            if not Path(dirpath).is_dir():
+            if (dirpath and not Path(dirpath).is_dir()):
                 raise ValueError(f"{name} '{dirpath}' does not exist.")
 
     return mask_path, data_path, save_path
