@@ -81,7 +81,7 @@ coords_to_exclude = None
 max_iterations: int = 30
 snr_threshold: int | float = 5
 
-sky_compositions: bool = False    # if True, the WFM cameras will be joined to get the composed sky
+sky_compositions: bool = True    # if True, the WFM cameras will be joined to get the composed sky
 
 ## setup filters
 # - photons energy filter - [keV]
@@ -92,7 +92,7 @@ photons_coords: CoordEquatorial | Sequence[CoordEquatorial] | None = coords_to_e
 # - number of sources in the catalog for comparison
 n_sources: int | tuple[int, int] | None = None
 # - sources flux filter for the catalog comparison - [ph/cm2/s]
-sources_flux_range: int | float | tuple[int | float, int | float] | None = None
+sources_flux_range: int | float | tuple[int | float, int | float] | None = (9e-2, None)
 
 
 

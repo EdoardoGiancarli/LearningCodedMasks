@@ -807,8 +807,8 @@ def iros(
             for i, _ in enumerate(sdls):
                 batches[i] = batches[i][:-1]
             return out
-
-        return get if max(tuple(snr[argmax(sky)] for sky, snr in zip(skies, snrs))) > snr_threshold else lambda: None
+        
+        return get if max(tuple(snr[*cand] for cand, snr in zip(get(), snrs))) > snr_threshold else lambda: None
 
     def find_candidates(skies: tuple, snrs: tuple, max_pending=6666) -> tuple:
         """Returns candidate, compatible sources for the two cameras.
@@ -843,7 +843,7 @@ def iros(
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
-        significance = float(snr_map[*shift2pos(camera, shiftx, shifty)])
+        significance = float(snr_map[*arg])  # candidate significance at peak counts
         model = model_sky(
             camera=camera,
             shift_x=shiftx,
