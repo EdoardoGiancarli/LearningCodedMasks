@@ -565,6 +565,7 @@ def optimize(
         raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
     
     sx_start, sy_start = interpmax(camera, arg_sky, sky)
+    #sx_start += 1e-16; sy_start += 1e-16
     fluence_start = sky[*arg_sky]
     print(
         f"\nFLUENCE START: {fluence_start}\n"
