@@ -66,7 +66,7 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "errorbox_wrt_coords"
+ANALYSIS_ID: str = "testing"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 9
