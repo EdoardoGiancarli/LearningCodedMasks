@@ -49,7 +49,7 @@ THIN_MASK: bool = False             # selects if infinitely opaque and thin mask
 
 #### --- OBSERVATION DATA
 #SKYFIELD: str = "GalacticCenter"                                                          # skyfield selection
-#DATA_FITS: str = ""       # directory with FITS files from WFM
+#DATA_FITS: str = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"       # directory with FITS files from WFM
 
 SKYFIELD: str = "IROSDummy"
 DATA_FITS: str = "catalog_withCXB_1Crab_infdet_2-50keV_1ks"
@@ -66,11 +66,11 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "test_association"
+ANALYSIS_ID: str = "errorbox_wrt_coords"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 9
-SNR_THRESHOLD: int | float = 5
+SNR_THRESHOLD: int | float = 10
 
 WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
 
