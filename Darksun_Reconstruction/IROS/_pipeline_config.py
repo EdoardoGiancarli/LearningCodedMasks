@@ -205,17 +205,17 @@ def run(params: PipelineParams) -> None:
                 n=params.n,
                 flux_range=params.flux_range,
             )
-            catB = ds.get_catalogue(
-                filepath=filepaths[CAM_B]["sources"],
-                n=params.n,
-                flux_range=params.flux_range,
-            )
             log_camA = ds.catalogue_comparison(
                 log=log_camA,
                 catalogue=catA,
                 sdl=sdlA,
                 camera=wfm,
                 screening=True,
+            )
+            catB = ds.get_catalogue(
+                filepath=filepaths[CAM_B]["sources"],
+                n=params.n,
+                flux_range=params.flux_range,
             )
             log_camB = ds.catalogue_comparison(
                 log=log_camB,

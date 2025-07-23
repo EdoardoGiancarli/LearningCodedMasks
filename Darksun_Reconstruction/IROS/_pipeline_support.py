@@ -356,6 +356,7 @@ def output_files(
         for name, path in files_list:
             check_list.append(status := check(path))
             print(f"  - {name}: {status}")
+    print('\n')
     
     if check_out and "MISSING" not in check_list:
         print("\nAll files present!")
