@@ -48,11 +48,11 @@ MASK_FITS: str = "wfm_mask.fits"
 THIN_MASK: bool = False             # selects if infinitely opaque and thin mask (removes vignetting effects)
 
 #### --- OBSERVATION DATA
-#SKYFIELD: str = "GalacticCenter"                                                          # skyfield selection
-#DATA_FITS: str = "20250430_galctr_rxte_sax_2-50keV_1ks_realmask_infdet_sources_cxb"       # directory with FITS files from WFM
+SKYFIELD: str = "GalacticCenter"                                            # skyfield selection
+DATA_FITS: str = "galctr_rxte-sax_mask_summer2021_infdet_2-50keV_1ks"       # directory with FITS files from WFM
 
-SKYFIELD: str = "IROSDummy"
-DATA_FITS: str = "catalog_withCXB_1Crab_infdet_2-50keV_1ks"
+#SKYFIELD: str = "IROSDummy"
+#DATA_FITS: str = "catalog_withCXB_1Crab_infdet_2-50keV_1ks"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
@@ -69,10 +69,10 @@ UPSY_FINAL: int = 1
 ANALYSIS_ID: str = "testing"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 9
-SNR_THRESHOLD: int | float = 10
+MAX_ITERATIONS: int = 20
+SNR_THRESHOLD: int | float = 5
 
-WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
+WFM_SKY_COMPOSITION: bool = True   # selects if the WFM cameras are to be joined to get the composed sky
 
 #### --- DATA FILTERS SETUP
 # photons energy filter - [keV]
@@ -83,7 +83,7 @@ PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 # number of sources in the catalog for comparison
 CATALOGUE_NUM_BRIGHT_SOURCES: int | tuple[int, int] | None = None
 # sources flux filter for the catalog comparison - [ph/cm2/s]
-CATALOGUE_FLUX_RANGE: tuple[int | float | None, int | float | None] | None = None # (9e-2, None)
+CATALOGUE_FLUX_RANGE: tuple[int | float | None, int | float | None] | None = (1e-2, None)
 
 
 

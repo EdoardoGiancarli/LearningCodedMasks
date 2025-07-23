@@ -370,10 +370,10 @@ def catalogue_comparison(
     log.insert(params)
 
     def candidate_association(
-        shiftx: float,
-        dshiftx: float,
-        shifty: float,
-        dshifty: float,
+        thetax: float,
+        dthetax: float,
+        thetay: float,
+        dthetay: float,
         sigma: int | float = 3,
     ) -> tuple[str, float]:
         """Candidate association from catalogue."""
@@ -381,18 +381,21 @@ def catalogue_comparison(
         def closest_source(batch: FITS_rec) -> int:
             """Returns candidate's closer catalogue source index."""
             arg = np.argmin(
-                np.square(batch['SHIFT_X'] - shiftx) + np.square(batch['SHIFT_Y'] - shifty)
+                np.square(np.tan(np.deg2rad(batch['ANGLE_X'])) - np.tan(np.deg2rad(thetax)))
+                +
+                np.square(np.tan(np.deg2rad(batch['ANGLE_Y'])) - np.tan(np.deg2rad(thetay)))
             )
             return arg
     
         box = (
-            (database['SHIFT_X'] > shiftx - sigma * dshiftx) &
-            (database['SHIFT_X'] < shiftx + sigma * dshiftx) &
-            (database['SHIFT_Y'] > shifty - sigma * dshifty) &
-            (database['SHIFT_Y'] < shifty + sigma * dshifty) &
+            (database['ANGLE_X'] > thetax - sigma * dthetax) &
+            (database['ANGLE_X'] < thetax + sigma * dthetax) &
+            (database['ANGLE_Y'] > thetay - sigma * dthetay) &
+            (database['ANGLE_Y'] < thetay + sigma * dthetay) &
             (database['ID'] != KEYMAP['cxb_tag'])
         )
         associated_batch = database[box]
+        print(associated_batch['ID'])
 
         if not any(associated_batch):
             sourceID = f'lemx-{log.name.lower()}S{KEYMAP['NEW_ID']}'
@@ -410,11 +413,11 @@ def catalogue_comparison(
 
     print("# Comparing with Catalogue...")
     # initial sources association
-    for sx, dsx, sy, dsy in zip(
-        log.log["shift_x"], log.log["dshift_x"],
-        log.log["shift_y"], log.log["dshift_y"],
+    for tx, dtx, ty, dty in zip(
+        log.log["angle_x"], log.log["dangle_x"],
+        log.log["angle_y"], log.log["dangle_y"],
     ):
-        sourceID, flux = candidate_association(sx, dsx, sy, dsy)
+        sourceID, flux = candidate_association(tx, dtx, ty, dty)
         log.update(values=(('ID', sourceID), ('catalogue_flux', flux)))
     
     # sources screening based on significance
