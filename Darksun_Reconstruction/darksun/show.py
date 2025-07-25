@@ -3,6 +3,7 @@ IROS output plotting.
 """
 
 from typing import Any, Sequence
+from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
@@ -74,10 +75,10 @@ def _config_subplots(nplots: int) -> tuple[Figure, Axes | list[Axes]]:
 def _config_labels(ax: Axes, xlabel: str | None, ylabel: str | None, title: str) -> None:
     """Configures labels and titles."""
     ax.set_xlabel(
-        label=xlabel or '', fontsize=PLOTPARAMS['label_fs'], fontweight=PLOTPARAMS['label_fw'],
+        xlabel=xlabel or '', fontsize=PLOTPARAMS['label_fs'], fontweight=PLOTPARAMS['label_fw'],
     )
     ax.set_ylabel(
-        label=ylabel or '', fontsize=PLOTPARAMS['label_fs'], fontweight=PLOTPARAMS['label_fw'],
+        ylabel=ylabel or '', fontsize=PLOTPARAMS['label_fs'], fontweight=PLOTPARAMS['label_fw'],
     )
     ax.set_title(
         label=title, fontsize=PLOTPARAMS['title_fs'],
@@ -87,7 +88,7 @@ def _config_labels(ax: Axes, xlabel: str | None, ylabel: str | None, title: str)
 def _config_ticks(ax: Axes) -> None:
     """Configures grid and tick properties."""
     ax.grid(
-        visible=True, color=PLOTPARAMS['lightgray'], linestyle=PLOTPARAMS['grid_ls'],
+        visible=True, color=PLOTPARAMS['grid_color'], linestyle=PLOTPARAMS['grid_ls'],
         linewidth=PLOTPARAMS['grid_lw'], alpha=PLOTPARAMS['grid_alpha'],
     )
     ax.xaxis.set_ticks_position('both')
@@ -98,16 +99,205 @@ def _config_ticks(ax: Axes) -> None:
     )
     ax.ticklabel_format(scilimits=PLOTPARAMS['ticks_scilim'])
 
+def _config_view(
+    ax: Axes,
+    xlim: tuple[Any, Any],
+    ylim: tuple[Any, Any],
+    xscale: str,
+    yscale: str,
+) -> None:
+    """Configures axes limits and scales."""
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+
+"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+
+def map4biplot(
+    arrs: NDArray | Sequence[NDArray],
+    title: str,
+    *,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
+    labels: str | Sequence[str | None] | None = None,
+    x: NDArray | Sequence[NDArray] | None = None,
+    style: str | Sequence[str] | None = None,
+    color: str | tuple[str, str] | Sequence[str | tuple[str, str]] | None = None,
+    xlim: tuple[Any, Any] | Sequence[tuple[Any, Any]] | None = None,
+    ylim: tuple[Any, Any] | Sequence[tuple[Any, Any]] | None = None,
+    xscale: str | Sequence[str | None] | None = None,
+    yscale: str | Sequence[str | None] | None = None,
+) -> dict[str, Any]:
+    """
+    Configures a dictionary with the specified info for plotting.
+    This method can be used to generate a map to give as input to `biplot`.
+
+    For parameters like `labels`, `style`, and `color`, you can provide a
+    single value to apply to all data series or a sequence of values to
+    style each series individually. The function processes these inputs
+    and returns them in a structured dictionary, ready for a plotting utility.
+
+    Args:
+        arrs (NDArray | Sequence[NDArray]):
+            The data to be plotted. Can be a single NumPy array or a
+            sequence of arrays.
+        title (str):
+            The main title for the plot.
+        xlabel (str | None, optional (default=`None`)):
+            The label for the plot's x-axis.
+        ylabel (str | None, optional (default=`None`)):
+            The label for the plot's y-axis.
+        labels (str | Sequence[str | None] | None, optional (default=`None`)):
+            The legend labels for the data series. If a single string
+            is provided, it's applied to all series. If a sequence of
+            strings is given, each series gets its corresponding label.
+        x (NDArray | Sequence[NDArray] | None, optional (default=`None`)):
+            The x-coordinates for the data points. If not provided, it
+            defaults to `np.arange(n)` for each array. If a single array
+            is provided, it's used for all data series. A sequence of
+            arrays can be used to specify x-values for each data series.
+        style (str | Sequence[str] | None, optional (default=`None`)):
+            The plotting style (e.g., 'plot', 'scatter', 'bar').
+            A single string applies the same style to all series. A
+            sequence of strings applies a different style to each.
+        color (str | tuple[str, str] | Sequence[str | tuple[str, str]] | None, optional (default=`None`)):
+            The color for the data series. A single color string
+            (e.g., 'blue') applies to all series. A sequence of color
+            strings styles each series individually.
+        xlim (tuple[Any, Any] | Sequence[tuple[Any, Any]] | None, optional (default=`None`)):
+            A tuple `(min, max)` setting the limits for the x-axis.
+            This setting applies to the entire plot.
+        ylim (tuple[Any, Any] | Sequence[tuple[Any, Any]] | None, optional (default=`None`)):
+            A tuple `(min, max)` setting the limits for the y-axis.
+            This setting applies to the entire plot.
+        xscale (str | Sequence[str | None] | None, optional (default=`None`)):
+            The scale for the x-axis (e.g., 'linear', 'log').
+            Applies to the entire plot.
+        yscale (str | Sequence[str | None] | None, optional (default=`None`)):
+            The scale for the y-axis (e.g., 'linear', 'log').
+            Applies to the entire plot.
+    
+    Returns:
+        output (dict[str, Any]): Map with the info for the plot.
+    
+    Example:
+        >>> import numpy as np
+        >>> arr1 = np.array([1, 2, 3])
+        >>> arr2 = np.array([3, 2, 1])
+        >>> # Using single values for style and label
+        >>> params = map4biplot(
+        ...     arrs=[arr1, arr2],
+        ...     title="My Plot",
+        ...     labels="Series",
+        ...     style="scatter"
+        ... )
+    """
+    arrs_ = (arrs,) if isinstance(arrs, np.ndarray) else tuple(arrs)
+    N_PLOTS = len(arrs_)
+
+    def setup(x: Any, *, dtype: Any, default: Any) -> tuple[Any]:
+        """Setup variables for plotting."""
+        if x is None:
+            return (default,) * N_PLOTS
+        elif isinstance(x, dtype):
+            return (x,) * N_PLOTS
+        return tuple(x)
+    
+    dmap = {
+        'arrs': arrs_,
+        'title': title,
+        'xlabel': xlabel,
+        'ylabel': ylabel,
+        'labels': setup(labels, dtype=str, default=None),
+        'x': setup(x, dtype=np.ndarray, default=np.arange(len(arrs_[0]))),
+        'style': setup(style, dtype=str, default='plot'),
+        'color': setup(color, dtype=str, default=None),
+        'xlim': xlim or (None, None),
+        'ylim': ylim or (None, None),
+        'xscale': xscale or 'linear',
+        'yscale': yscale or 'linear',
+    }
+    return dmap
+
 
 def biplot(
-    first_arr: Sequence | Sequence[Any],
-    second_arr: Sequence | Sequence[Any],
+    dmap_A: dict[str, Any],
+    dmap_B: dict[str, Any],
+    save_to: str | Path | None = None,
     **kwargs,
 ) -> None:
     """
-    
+    Displays a figure with two subplots by taking the info stored
+    in the two dictionaries in input. The two maps must have the
+    structure described in `map4biplot()`.
+
+    Args:
+        dmap_A (dict[str, Any]):
+            Dictionary with the info for the first subplot.
+        dmap_B (dict[str, Any]):
+            Dictionary with the info for the second subplot.
+        save_to (str | Path | None, optional (default=`None`)):
+            Path to save the figure.
     """
-    raise NotImplementedError
+    fig, axs = _config_subplots(2)
+    for ax, dmap in zip(axs, (dmap_A, dmap_B)):
+        _config_labels(ax, dmap['xlabel'], dmap['ylabel'], dmap['title'])
+        _config_ticks(ax)
+        
+        for idx, arr in enumerate(dmap['arrs']):
+            match dmap['style'][idx]:
+                case 'plot':
+                    ax.plot(
+                        dmap['x'][idx], arr, c=dmap['color'][idx], alpha=0.75,
+                        label=dmap['labels'][idx], **kwargs,
+                    )
+                case 'scatter':
+                    c = dmap['color'][idx]
+                    fcolor, ecolor = c if isinstance(c, tuple) else (c, c)
+                    ax.scatter(
+                        dmap['x'][idx], arr, c=fcolor, edgecolors=ecolor, s=60, alpha=0.75,
+                        linewidths=1.5, label=dmap['labels'][idx], **kwargs,
+                    )
+                case 'bar':
+                    raise NotImplementedError
+        
+        _config_view(
+            ax, dmap['xlim'], dmap['ylim'], dmap['xscale'], dmap['yscale'],
+        )
+        if any(dmap['labels']): ax.legend(loc='best')
+    
+    if save_to is not None: plt.savefig(save_to)
+    plt.show()
 
 
 def distr_plot(
@@ -142,9 +332,6 @@ def distr_plot(
     arr_ = arr.copy()
     if np.ndim(arr_) > 1: arr_ = arr_.reshape(-1)
 
-    if xlim is not None:
-        arr_ = arr_[(xlim[0] < arr_ < xlim[1])]
-
     fig, ax = _config_subplots(1)
     _config_labels(ax, xlabel, 'density', title)
     _config_ticks(ax)
@@ -156,6 +343,7 @@ def distr_plot(
             np.arange(len(pdf_distr[1])), pdf_distr[1], color='OrangeRed', label=f'{pdf_distr[0]}',
         )
         ax.legend(loc='best')
+    _config_view(ax, xlim, (None, None), 'linear', 'linear')
     plt.show()
 
 
@@ -201,6 +389,15 @@ def slices_plot(
 ) -> None:
     """
     
+    """
+    raise NotImplementedError
+
+
+def reconstruction_plot(
+    *args, **kwargs,
+) -> None:
+    """
+    The one with all the sources profiles "up_to".
     """
     raise NotImplementedError
 

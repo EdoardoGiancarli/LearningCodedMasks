@@ -44,12 +44,13 @@ from bloodmoon.types import CoordEquatorial
 PIPELINE SET-UP.
 """
 #### --- WIDE FIELD MONITOR MASK
-MASK_FITS: str = "wfm_mask.fits"
-THIN_MASK: bool = False             # selects if infinitely opaque and thin mask (removes vignetting effects)
+#MASK_FITS: str = "wfm_mask_summer2021.fits"
+MASK_FITS: str = "wfm_mask_NTHT_20250725.fits"
+THIN_MASK: bool = False                           # selects if infinitely opaque and thin mask (removes vignetting effects)
 
 #### --- OBSERVATION DATA
 SKYFIELD: str = "GalacticCenter"                                            # skyfield selection
-DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_infdet_2-50keV_1ks"       # directory with FITS files from WFM
+DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_infdet_2-50keV_1ks"      # directory with FITS files from WFM
 
 #SKYFIELD: str = "IROSDummy"
 #DATA_FITS: str = "catalog_withCXB_1Crab_infdet_2-50keV_1ks"
@@ -66,13 +67,13 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "testing_thresh"
+ANALYSIS_ID: str = "testing"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 20
-SNR_THRESHOLD: int | float = 10
+SNR_THRESHOLD: int | float = 5
 
-WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
+WFM_SKY_COMPOSITION: bool = True   # selects if the WFM cameras are to be joined to get the composed sky
 
 #### --- DATA FILTERS SETUP
 # photons energy filter - [keV]
