@@ -59,8 +59,10 @@ PLOTPARAMS = {
     'txt_title_fs': 12,
     'txt_fw': 'bold',
     'txt_color': 'black',
+    # line/scatter/bar plot styles
+    'scatter_size': 50,
+    'scatter_lw': 1.5,
 }
-
 
 def _config_subplots(nplots: int) -> tuple[Figure, Axes | list[Axes]]:
     """Creates and configures subplots."""
@@ -107,10 +109,8 @@ def _config_view(
     yscale: str,
 ) -> None:
     """Configures axes limits and scales."""
-    ax.set_xlim(*xlim)
-    ax.set_ylim(*ylim)
-    ax.set_xscale(xscale)
-    ax.set_yscale(yscale)
+    ax.set_xlim(*xlim); ax.set_ylim(*ylim)
+    ax.set_xscale(xscale); ax.set_yscale(yscale)
 
 """                               
                           █████████████                     
@@ -154,24 +154,23 @@ def map4biplot(
     x: NDArray | Sequence[NDArray] | None = None,
     style: str | Sequence[str] | None = None,
     color: str | tuple[str, str] | Sequence[str | tuple[str, str]] | None = None,
-    xlim: tuple[Any, Any] | Sequence[tuple[Any, Any]] = (None, None),
-    ylim: tuple[Any, Any] | Sequence[tuple[Any, Any]] = (None, None),
-    xscale: str | Sequence[str | None] = 'linear',
-    yscale: str | Sequence[str | None] = 'linear',
+    xlim: tuple[Any, Any] = (None, None),
+    ylim: tuple[Any, Any] = (None, None),
+    xscale: str = 'linear',
+    yscale: str = 'linear',
 ) -> dict[str, Any]:
     """
     Configures a dictionary with the specified info for plotting.
     This method can be used to generate a map to give as input to `biplot`.
 
-    For parameters like `labels`, `style`, and `color`, you can provide a
-    single value to apply to all data series or a sequence of values to
-    style each series individually. The function processes these inputs
-    and returns them in a structured dictionary, ready for a plotting utility.
+    For parameters like `labels`, `style`, and `color`, you can provide a single value to
+    apply to all data series or a sequence of values to style each series individually.
+    The function processes these inputs and returns them in a structured dictionary,
+    ready for a plotting utility.
 
     Args:
         arrs (NDArray | Sequence[NDArray]):
-            The data to be plotted. Can be a single NumPy array or a
-            sequence of arrays.
+            The data to be plotted. Can be a single NumPy array or a sequence of arrays.
         title (str):
             The main title for the plot.
         xlabel (str | None, optional (default=`None`)):
@@ -179,32 +178,29 @@ def map4biplot(
         ylabel (str | None, optional (default=`None`)):
             The label for the plot's y-axis.
         labels (str | Sequence[str | None] | None, optional (default=`None`)):
-            The legend labels for the data series. If a single string
-            is provided, it's applied to all series. If a sequence of
-            strings is given, each series gets its corresponding label.
+            The labels for the data series. If a single string is provided, it's applied to all
+            series. If a sequence of strings is given, each series gets its corresponding label.
         x (NDArray | Sequence[NDArray] | None, optional (default=`None`)):
-            The x-coordinates for the data points. If not provided, it
-            defaults to `np.arange(n)` for each array. If a single array
-            is provided, it's used for all data series. A sequence of
-            arrays can be used to specify x-values for each data series.
+            The x-coordinates for the data points. If not provided, it defaults to `np.arange(n)`
+            for each array. If a single array is provided, it's used for all data series. A
+            sequence of arrays can be used to specify x-values for each data series.
         style (str | Sequence[str] | None, optional (default=`None`)):
-            The plotting style (e.g., 'plot', 'scatter', 'bar').
-            A single string applies the same style to all series. A
-            sequence of strings applies a different style to each.
+            The plotting style ('plot', 'scatter', 'bar'). A single string applies the same
+            style to all series. A sequence of strings applies a different style to each.
+            If `None`, the style is initialised to 'plot' for all array entries.
         color (str | tuple[str, str] | Sequence[str | tuple[str, str]] | None, optional (default=`None`)):
-            The color for the data series. A single color string
-            (e.g., 'blue') applies to all series. A sequence of color
-            strings styles each series individually.
-        xlim (tuple[Any, Any] | Sequence[tuple[Any, Any]] | None, optional (default=`None`)):
+            The color for the data series. A single color string (e.g., 'blue') applies to
+            all series. A sequence of color strings styles each series individually.
+        xlim (tuple[Any, Any], optional (default=`tuple(None, None)`)):
             A tuple `(min, max)` setting the limits for the x-axis.
             This setting applies to the entire plot.
-        ylim (tuple[Any, Any] | Sequence[tuple[Any, Any]] | None, optional (default=`None`)):
+        ylim (tuple[Any, Any], optional (default=`tuple(None, None)`)):
             A tuple `(min, max)` setting the limits for the y-axis.
             This setting applies to the entire plot.
-        xscale (str | Sequence[str | None] | None, optional (default=`None`)):
+        xscale (str, optional (default=`linear`)):
             The scale for the x-axis (e.g., 'linear', 'log').
             Applies to the entire plot.
-        yscale (str | Sequence[str | None] | None, optional (default=`None`)):
+        yscale (str, optional (default=`linear`)):
             The scale for the y-axis (e.g., 'linear', 'log').
             Applies to the entire plot.
     
@@ -212,25 +208,49 @@ def map4biplot(
         output (dict[str, Any]): Map with the info for the plot.
     
     Example:
+        >>> # Example 1
         >>> import numpy as np
         >>> arr1 = np.array([1, 2, 3])
-        >>> arr2 = np.array([3, 2, 1])
-        >>> # Using single values for style and label
+        >>> # using default values
         >>> params = map4biplot(
         ...     arrs=[arr1, arr2],
+        ...     title="My Plot",
+        ... )
+        >>> print(params['title'])
+        >>> My Plot
+        >>> print(params['labels'])
+        >>> (None,)
+        ...
+        >>> # Example 2
+        >>> import numpy as np
+        >>> arrs = (np.array([1, 2, 3]), np.array([3, 2, 1]))
+        >>> # using single values for style and label
+        >>> params = map4biplot(
+        ...     arrs=arrs,
         ...     title="My Plot",
         ...     labels="Series",
         ...     style="scatter"
         ... )
+        >>> print(params['title'])
+        >>> My Plot
+        >>> print(params['labels'])
+        >>> ("Series", "Series")
+        >>> print(params['color'])
+        >>> (None, None)
     """
     arrs_ = (arrs,) if isinstance(arrs, np.ndarray) else tuple(arrs)
-    
     N_PLOTS = len(arrs_)
 
-    def setup(x: Any, *, dtype: Any, default: Any) -> tuple[Any]:
+    def setup(
+        x: Any,
+        dtype: Any,
+        *,
+        default: Any = None,
+        special: Any = None,
+    ) -> tuple[Any]:
         """Setup variables for plotting."""
         if x is None:
-            return (default,) * N_PLOTS
+            return (default,) * N_PLOTS if special is None else special
         elif isinstance(x, dtype):
             return (x,) * N_PLOTS
         return tuple(x)
@@ -240,10 +260,12 @@ def map4biplot(
         'title': title,
         'xlabel': xlabel,
         'ylabel': ylabel,
-        'labels': setup(labels, dtype=str, default=None),
-        'x': setup(x, dtype=np.ndarray, default=np.arange(len(arrs_[0]))),
-        'style': setup(style, dtype=str, default='plot'),
-        'color': setup(color, dtype=str, default=None),
+        'labels': setup(labels, str),
+        'x': setup(
+            x, np.ndarray, special=tuple(np.arange(len(arr)) for arr in arrs_),
+        ),
+        'style': setup(style, str, default='plot'),
+        'color': setup(color, str),
         'xlim': xlim,
         'ylim': ylim,
         'xscale': xscale,
@@ -256,7 +278,7 @@ def biplot(
     dmap_A: dict[str, Any],
     dmap_B: dict[str, Any],
     save_to: str | Path | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> None:
     """
     Displays a figure with two subplots by taking the info stored
@@ -270,14 +292,21 @@ def biplot(
             Dictionary with the info for the second subplot.
         save_to (str | Path | None, optional (default=`None`)):
             Path to save the figure.
+        **kwargs (Any):
+            Additional arguments passed to plot func (e.g., `plt.plot()`).
+    
+    Raises:
+        ValueError: If plot style different from 'plot', 'scatter' or 'bar'.
     
     Example:
+        >>> # built maps from `map4biplot()`
         >>> dmap1 = map4biplot(
         ...     ...,
         ... )
         >>> dmap2 = map4biplot(
         ...     ...,
         ... )
+        >>> # plot maps
         >>> biplot(dmap1, dmap2)
     """
     fig, axs = _config_subplots(2)
@@ -289,18 +318,23 @@ def biplot(
             match dmap['style'][idx]:
                 case 'plot':
                     ax.plot(
-                        dmap['x'][idx], arr, c=dmap['color'][idx], alpha=0.75,
+                        dmap['x'][idx], arr, c=dmap['color'][idx], alpha=PLOTPARAMS['alpha'],
                         label=dmap['labels'][idx], **kwargs,
                     )
                 case 'scatter':
                     c = dmap['color'][idx]
                     fcolor, ecolor = c if isinstance(c, tuple) else (c, c)
                     ax.scatter(
-                        dmap['x'][idx], arr, c=fcolor, edgecolors=ecolor, s=60, alpha=0.75,
-                        linewidths=1.5, label=dmap['labels'][idx], **kwargs,
+                        dmap['x'][idx], arr, c=fcolor, edgecolors=ecolor, s=PLOTPARAMS['scatter_size'],
+                        alpha=PLOTPARAMS['alpha'], linewidths=PLOTPARAMS['scatter_lw'],
+                        label=dmap['labels'][idx], **kwargs,
                     )
                 case 'bar':
                     raise NotImplementedError
+                case _:
+                    raise ValueError(
+                        f"Invalid plot style '{dmap['style'][idx]}'. Must be 'plot', 'scatter' or 'bar'."
+                    )
         
         _config_view(
             ax, dmap['xlim'], dmap['ylim'], dmap['xscale'], dmap['yscale'],
@@ -492,7 +526,7 @@ def skyfield_map(
         marker='+', alpha=PLOTPARAMS['alpha'], s=15, label='sources',
     )
     if any((show_IDs, show_coords, show_errbox)):
-        for name, sx, dsx, sy, dsy, ra, dec in zip(
+        for name, x, dx, y, dy, ra, dec in zip(
             log.log['ID'],
             log.log[SETUP['x']],
             log.log[SETUP['err_x']],
@@ -503,18 +537,18 @@ def skyfield_map(
         ):
             if show_coords:
                 ax.text(
-                    sx - 18, sy + 5, f'RA: {ra:.4f}\nDEC: {dec:.4f}', color=SETUP['txt_color'],
+                    x - 18, y + 5, f'RA: {ra:.4f}\nDEC: {dec:.4f}', color=SETUP['txt_color'],
                     fontsize=0.9*PLOTPARAMS['txt_body_fs'], fontweight=PLOTPARAMS['txt_fw'],
                 )
             if show_IDs:
                 ax.text(
-                    sx - 5, sy - 5, name, color=SETUP['txt_color'],
+                    x - 5, y - 5, name, color=SETUP['txt_color'],
                     fontsize=0.9*PLOTPARAMS['txt_body_fs'], fontweight=PLOTPARAMS['txt_fw'],
                 )
             if show_errbox:
                 ax.add_patch(
                     Rectangle(
-                        xy=(sx - dsx, sy - dsy), width=2*dsx, height=2*dsy,
+                        xy=(x - dx, y - dy), width=2 * dx, height=2 * dy,
                         linewidth=0.1, edgecolor=SETUP['errbox_color'], facecolor=None,
                     )
                 )
