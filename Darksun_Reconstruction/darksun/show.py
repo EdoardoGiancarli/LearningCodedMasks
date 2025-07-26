@@ -112,35 +112,36 @@ def _config_view(
     ax.set_xscale(xscale)
     ax.set_yscale(yscale)
 
-"""
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+"""                               
+                          █████████████                     
+                     ███████  ░░░░  ███████                 
+                   ████       ░░░░       ████               
+                 ████░░     ░░░░░░░░     ░░████             
+                 ██  ░░░░░░░░░░░░░░░░░░░░░░  ██             
+               ████    ░░░░░        ░░░░░    ████           
+               ████    ░░░░░        ░░░░░    ████           
+               ██      ░░░             ░░      ██           
+               ██      ░░░             ░░      ██           
+               ██    ░░░░░             ░░░░    ██           
+               ██░░░░░░░░░░░        ░░░░░░░░░░░██           
+               ██░░░░██████████████████████░░░░██           
+               ████████     ██    ██     ████████           
+               ████████     ██    ██     ████████           
+                 ████       ██    ██       ████             
+       ██████████████                      ██               
+    ███████      █████████████████████████████              
+    ███████      █████████████████████████████              
+    ███          █████████████████████████████████████     
+    ███          ██████    ██████   █████           ▒████   
+    ███████      ██████    ██████   █████    ██████   ▒███ 
+       ████      ██████    ██████   █████    ██████   ▒███ 
+       ████      ██████    ██████   █████    ██████   ▒███ 
+       ████      ██████    ██████   █████           ▒████
+       ████      ██████    ██████   █████    █████████
+ ██████████      ████████          ██████    ██████ 
+ ███                   ████████████████████████████            
+ ███                   ██████            
+ ████████████████████████████                        
 """
 
 def map4biplot(
@@ -153,10 +154,10 @@ def map4biplot(
     x: NDArray | Sequence[NDArray] | None = None,
     style: str | Sequence[str] | None = None,
     color: str | tuple[str, str] | Sequence[str | tuple[str, str]] | None = None,
-    xlim: tuple[Any, Any] | Sequence[tuple[Any, Any]] | None = None,
-    ylim: tuple[Any, Any] | Sequence[tuple[Any, Any]] | None = None,
-    xscale: str | Sequence[str | None] | None = None,
-    yscale: str | Sequence[str | None] | None = None,
+    xlim: tuple[Any, Any] | Sequence[tuple[Any, Any]] = (None, None),
+    ylim: tuple[Any, Any] | Sequence[tuple[Any, Any]] = (None, None),
+    xscale: str | Sequence[str | None] = 'linear',
+    yscale: str | Sequence[str | None] = 'linear',
 ) -> dict[str, Any]:
     """
     Configures a dictionary with the specified info for plotting.
@@ -223,6 +224,7 @@ def map4biplot(
         ... )
     """
     arrs_ = (arrs,) if isinstance(arrs, np.ndarray) else tuple(arrs)
+    
     N_PLOTS = len(arrs_)
 
     def setup(x: Any, *, dtype: Any, default: Any) -> tuple[Any]:
@@ -242,10 +244,10 @@ def map4biplot(
         'x': setup(x, dtype=np.ndarray, default=np.arange(len(arrs_[0]))),
         'style': setup(style, dtype=str, default='plot'),
         'color': setup(color, dtype=str, default=None),
-        'xlim': xlim or (None, None),
-        'ylim': ylim or (None, None),
-        'xscale': xscale or 'linear',
-        'yscale': yscale or 'linear',
+        'xlim': xlim,
+        'ylim': ylim,
+        'xscale': xscale,
+        'yscale': yscale,
     }
     return dmap
 
@@ -268,6 +270,15 @@ def biplot(
             Dictionary with the info for the second subplot.
         save_to (str | Path | None, optional (default=`None`)):
             Path to save the figure.
+    
+    Example:
+        >>> dmap1 = map4biplot(
+        ...     ...,
+        ... )
+        >>> dmap2 = map4biplot(
+        ...     ...,
+        ... )
+        >>> biplot(dmap1, dmap2)
     """
     fig, axs = _config_subplots(2)
     for ax, dmap in zip(axs, (dmap_A, dmap_B)):
