@@ -50,7 +50,7 @@ THIN_MASK: bool = False                           # selects if infinitely opaque
 
 #### --- OBSERVATION DATA
 SKYFIELD: str = "GalacticCenter"                                            # skyfield selection
-DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_infdet_2-50keV_1ks"      # directory with FITS files from WFM
+DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"      # directory with FITS files from WFM
 
 #SKYFIELD: str = "IROSDummy"
 #DATA_FITS: str = "catalog_withCXB_1Crab_infdet_2-50keV_1ks"
