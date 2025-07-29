@@ -5,6 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 from tqdm import tqdm
 
+from bloodmoon.coords import angle2shift
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import count
 from bloodmoon.mask import decode
@@ -12,6 +13,9 @@ from bloodmoon.mask import snratio
 from bloodmoon.mask import variance
 from bloodmoon.optim import optimize, model_sky
 
+from darksun.types import LogEntry
+from darksun.data import Log
+from darksun.data import create_log
 from darksun.data import DataLoader
 
 
@@ -52,7 +56,7 @@ def iros_singleCAM(
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
 
-        significance = float(snr[*candidate])  # candidate significance at peak counts
+        significance = float(snr[*candidate])
         model = model_sky(
             camera=camera,
             shift_x=shiftx,
@@ -81,6 +85,7 @@ def iros_singleCAM(
 
 
 def run_IROS(
+    IDcam: str,
     camera: CodedMaskCamera,
     sdl: DataLoader,
     max_iterations: int,
@@ -88,19 +93,35 @@ def run_IROS(
     vignetting: bool = True,
     psfy: bool = True,
     sky_start: NDArray | None = None,
-) -> tuple[dict, NDArray]:
+) -> tuple[Log, NDArray]:
     """
     """
-    entries = (
-        'shift_x', 'shift_y', 'fluence', 'snr',
+    # coded-mask sensitivity along the (x, y) axis
+    # - TODO: insert correct camera sensitivity estimation (this is a proxy,
+    #         dthetax = 5 arcmin, dthetay = 60 arcmin at (upx, upy) = (1, 1))
+    UPX, UPY = camera.upscale_f
+    DTHETA_X = 5.0 / UPX / 60                  # [deg] PN: `/ 60` is for arcmin -> deg
+    DTHETA_Y = 60.0 / UPY / 60                 # [deg]
+    # errors for sky-coords shifts
+    DSX = abs(angle2shift(camera, DTHETA_X))   # [mm]
+    DSY = abs(angle2shift(camera, DTHETA_Y))   # [mm]
+
+    def callback(output: tuple[float]) -> tuple[float]:
+        """Manage IROS candidate output parameters."""
+        sx, sy, f, signf = output
+        df = np.sqrt(f)
+        return sx, DSX, sy, DSY, f, df, signf
+    
+    # generate IROS output log
+    params = (
+        LogEntry('shift_x', 'D', 'mm'), LogEntry('dshift_x', 'D', 'mm'),
+        LogEntry('shift_y', 'D', 'mm'), LogEntry('dshift_y', 'D', 'mm'),
+        LogEntry('fluence', 'D', 'ph'), LogEntry('dfluence', 'D', 'ph'),
+        LogEntry('snr', 'D', ''),
     )
-    db = {entry: [] for entry in entries}
+    cam_log = create_log(params, IDcam)
 
-    def store_output(values: tuple[float]) -> None:
-        """Stores values in database."""
-        for par, val in zip(entries, values):
-            db[par].append(val)
-
+    print("# Initializing Loop...")
     loop = iros_singleCAM(
         camera=camera,
         sdl=sdl,
@@ -110,12 +131,13 @@ def run_IROS(
         psfy=psfy,
         sky_start=sky_start,
     )
-
     print("# Looping around the FOV...")
-    for source, residual in tqdm(loop):
-        store_output(source)
+    for candidate, residual in tqdm(loop):
+        cam_log.update(
+            tuple((p.entry, val) for p, val in zip(params, callback(candidate)))
+        )
 
-    return db, residual
+    return cam_log, residual
 
 
 # end    
