@@ -33,8 +33,10 @@ def iros_singleCAM(
     """    
     def find_candidate(sky: NDArray, snr: NDArray, batch: int = 1000) -> tuple:
         """Returns candidate."""
-        reservoir = np.array([np.unravel_index(id, sky.shape) for id in np.argsort(sky, axis=None)[-batch:]])[::-1]
-        for pos in reservoir:
+        reservoir = np.array(
+            [np.unravel_index(id, sky.shape) for id in np.argsort(sky, axis=None)[-batch:]]
+        )
+        for pos in reservoir[::-1]:
             if (snr[*pos] > snr_threshold):
                 return tuple(pos)
         return tuple()
