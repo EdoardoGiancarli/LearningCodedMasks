@@ -30,6 +30,8 @@ RCPARAMS = {
     'xtick.labelsize': 12,
     'ytick.labelsize': 12,
     'axes.formatter.limits': (-3, 3),
+    'savefig.bbox': 'tight',
+    'savefig.dpi': 350,
 }
 mpl.rcParams.update(RCPARAMS)
 
@@ -367,7 +369,7 @@ def biplot(
         _config_axlim(ax, dmap['xlim'], dmap['ylim'])
         if any(dmap['labels']): ax.legend(loc='best')
     
-    if save_to is not None: plt.savefig(save_to)
+    if save_to is not None: fig.savefig(save_to)
     plt.show()
 
 
@@ -379,6 +381,7 @@ def distr_plot(
     xlabel: str | None = None,
     xlim: tuple[float | None, float | None] | None = None,
     pdf_distr: tuple[str, NDArray] | None = None,
+    save_to: str | Path | None = None,
     **hist_kwargs: Any,
 ) -> None:
     """
@@ -398,6 +401,8 @@ def distr_plot(
             Edge values for the distribution.
         pdf_distr (tuple[str, NDArray] | None, optional (default=`None`)):
             Input PDF distribution for comparison.
+        save_to (str | Path | None, optional (default=`None`)):
+            Path to save the figure.
         hist_kwargs (Any): Keyword arguments passed to `matplotlib.pyplot.hist`.
     """
     arr_ = arr.copy()
@@ -416,6 +421,7 @@ def distr_plot(
         )
         ax.legend(loc='best')
     _config_axlim(ax, xlim, (None, None))
+    if save_to is not None: fig.savefig(save_to)
     plt.show()
 
 
@@ -427,6 +433,7 @@ def image_plot(
     ylabel: str = None,
     cbarlabel: str = None,
     cbarloc: str = 'right',
+    save_to: str | Path | None = None,
     **img_kwargs: Any,
 ) -> None:
     """
@@ -439,6 +446,7 @@ def image_plot(
         ylabel (str, optional (default=`None`)): Label for the y-axis.
         cbarlabel (str, optional (default=`None`)): Label for the colorbar.
         cbarloc (str, optional (default=`'right'`)): Location of the colorbar.
+        save_to (str | Path | None, optional (default=`None`)): Path to save the figure.
         **img_kwargs (Any): Keyword arguments passed to `matplotlib.pyplot.imshow`.
     """
     fig, ax = _config_subplots(1, dpi=110)
@@ -453,6 +461,7 @@ def image_plot(
     if cbarlabel: cbar.set_label(
         cbarlabel, fontsize=PLOTPARAMS['cbar_label_fs'], fontweight=PLOTPARAMS['cbar_label_fw'],
     )
+    if save_to is not None: fig.savefig(save_to)
     plt.show()
 
 
@@ -467,6 +476,7 @@ def slices_plot(
     ylim_yslice: tuple[Any, Any] | None = None,
     labels: str | Sequence[str | None] | None = None,
     cameraID: str | None = None,
+    save_to: str | Path | None = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -496,6 +506,8 @@ def slices_plot(
             Labels for each 2D array slice, used in the legend.
         cameraID (str | None, optional (default=`None`)):
             ID for the Wide Field Monitor coded-mask camera.
+        save_to (str | Path | None, optional (default=`None`)):
+            Path to save the figure.
         **kwargs (Any):
             Additional keyword arguments for the `biplot` function.
     """
@@ -540,6 +552,7 @@ def slices_plot(
             color=colors_,
             ylim=ylim_yslice or (None, None),
         ),
+        save_to=save_to,
         **kwargs,
     )
 
@@ -552,6 +565,7 @@ def reconstruction_plot(
     *,
     vignetting: bool = True,
     psfy: bool = True,
+    savepath: Any = None,
 ) -> None:
     """
     Displays the IROS reconstruction effect wrt the original decoded sky.
@@ -609,6 +623,7 @@ def reconstruction_plot(
             source=source,
             labels=('True', 'IROS'),
             cameraID=log.name,
+            save_to=savepath(f'{source.upper()}_profile'),
         )
         slices_plot(
             sky=true_sky_ - modeled,
@@ -617,6 +632,7 @@ def reconstruction_plot(
             source=source,
             ylabel='residues [ph]',
             cameraID=log.name,
+            save_to=savepath(f'{source.upper()}_profile_res'),
         )
 
         # plot IROS vs True residues heatmaps
@@ -636,6 +652,7 @@ def reconstruction_plot(
             cbarlabel='counts',
             cmap='bwr',
             extent=(-CUT[1] * F_UPX, CUT[1] * F_UPX, -CUT[0] * F_UPY, CUT[0] * F_UPY),
+            save_to=savepath(f'{source.upper()}_res_HM'),
         )
 
         # remove source from True sky
@@ -658,6 +675,7 @@ def skyfield_map(
     show_IDs: bool = True,
     show_coords: bool = False,
     show_errbox: bool = False,
+    save_to: str | Path | None = None,
 ) -> None:
     """
     Displays the reconstructed sources in the sky-grid, optionally
@@ -674,6 +692,8 @@ def skyfield_map(
             If `True`, the RA/Dec coords are shown in the plot.
         show_errbox (bool, optional (default=`False`)):
             If `True`, the source pos errorboxes are displayed.
+        save_to (str | Path | None, optional (default=`None`)):
+            Path to save the figure.
     """
     skyx, skyy = camera.bins_sky
     SETUP = {
@@ -748,6 +768,7 @@ def skyfield_map(
                 )
 
     _config_axlim(ax, SETUP['xlim'], SETUP['ylim'])
+    if save_to is not None: fig.savefig(save_to)
     plt.show()
 
 

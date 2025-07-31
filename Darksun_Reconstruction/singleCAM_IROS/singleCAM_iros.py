@@ -77,6 +77,7 @@ def iros_singleCAM(
         snrmap = snratio(skymap, np.clip(var_, a_min=1, a_max=None))
         candidate = find_candidate(skymap, snrmap)
         if not candidate:
+            print("\nNo candidates left...")
             break
         try:
             source, skymap = subtract(candidate, skymap, snrmap)
