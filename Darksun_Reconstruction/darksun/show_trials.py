@@ -3,6 +3,7 @@ IROS output plotting.
 """
 
 from typing import Any, Sequence
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -72,17 +73,24 @@ PLOTPARAMS = {
 }
 
 def _config_subplots(
-    nplots: int,
+    nrows: int,
+    ncols: int,
     *,
     size: int | float = PLOTPARAMS['size'],
     dpi: int | float = PLOTPARAMS['dpi'],
 ) -> tuple[Figure, Axes | list[Axes]]:
     """Creates and configures subplots."""
-    fig_size = (size * nplots + 1, size) if nplots > 1 else (size, size)
-    fig, axs = plt.subplots(1, nplots, figsize=fig_size)
+    height, width = map(
+        lambda x: int(size * x + 1) if x > 1 else size,
+        (nrows, ncols),
+    )
+    fig, axs = plt.subplots(nrows, ncols, figsize=(width, height))
     fig.dpi = dpi
     fig.tight_layout()
-    fig.subplots_adjust(wspace=PLOTPARAMS['spacing'] / size)
+    fig.subplots_adjust(
+        wspace=PLOTPARAMS['spacing'] / size,
+        hspace=PLOTPARAMS['spacing'] / size,
+    )
     return fig, axs
 
 def _config_labels(ax: Axes, xlabel: str | None, ylabel: str | None, title: str) -> None:
@@ -161,7 +169,7 @@ def _config_axlim(
                     ████████████████████████████                        
 """
 
-def map4biplot(
+def map4plot(
     arrs: NDArray | Sequence[NDArray],
     title: str,
     *,
@@ -179,9 +187,9 @@ def map4biplot(
 ) -> dict[str, Any]:
     """
     Configures a dictionary with the specified info for plotting.
-    This method can be used to generate a map to give as input to `biplot`.
+    This method can be used to generate a map to give as input to `plot`.
 
-    For parameters like `labels`, `style`, and `color`, you can provide a single value to
+    For parameters like `labels`, `style`, and `color`, it is possible to provide a single value to
     apply to all data series or a sequence of values to style each series individually.
     The function processes these inputs and returns them in a structured dictionary,
     ready for a plotting utility.
@@ -210,7 +218,7 @@ def map4biplot(
             The color for the data series. A single color string (e.g., 'blue') applies to
             all series. A sequence of color strings styles each series individually.
             For 'scatter' plots, it is possible to insert a tuple to specify the facecolor
-            and the edgecolor of the points (e.g., ('SkyBlue', 'DodgerBlue')).
+            and the edgecolor of the points (e.g., ('blue', 'red')).
         xlim (tuple[Any, Any], optional (default=`tuple(None, None)`)):
             A tuple `(min, max)` setting the limits for the x-axis.
             This setting applies to the entire plot.
@@ -235,7 +243,7 @@ def map4biplot(
         >>> import numpy as np
         >>> arr1 = np.array([1, 2, 3])
         >>> # using default values
-        >>> params = map4biplot(
+        >>> params = map4plot(
         ...     arrs=[arr1, arr2],
         ...     title="My Plot",
         ... )
@@ -248,7 +256,7 @@ def map4biplot(
         >>> import numpy as np
         >>> arrs = (np.array([1, 2, 3]), np.array([3, 2, 1]))
         >>> # using single values for style and label
-        >>> params = map4biplot(
+        >>> params = map4plot(
         ...     arrs=arrs,
         ...     title="My Plot",
         ...     labels="Series",
@@ -299,22 +307,26 @@ def map4biplot(
     return dmap
 
 
-def biplot(
-    dmap_A: dict[str, Any],
-    dmap_B: dict[str, Any],
+def plot(
+    dmaps: dict[str, Any] | Sequence[dict[str, Any]],
+    *,
+    ncols: int = 1,
+    nrows: int = 1,
     save_to: str | Path | None = None,
     **kwargs: Any,
 ) -> None:
     """
     Displays a figure with two subplots by taking the info stored
     in the two dictionaries in input. The two maps must have the
-    structure described in `map4biplot()`.
+    structure described in `map4plot()`.
 
     Args:
-        dmap_A (dict[str, Any]):
-            Dictionary with the info for the first subplot.
-        dmap_B (dict[str, Any]):
-            Dictionary with the info for the second subplot.
+        dmaps (dict[str, Any] | Sequence[dict[str, Any]]):
+            Dictionary with the info for the plots.
+        ncols (int, optional (default=`1`)):
+            Number of columns to insert in the plot.
+        nrows (int, optional (default=`1`)):
+            Number of rows to insert in the plot.
         save_to (str | Path | None, optional (default=`None`)):
             Path to save the figure.
         **kwargs (Any):
@@ -324,18 +336,36 @@ def biplot(
         ValueError: If plot style different from 'plot', 'scatter' or 'bar'.
     
     Example:
-        >>> # built maps from `map4biplot()`
-        >>> dmap1 = map4biplot(
+        >>> # build maps from `map4plot()`
+        >>> dmap1 = map4plot(
         ...     ...,
         ... )
-        >>> dmap2 = map4biplot(
+        >>> dmap2 = map4plot(
         ...     ...,
         ... )
         >>> # plot maps
-        >>> biplot(dmap1, dmap2)
+        >>> plot(dmap1)
+        >>> plot(dmaps=(dmap1, dmap2), ncols=2)
     """
-    fig, axs = _config_subplots(2)
-    for ax, dmap in zip(axs, (dmap_A, dmap_B)):
+    def setup(obj: object, dtype: Any) -> Any:
+        return (
+            (obj,) if isinstance(obj, dtype) else obj
+        )
+    
+    fig, axs = _config_subplots(nrows, ncols)
+    dmaps_ = setup(dmaps, dict)
+    axs_ = setup(axs, Axes)
+
+    if (len(dmaps_) < np.prod((nrows, ncols))):
+        raise ValueError(
+            "Invalid 'ncols' or 'nrows' values for input dmaps sequence."
+        )
+    elif (len(dmaps_) > np.prod((nrows, ncols))):
+        warnings.warn(
+            "To display all the input dmaps, select adequate values of 'ncols' or 'nrows'."
+        )
+
+    for ax, dmap in zip(axs_, dmaps_):
         _config_labels(ax, dmap['xlabel'], dmap['ylabel'], dmap['title'])
         _config_ticks(ax)
         _config_axscale(ax, dmap['xscale'], dmap['yscale'])
@@ -410,7 +440,7 @@ def distr_plot(
     arr_ = arr.copy()
     if np.ndim(arr_) > 1: arr_ = arr_.reshape(-1)
 
-    fig, ax = _config_subplots(1)
+    fig, ax = _config_subplots(1, 1)
     _config_labels(ax, xlabel, 'density', title)
     _config_ticks(ax)
     _config_axscale(ax, 'linear', 'linear')
@@ -451,7 +481,7 @@ def image_plot(
         save_to (str | Path | None, optional (default=`None`)): Path to save the figure.
         **img_kwargs (Any): Keyword arguments passed to `matplotlib.pyplot.imshow`.
     """
-    fig, ax = _config_subplots(1, dpi=110)
+    fig, ax = _config_subplots(1, 1, dpi=110)
     _config_labels(ax, xlabel, ylabel, title)
     _config_ticks(ax)
     img = ax.imshow(arr, origin=PLOTPARAMS['cbar_origin'], **img_kwargs)
@@ -511,7 +541,7 @@ def slices_plot(
         save_to (str | Path | None, optional (default=`None`)):
             Path to save the figure.
         **kwargs (Any):
-            Additional keyword arguments for the `biplot` function.
+            Additional keyword arguments for the `plot` function.
     """
     colors_ = (
         'OrangeRed', 'DodgerBlue', 'Lawngreen', 'm'
@@ -533,27 +563,31 @@ def slices_plot(
         lambda x: x.upper() if x else '',
         (source, cameraID),
     )
-    biplot(
-        dmap_A=map4biplot(
-            arrs=xslice,
-            title=f"{name} X-axis Slice {cam}",
-            xlabel='x [px]',
-            ylabel=ylabel or 'counts [ph]',
-            labels=labels,
-            x=map(phase, xslice),
-            color=colors_,
-            ylim=ylim_xslice or (None, None),
-        ),
-        dmap_B=map4biplot(
-            arrs=yslice,
-            title=f"{name} Y-axis Slice {cam}",
-            xlabel='y [px]',
-            ylabel=ylabel or 'counts [ph]',
-            labels=labels,
-            x=map(phase, yslice),
-            color=colors_,
-            ylim=ylim_yslice or (None, None),
-        ),
+
+    dmapx = map4plot(
+        arrs=xslice,
+        title=f"{name} X-axis Slice {cam}",
+        xlabel='x [px]',
+        ylabel=ylabel or 'counts [ph]',
+        labels=labels,
+        x=map(phase, xslice),
+        color=colors_,
+        ylim=ylim_xslice or (None, None),
+    )
+    dmapy = map4plot(
+        arrs=yslice,
+        title=f"{name} Y-axis Slice {cam}",
+        xlabel='y [px]',
+        ylabel=ylabel or 'counts [ph]',
+        labels=labels,
+        x=map(phase, yslice),
+        color=colors_,
+        ylim=ylim_yslice or (None, None),
+    )
+    plot(
+        nrows=1,
+        ncols=2,
+        dmaps=(dmapx, dmapy),
         save_to=save_to,
         **kwargs,
     )
@@ -722,7 +756,7 @@ def skyfield_map(
         'ylim': (skyy[0], skyy[-1]),
     }
 
-    fig, ax = _config_subplots(1, size=8, dpi=100)
+    fig, ax = _config_subplots(1, 1, size=8, dpi=100)
     _config_labels(ax, SETUP['xlabel'], SETUP['ylabel'], SETUP['title'])
     _config_ticks(ax)
 
