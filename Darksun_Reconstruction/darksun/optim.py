@@ -66,6 +66,7 @@ def bkg_smoothing(
         - CFR with url: [`bkg_fitting_v3.ipynb`](
         https://github.com/yuri-evangelista/CodedMasks/blob/main/notebooks/bkg_fitting_v3.ipynb
         ).
+        - The kernel size may change depending on the selected mask pattern design of the WFM.
     """
     # define median filter kernel size at given camera upscaling
     UPX, UPY = camera.upscale_f

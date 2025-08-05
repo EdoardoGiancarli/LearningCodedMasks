@@ -164,7 +164,7 @@ def run_IROS(
         return residual
 
     residual_detector = subtract(detector, candidates)
-    smoothed_detector = bkg_smoothing(residual_detector, camera)      # hmmm, wouldn't the remaining sources be subtracted in this way?
+    smoothed_detector = bkg_smoothing(residual_detector, camera)
     print("# Initializing second loop with smoothed detector...")
     second_loop = iros_singleCAM(
         detector=detector - smoothed_detector,
