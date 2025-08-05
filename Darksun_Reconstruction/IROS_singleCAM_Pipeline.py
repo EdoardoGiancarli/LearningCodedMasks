@@ -59,9 +59,6 @@ SKYFIELD: str = "GalacticCenter"                                            # sk
 #DATA_FITS: str = "galctr_rxte-sax_mask_summer2021_infdet_2-50keV_1ks"       # directory with FITS files from WFM
 DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_infdet_2-50keV_1ks"
 
-#SKYFIELD: str = "IROSDummy"
-#DATA_FITS: str = "catalog_withCXB_1Crab_infdet_2-50keV_1ks"
-
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
 DATASET: str = "detected"
@@ -74,10 +71,10 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_testing"
+ANALYSIS_ID: str = "singleCAM_iros_testing_smoothing_skyvarlogic_clipdet"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 20
+MAX_ITERATIONS: int = 25
 SNR_THRESHOLD: int | float = 5
 
 WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky

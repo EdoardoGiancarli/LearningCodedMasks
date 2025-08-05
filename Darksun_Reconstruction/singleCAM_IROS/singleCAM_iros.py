@@ -23,7 +23,8 @@ from darksun.optim import bkg_smoothing
 
 
 def iros_singleCAM(
-    detector: NDArray,
+    skymap: NDArray,
+    varmap: NDArray,
     camera: CodedMaskCamera,
     max_iterations: int,
     snr_threshold: float = 0.0,
@@ -72,10 +73,8 @@ def iros_singleCAM(
         residual = sky - model
         return (shiftx, shifty, fluence, significance), residual
     
-    skymap = decode(camera, detector)
-    varmap = variance(camera, detector)
     for i in range(max_iterations):
-        snrmap = snratio(skymap, np.clip(varmap, a_min=1, a_max=None))
+        snrmap = skymap / np.sqrt(varmap)
         candidate = find_candidate(skymap, snrmap)
         if not candidate:
             print("\nNo candidates left...")
@@ -129,11 +128,14 @@ def run_IROS(
 
     # generating detector image
     detector = count(camera, sdl.DLdata)[0]
+    skymap = decode(camera, detector)
+    varmap = np.clip(variance(camera, detector), a_min=1e-8, a_max=detector.sum())
 
     # performing IROS to remove the brightest sources (SNR > SMOOTHING_THRESH)
     print("# Running first loop...")
     first_loop = iros_singleCAM(
-        detector=detector,
+        skymap=skymap,
+        varmap=varmap,
         camera=camera,
         max_iterations=max_iterations,
         snr_threshold=SMOOTHING_THRESH,
@@ -156,18 +158,21 @@ def run_IROS(
                 camera=camera,
                 shift_x=sx,
                 shift_y=sy,
-                fluence=f,
                 vignetting=vignetting,
                 psfy=psfy,
             )
-            residual -= shadowgram
+            residual -= (f * shadowgram)
         return residual
 
-    residual_detector = subtract(detector, candidates)
-    smoothed_detector = bkg_smoothing(residual_detector, camera)
+    smoothed_detector = bkg_smoothing(
+        detector=subtract(detector, candidates),
+        camera=camera,
+    )
+    smoothed_skymap = decode(camera, detector - smoothed_detector)
     print("# Initializing second loop with smoothed detector...")
     second_loop = iros_singleCAM(
-        detector=detector - smoothed_detector,
+        skymap=smoothed_skymap,
+        varmap=varmap,
         camera=camera,
         max_iterations=max_iterations,
         snr_threshold=snr_threshold,
