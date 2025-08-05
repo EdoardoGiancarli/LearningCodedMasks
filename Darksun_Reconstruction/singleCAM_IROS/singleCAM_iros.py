@@ -235,7 +235,7 @@ def run_IROS(
     ) -> NDArray:
         """Subtracts retrieved sources from original detector."""
         residual = detector.copy()
-        for (sx, sy, f) in candidates:
+        for (sx, sy, f, _) in candidates:
             shadowgram = model_shadowgram(
                 camera=camera,
                 shift_x=sx,
