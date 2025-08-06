@@ -9,7 +9,6 @@ from bloodmoon.coords import angle2shift
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import count
 from bloodmoon.mask import decode
-from bloodmoon.mask import snratio
 from bloodmoon.mask import variance
 from bloodmoon.optim import optimize
 from bloodmoon.optim import model_shadowgram
@@ -97,6 +96,7 @@ def run_IROS(
     psfy: bool = True,
 ) -> tuple[Log, NDArray]:
     """
+
     """
     # coded-mask sensitivity along the (x, y) axis
     # - TODO: insert correct camera sensitivity estimation (this is a proxy,
@@ -131,6 +131,15 @@ def run_IROS(
     skymap = decode(camera, detector)
     varmap = np.clip(variance(camera, detector), a_min=1e-8, a_max=detector.sum())
 
+    # define unframe edges to remove sky and significance boundaries
+    # TODO:
+    #   - setup: done
+    #   - implement unframing factors (possible criteria: where not Poisson variance)
+    #   - implement shifts offset (due to framing) in IROS
+    # TODO:
+    #   - OR BETTER: implement sky mask from variance `* (variance > n)`
+    UNFR_X, UNFR_Y = None, None    # 100 * UPX, 70 * UPY
+
     # performing IROS to remove the brightest sources (SNR > SMOOTHING_THRESH)
     print("# Running first loop...")
     first_loop = iros_singleCAM(
@@ -147,12 +156,9 @@ def run_IROS(
     # perform detector smoothing and run again IROS on the processed data;
     # to do that, we first remove the stored sources from the original
     # detector, and then we perform the smoothing
-    def subtract(
-        detector: NDArray,
-        candidates: tuple[tuple[float]],
-    ) -> NDArray:
-        """Subtracts retrieved sources from original detector."""
-        residual = detector.copy()
+    def retrieve_detector(candidates: tuple[tuple[float]]) -> NDArray:
+        """Generates detector image from retrieved candidates."""
+        img = np.zeros(camera.shape_detector)
         for (sx, sy, f, _) in candidates:
             shadowgram = model_shadowgram(
                 camera=camera,
@@ -161,11 +167,11 @@ def run_IROS(
                 vignetting=vignetting,
                 psfy=psfy,
             )
-            residual -= (f * shadowgram)
-        return residual
+            img += (f * shadowgram)
+        return img
 
     smoothed_detector = bkg_smoothing(
-        detector=subtract(detector, candidates),
+        detector=detector - retrieve_detector(candidates),
         camera=camera,
     )
     smoothed_skymap = decode(camera, detector - smoothed_detector)
