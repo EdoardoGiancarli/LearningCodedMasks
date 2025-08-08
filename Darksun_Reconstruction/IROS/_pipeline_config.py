@@ -5,6 +5,7 @@ Configuration script for the IROS pipeline.
 from ._pipeline_support import PipelineParams
 from ._pipeline_support import config_parameters
 from ._pipeline_support import output_files
+from .doubleCAM_iros import run_IROS
 
 from typing import Sequence
 from pathlib import Path
@@ -123,7 +124,7 @@ def run(params: PipelineParams) -> None:
             is_file(res_camB)
         ):
             # IROS
-            logs, skies = ds.run_IROS(
+            logs, skies = run_IROS(
                 camera=wfm,
                 sdl_camA=sdlA,
                 sdl_camB=sdlB,

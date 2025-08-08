@@ -96,7 +96,50 @@ def run_IROS(
     psfy: bool = True,
 ) -> tuple[Log, NDArray]:
     """
+    Runs the IROS (Iterative Removal of Sources) loop and stores the output for the
+    chosen coded-mask camera of the Wide-Field Monitor.
 
+    This wrapper iteratively removes the detected sources candidates from the sky
+    until either the maximum number of iterations is reached or the sky significance
+    threshold is met. At each iteration, the log for the chosen coded-mask cameras
+    is updated with the following candidates estimated parameters:
+
+        - camera local frame sky-coordinates shifts along the (x, y)
+          axes wrt the coded-mask camera optical axis, in [mm]*
+        - fluence, in [ph]**
+        - significance at the selection
+    
+    * The candidates shifts errors at upscaling `(x, y)=(1, 1)` are assumed to be
+      `5 arcmin` along x and `60 arcmin` along y.
+    ** The candidates fluence is assumed to follow a Poissonian statistics, so the
+       fluence error is the square root of the fluence.
+    
+    Args:
+        IDcam (str | None, optional (default=`None`)):
+                WFM coded-mask camera ID (for the Log).
+        camera (CodedMaskCamera):
+            CodedMaskCamera instance used for imaging and reconstruction.
+        sdl (DataLoader):
+            DataLoader instance with the observed data.
+        max_iterations (int):
+            Maximum number of iterations for the IROS loop.
+        snr_threshold (int | float, optional (default=`0.0`)):
+            Minimum SNR value required to continue the iterative source removal process.
+        vignetting (bool, optional (default=`True`)):
+            If `True`, the model used for optimization will simulate vignetting.
+        psfy (bool, optional (default=`True`)):
+            If `True`, the model used for optimization will simulate detector
+            position reconstruction effects.
+
+    Returns:
+        output (tuple[Log, NDArray]):
+            - log (Log):
+                Coded-camera log with metadata and results from IROS.
+            - residual (tuple[NDArray, NDArray]):
+                Coded-camera residual sky after IROS.
+    
+    TODO:
+        * add smoothing doc
     """
     # coded-mask sensitivity along the (x, y) axis
     # - TODO: insert correct camera sensitivity estimation (this is a proxy,
