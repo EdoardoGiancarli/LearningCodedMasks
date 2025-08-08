@@ -24,11 +24,11 @@ def solid_angle(
                         |       |               |       |
                         |   4   |       3       |       |
                         |       |               |       |
-                     ___|___x___|_______________|____   |height
+                     ___|_______|_______________|____   |height
                         |       |               |       |
                         |   1  y|       2       |       |    
                         |_______|_______________|      _|_
-                                |
+                            x   |
                                 |                 
     
     To compute the solid angle, the plate is divided in four sub-portions,
@@ -99,8 +99,14 @@ def solid_angle(
 def detector_solid_angle(camera: CodedMaskCamera) -> NDArray:
     """
     Computes the sky solid angle profile seen by each active element
-    of the coded-mask camera detector. The solid angle is computed
-    by considering the instrument geometry.
+    of the coded-mask camera detector.
+
+    The solid angle is computed by considering only the instrument
+    geometry, taking into account the mask physical dimension, which
+    represents the base of a pyramid whose vertex sits on the center
+    of each active element of the detector plane, and slicing along
+    all the active elements.
+    The final array is masked with the detector bulk profile.
 
     Args:
         camera (CodedMaskCamera):
@@ -116,23 +122,24 @@ def detector_solid_angle(camera: CodedMaskCamera) -> NDArray:
     """
     UPX, UPY = camera.upscale_f
 
-    # define detector plate physical dim (width, height)
+    # define mask physical dim (width, height)
     d = camera.specs['mask_detector_distance']
-    maxx, minx = camera.specs['detector_maxx'], camera.specs['detector_minx']
-    maxy, miny = camera.specs['detector_maxy'], camera.specs['detector_miny']
-    detplate_physdim = (maxx - minx, maxy - miny)
+    maxx, minx = camera.specs['mask_maxx'], camera.specs['mask_minx']
+    maxy, miny = camera.specs['mask_maxy'], camera.specs['mask_miny']
+    maskplate_physdim = (maxx - minx, maxy - miny)
 
+    # compute x- and y-coords for the detector elements solid angle
+    #   - first define detector plane active elements positions
+    #   - elements coords are clipped to remove binning artefact
+    #   - the solid angle is masked with the bulk active elements
     _binsx, _binsy = camera.bins_detector
     centers_x, centers_y = (
         _binsx[:-1] + camera.specs['mask_deltax'] / (2 * UPX),
         _binsy[:-1] + camera.specs['mask_deltay'] / (2 * UPY),
     )
-    # compute x- and y-coords for the detector elements solid angle
-    #   - elements coords are clipped to remove binning artefact
-    #   - the solid angle is masked with the bulk active elements
     x = np.clip(maxx - np.abs(centers_x[np.newaxis, :]), a_min=0, a_max=None)
     y = np.clip(maxy - np.abs(centers_y[:, np.newaxis]), a_min=0, a_max=None)
-    return solid_angle(x, y, *detplate_physdim, d) * (camera.bulk > 0)
+    return solid_angle(x, y, *maskplate_physdim, d) * (camera.bulk > 0)
 
 
 def sky_variance(
