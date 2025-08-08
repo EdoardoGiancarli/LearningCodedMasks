@@ -104,8 +104,8 @@ def detector_solid_angle(camera: CodedMaskCamera) -> NDArray:
     The solid angle is computed by considering only the instrument
     geometry, taking into account the mask physical dimension, which
     represents the base of a pyramid whose vertex sits on the center
-    of each active element of the detector plane, and slicing along
-    all the active elements.
+    of each active element of the detector plane, and all the active
+    elements coordinates (along the plane).
     The final array is masked with the detector bulk profile.
 
     Args:
