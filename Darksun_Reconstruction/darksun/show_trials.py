@@ -39,7 +39,10 @@ mpl.rcParams.update(RCPARAMS)
 PLOTPARAMS = {
     # figure
     'size': 6,
-    'spacing': 1.25,
+    'wspacing_plot': 1.25,
+    'hspacing_plot': 1.25,
+    'wspacing_image': 1.25,
+    'hspacing_image': 0.5,
     'dpi': 200,
     # plot
     'title_pad': 8,
@@ -57,7 +60,8 @@ PLOTPARAMS = {
     # colorbar
     'cbar_origin': 'lower',
     'cbar_shrink': 0.75,
-    'cbar_pad': 0.05,
+    'cbar_pad_right': 0.03,
+    'cbar_pad_bottom': 0.1,
     'cbar_ticks_ls': 11,
     'cbar_label_fs': 12,
     'cbar_label_fw': 'bold',
@@ -78,8 +82,13 @@ def _config_subplots(
     *,
     size: int | float = PLOTPARAMS['size'],
     dpi: int | float = PLOTPARAMS['dpi'],
-) -> tuple[Figure, Axes | list[Axes]]:
+    ptype: str = 'plot',
+) -> tuple[Figure, Axes | NDArray]:
     """Creates and configures subplots."""
+    if ptype not in ('plot', 'image'):
+        raise ValueError(
+            f"Invalid 'ptype'={ptype}. Must be 'plot' for plots or 'image' for images."
+        )
     height, width = map(
         lambda x: int(size * x + 1) if x > 1 else size,
         (nrows, ncols),
@@ -88,8 +97,8 @@ def _config_subplots(
     fig.dpi = dpi
     fig.tight_layout()
     fig.subplots_adjust(
-        wspace=PLOTPARAMS['spacing'] / size,
-        hspace=PLOTPARAMS['spacing'] / size,
+        wspace=PLOTPARAMS[f'wspacing_{ptype}'] / size,
+        hspace=PLOTPARAMS[f'hspacing_{ptype}'] / size,
     )
     return fig, axs
 
@@ -187,7 +196,7 @@ def map4plot(
 ) -> dict[str, Any]:
     """
     Configures a dictionary with the specified info for plotting.
-    This method can be used to generate a map to give as input to `plot`.
+    This method can be used to generate a map to give as input to `darksun.plot()`.
 
     For parameters like `labels`, `style`, and `color`, it is possible to provide a single value to
     apply to all data series or a sequence of values to style each series individually.
@@ -211,14 +220,14 @@ def map4plot(
             for each array. If a single array is provided, it's used for all data series. A
             sequence of arrays can be used to specify x-values for each data series.
         style (str | Sequence[str] | None, optional (default=`None`)):
-            The plotting style ('plot', 'scatter', 'bar'). A single string applies the same
+            The plotting style ('plot', 'scatter', 'stairs'). A single string applies the same
             style to all series. A sequence of strings applies a different style to each.
             If `None`, the style is initialised to 'plot' for all array entries.
         color (str | tuple[str, str] | Sequence[str | tuple[str, str]] | None, optional (default=`None`)):
             The color for the data series. A single color string (e.g., 'blue') applies to
             all series. A sequence of color strings styles each series individually.
             For 'scatter' plots, it is possible to insert a tuple to specify the facecolor
-            and the edgecolor of the points (e.g., ('blue', 'red')).
+            and the edgecolor of the points (e.g., ('SkyBlue', 'DodgerBlue')).
         xlim (tuple[Any, Any], optional (default=`tuple(None, None)`)):
             A tuple `(min, max)` setting the limits for the x-axis.
             This setting applies to the entire plot.
@@ -316,9 +325,9 @@ def plot(
     **kwargs: Any,
 ) -> None:
     """
-    Displays a figure with two subplots by taking the info stored
-    in the two dictionaries in input. The two maps must have the
-    structure described in `map4plot()`.
+    Displays a figure with the specified subplots by taking the info stored in the
+    dictionaries in input. The maps must have the structure described in `map4plot()`.
+    Each subplot displays a plot with the sequences in the respective dmap.
 
     Args:
         dmaps (dict[str, Any] | Sequence[dict[str, Any]]):
@@ -333,7 +342,7 @@ def plot(
             Additional arguments passed to plot func (e.g., `plt.plot()`).
     
     Raises:
-        ValueError: If plot style different from 'plot', 'scatter' or 'bar'.
+        ValueError: If plot style different from 'plot', 'scatter' or 'stairs'.
     
     Example:
         >>> # build maps from `map4plot()`
@@ -344,23 +353,19 @@ def plot(
         ...     ...,
         ... )
         >>> # plot maps
-        >>> plot(dmap1)
-        >>> plot(dmaps=(dmap1, dmap2), ncols=2)
+        >>> plot(dmap1)                           # single plot
+        >>> plot(dmaps=(dmap1, dmap2), ncols=2)   # double plot on two cols
+        >>> plot(dmaps=(dmap1, dmap2), nrows=2)   # double plot on two rows
+        >>> plot(dmaps=(...), ncols=2, nrows=2)   # plots on two cols and rows
     """
-    def setup(obj: object, dtype: Any) -> Any:
-        return (
-            (obj,) if isinstance(obj, dtype) else obj
-        )
-    
     fig, axs = _config_subplots(nrows, ncols)
-    dmaps_ = setup(dmaps, dict)
-    axs_ = setup(axs, Axes)
-
-    if (len(dmaps_) < np.prod((nrows, ncols))):
-        raise ValueError(
-            "Invalid 'ncols' or 'nrows' values for input dmaps sequence."
-        )
-    elif (len(dmaps_) > np.prod((nrows, ncols))):
+    dmaps_ = (dmaps,) if isinstance(dmaps, dict) else dmaps
+    axs_ = (
+        (axs,) if isinstance(axs, Axes)
+        else axs.flatten() if (isinstance(axs, np.ndarray) and np.ndim(axs) > 1)
+        else axs
+    )
+    if (len(dmaps_) > np.prod((nrows, ncols))):
         warnings.warn(
             "To display all the input dmaps, select adequate values of 'ncols' or 'nrows'."
         )
@@ -385,11 +390,14 @@ def plot(
                         alpha=PLOTPARAMS['alpha'], linewidths=PLOTPARAMS['scatter_lw'],
                         label=dmap['labels'][idx], **kwargs,
                     )
-                case 'bar':
-                    raise NotImplementedError
+                case 'stairs':
+                    ax.stairs(
+                        arr, edges=dmap['x'][idx], edgecolor=dmap['color'][idx],
+                        alpha=PLOTPARAMS['alpha'], label=dmap['labels'][idx], **kwargs,
+                    )
                 case _:
                     raise ValueError(
-                        f"Invalid plot style '{dmap['style'][idx]}'. Must be 'plot', 'scatter' or 'bar'."
+                        f"Invalid plot style '{dmap['style'][idx]}'. Must be 'plot', 'scatter' or 'stairs'."
                     )
             
         if dmap['tags'] is not None:
@@ -466,7 +474,7 @@ def image_plot(
     cbarlabel: str = None,
     cbarloc: str = 'right',
     save_to: str | Path | None = None,
-    **img_kwargs: Any,
+    **kwargs: Any,
 ) -> None:
     """
     Displays a 2D array as an image.
@@ -479,12 +487,12 @@ def image_plot(
         cbarlabel (str, optional (default=`None`)): Label for the colorbar.
         cbarloc (str, optional (default=`'right'`)): Location of the colorbar.
         save_to (str | Path | None, optional (default=`None`)): Path to save the figure.
-        **img_kwargs (Any): Keyword arguments passed to `matplotlib.pyplot.imshow`.
+        **kwargs (Any): Keyword arguments passed to `matplotlib.pyplot.imshow`.
     """
     fig, ax = _config_subplots(1, 1, dpi=110)
     _config_labels(ax, xlabel, ylabel, title)
     _config_ticks(ax)
-    img = ax.imshow(arr, origin=PLOTPARAMS['cbar_origin'], **img_kwargs)
+    img = ax.imshow(arr, origin=PLOTPARAMS['cbar_origin'], **kwargs)
     cbar = fig.colorbar(
         img, ax=ax, location=cbarloc, shrink=PLOTPARAMS['cbar_shrink'], pad=PLOTPARAMS['cbar_pad'],
     )
@@ -585,9 +593,8 @@ def slices_plot(
         ylim=ylim_yslice or (None, None),
     )
     plot(
-        nrows=1,
-        ncols=2,
         dmaps=(dmapx, dmapy),
+        ncols=2,
         save_to=save_to,
         **kwargs,
     )
