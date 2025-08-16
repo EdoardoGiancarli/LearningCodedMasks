@@ -17,10 +17,10 @@ import matplotlib.pyplot as plt
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.optim import model_sky
 
-from .types import Tag
-from .data import Log
-from .images import crop
-from .images import upscale
+from darksun.types import Tag
+from darksun.data import Log
+from darksun.images import crop
+from darksun.images import upscale
 
 __all__ = []
 
