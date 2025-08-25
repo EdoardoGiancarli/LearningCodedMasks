@@ -188,7 +188,7 @@ def model_shadowgram(
         return mask_maybe_vignetted_maybe_psfy
     
     # apply instrument effects and shift mask pattern
-    mask_p = process_mask(shift_x, shift_y)
+    mask_p = process_mask(shift_x, shift_y).astype(float)
     r, c = _shifts_interp(camera, shift_y, shift_x)
     sg = fshift(mask_p, r, c)
 
