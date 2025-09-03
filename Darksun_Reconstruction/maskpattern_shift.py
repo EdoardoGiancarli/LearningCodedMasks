@@ -71,10 +71,11 @@ def _apply_decimal_correction(
     """
     def source_decimal_correction(arr: NDArray, dec: float) -> NDArray:
         """Applies source-binning structure disalignment correction."""
-        raise NotImplementedError
-        edges = (arr - _shift(arr, (0, int(np.sign(dec))))) > 0 # PROBLEM: since mask is not INT, there are residual positive values
-        arr[edges] *= dec # meh, what if arr is modified? TO CHECK
-        return arr
+        # raise NotImplementedError
+        # PROBLEM: since mask is not INT, there are residual positive values
+        arr_ = np.ceil(arr).astype(int)
+        edges = (arr_ - _shift(arr_, (0, int(np.sign(dec))))) > 0
+        return arr * (arr_ - abs(dec) * edges)
     
     sgy = source_decimal_correction(mask.T, decimal_i)
     sgx = source_decimal_correction(mask, decimal_j)
@@ -101,26 +102,6 @@ def shift_mask(
 
     Returns:
         output (NDArray): Shifted 2D mask array casted to float.
-    
-    Examples:
-        >>> mask = np.ones((2, 2))
-        >>> # INT shifts
-        >>> shift_mask(mask, 1, 0)       # Shift down by 1
-        ... array([[0., 0.],
-                   [1., 1.]])
-        >>> shift_mask(mask, 0, -1)      # Shift left by 1
-        ... array([[1., 0.],
-                   [1., 0.]])
-        >>> # FLOAT shifts
-        >>> shift_mask(mask, 1.1, 0)     # Shift up by 1.1
-        ... array([[0.9, 0.9],
-                   [0.,  0. ]])
-        >>> shift_mask(mask, 0, 1.1)     # Shift right by 1.1
-        ... array([[0., 0.9],
-                   [0., 0.9]])
-        >>> shift_mask(mask, 1.3, -1.2)  # Shift (down, left) by (1.3, 1.2)
-        ... array([[0.  , 0.],
-                   [0.56, 0.]])
 
     ## Notes:
         - If `shifty` or `shiftx` are larger than input `mask.shape`, a
@@ -192,8 +173,8 @@ def model_shadowgram(
     
     # apply instrument effects and shift mask pattern
     mask_p = process_mask(shift_x, shift_y).astype(float)
-    r, c = _shifts_interp(camera, shift_y, shift_x)
-    sg = shift_mask(mask_p, r, c)
+    fr, fc = _shifts_interp(camera, shift_y, shift_x)
+    sg = shift_mask(mask_p, fr, fc)
 
     # extract normalised detector image
     i_min, i_max, j_min, j_max = _detector_footprint(camera)
