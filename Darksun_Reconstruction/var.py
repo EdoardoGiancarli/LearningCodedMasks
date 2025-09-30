@@ -59,6 +59,9 @@ def solid_angle(
     Returns:
         output (float | NDArray):
             Solid angle on the plate seen by the observer.
+    
+    Raises:
+        ValueError: If input coords (x, y) not in the range [0, width / 2] x [0, height / 2].
 
     ## Notes
         - CFR with:
