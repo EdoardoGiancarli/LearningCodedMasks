@@ -138,7 +138,76 @@ def iros_singleCAM(
         yield (source, skymap)
 
 
-def camera_sensitivity(camera: CodedMaskCamera) -> tuple[float, float]:
+def camera_angular_resolution(camera: CodedMaskCamera) -> tuple[float, float]:
+    """
+    Computes the camera angular resolution along the axes, in [arcmin].
+
+    Args:
+        camera (CodedMaskCamera):
+            Instance with info on the camera system geometry.
+    
+    Returns:
+        output (tuple[float, float]):
+            Camera angular resolution along the (x, y) axes in [arcmin].
+    
+    ## Notes:
+        * From: Skinner, G.K., 2008. Sensitivity of coded mask telescopes.
+          Applied optics, 47(15), pp.2739-2749.
+    """
+    def angular_resolution(m: float, d: float, p: float) -> float:
+        """
+        Computes the camera angular resolution along the axis, in [arcmin].
+
+        Args:
+            m (float): Mask element pitch.
+            d (float): Detector element resolution pitch.
+            p (float): Mask - Detector distance.
+        """
+        dtheta = np.sqrt(np.square(m / p) + np.square(d / p))  # [rad]
+        dtheta_arcmin = np.rad2deg(dtheta) * 60
+        return dtheta_arcmin
+    
+    p = camera.specs['mask_detector_distance']
+    mx, my = (
+        camera.specs[''],
+        camera.specs[''],
+    )
+    dx, dy = (
+        camera.specs[''],
+        camera.specs[''],
+    )
+    return (
+        angular_resolution(mx, dx, p),
+        angular_resolution(my, dy, p),
+    )
+
+
+def camera_skycoords_errors(camera: CodedMaskCamera) -> tuple[float, float]:
+    """
+    Computes the camera local-frame coords errors along the
+    axes taking into account the chosen camera upscaling.
+
+    Args:
+        camera (CodedMaskCamera):
+            Instance with info on the camera system geometry.
+    
+    Returns:
+        output (tuple[float, float]):
+            Camera local-frame cartesian coords errors along
+            the (x, y) axes in [mm].
+    """
+    def arcmin2deg(angle: float) -> float:
+        """Converts angle from [arcmin] to [deg]."""
+        return angle / 60
+    
+    UPX, UPY = camera.upscale_f
+    ang_res_x, ang_res_y = camera_angular_resolution(camera)
+    dsx = abs(angle2shift(camera, arcmin2deg(ang_res_x))) / UPX  # [mm]
+    dsy = abs(angle2shift(camera, arcmin2deg(ang_res_y))) / UPY  # [mm]
+    return dsx, dsy
+
+
+def shifts_errors(camera: CodedMaskCamera) -> tuple[float, float]:
     """
     Computes the camera local-frame coords sensitivity along the axes.
 
@@ -223,7 +292,7 @@ def run_IROS(
     cam_log = create_log(params, IDcam)
 
     # get camera local-frame coords sensitivity along the axes
-    DSX, DSY = camera_sensitivity(camera)
+    DSX, DSY = shifts_errors(camera)
     
     # define significance threshold for detector smoothing
     SMOOTHING_THRESH = 25.0
