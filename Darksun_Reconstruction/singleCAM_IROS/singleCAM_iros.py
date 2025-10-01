@@ -45,19 +45,7 @@ def iros_singleCAM(
     5. Repeats until no significant sources remain or max iterations reached
 
     Args:
-        TODO: update here!
-        camera (CodedMaskCamera):
-            Instance containing mask/detector geometry and parameters.
-        max_iterations (int):
-            Maximum number of source removal iterations to perform.
-        snr_threshold (float, optional (default=`0.0`)):
-            Minimum candidates significance value. The procedure stops if no
-            significant candidates are found.
-        vignetting (bool, optional (default=`True`)):
-            If `True`, the model used for optimization will simulate vignetting.
-        psfy (bool, optional (default=`True`)):
-            If `True`, the model used for optimization will simulate detector
-            position reconstruction effects.
+        ...
 
     Yields:
         TODO: update here!
@@ -79,7 +67,7 @@ def iros_singleCAM(
         - Optimizes source parameters in local windows around candidates
         - When using reconstructed data, accounts for vignetting and PSF effects
 
-    Example:
+    Example: TODO: update here!
     >>> for sources, residuals in iros(camera, sdl_cam1a, sdl_cam1b, max_iterations=2):
     >>>     source_1a, source_1b = sources
     >>>     residual_1a, residual_1b = residuals
@@ -159,9 +147,9 @@ def camera_angular_resolution(camera: CodedMaskCamera) -> tuple[float, float]:
         Computes the camera angular resolution along the axis, in [arcmin].
 
         Args:
-            m (float): Mask element pitch.
-            d (float): Detector element resolution pitch.
-            p (float): Mask - Detector distance.
+            m_pitch (float): Mask element pitch.
+            d_pitch (float): Detector element resolution pitch.
+            dist (float): Mask - Detector distance.
         """
         dtheta_rad = np.sqrt(
             np.square(m_pitch / dist) + np.square(d_pitch / dist)
@@ -175,8 +163,8 @@ def camera_angular_resolution(camera: CodedMaskCamera) -> tuple[float, float]:
         camera.specs['slit_deltay'],
     )
     dx, dy = (
-        camera.specs[''],
-        camera.specs[''],
+        camera.specs['...'],
+        camera.specs['...'],
     )
     return (
         angular_resolution(mx, dx, p),
