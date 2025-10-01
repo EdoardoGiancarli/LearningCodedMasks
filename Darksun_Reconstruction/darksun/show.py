@@ -561,6 +561,7 @@ def map4image(
     ylabel: str | None = None,
     cbarlabel: str = None,
     cbarloc: str = 'right',
+    tags: Tag | Sequence[Tag] | None = None,
     img_kwargs: dict[str, Any],
 ) -> dict[str, Any]:
     """
@@ -581,6 +582,9 @@ def map4image(
             Label for the colorbar.
         cbarloc (str, optional (default=`'right'`)):
             Location of the colorbar.
+        tags (Tag | Sequence[Tag] | None, optional (default=`None`)):
+            Single `Tag` or sequence of `Tag`s objects (e.g., to
+            mark the position of the sources, with respective ID).
         img_kwargs (dict[str, Any]):
             Keyword arguments passed to `matplotlib.pyplot.imshow`.
     """
@@ -592,6 +596,7 @@ def map4image(
         'cbarlabel': cbarlabel,
         'cbarloc': cbarloc,
         'img_kwargs': img_kwargs,
+        'tags': (tags,) if isinstance(tags, Tag) else tags,
     }
     return dmap
 
@@ -651,10 +656,21 @@ def image_plot(
         )
         cbar.ax.tick_params(labelsize=PLOTPARAMS['cbar_ticks_ls'])
         cbar.formatter.set_powerlimits(PLOTPARAMS['cbar_scilim'])
-        if dmap['cbarlabel']: cbar.set_label(
-            dmap['cbarlabel'], fontsize=PLOTPARAMS['cbar_label_fs'], fontweight=PLOTPARAMS['cbar_label_fw'],
-        )
-
+        if dmap['cbarlabel']:
+            cbar.set_label(
+                dmap['cbarlabel'], fontsize=PLOTPARAMS['cbar_label_fs'], fontweight=PLOTPARAMS['cbar_label_fw'],
+            )
+        if dmap['tags'] is not None:
+            for (name, y, x) in dmap['tags']:
+                ax.scatter(
+                    x, y, s=12, facecolors='None', edgecolors='white',
+                    linewidths=1.0, alpha=0.9,
+                )
+                ax.text(
+                    x + 125, y, name, color='white', rotation=45,
+                    fontsize=PLOTPARAMS['txt_body_fs'], fontweight=PLOTPARAMS['txt_fw'],
+                )
+        
     if save_to is not None: fig.savefig(save_to)
     plt.show()
 
@@ -820,7 +836,9 @@ def reconstruction_plot(
             source=source,
             labels=('True', 'IROS'),
             cameraID=log.name,
-            save_to=savepath(f'{source.upper()}_profile'),
+            save_to=(
+                savepath(f'{source.upper()}_profile') if savepath is not None else None
+            ),
         )
         slices_plot(
             sky=true_sky_ - modeled,
@@ -829,7 +847,9 @@ def reconstruction_plot(
             source=source,
             ylabel='residues [ph]',
             cameraID=log.name,
-            save_to=savepath(f'{source.upper()}_profile_res'),
+            save_to=(
+                savepath(f'{source.upper()}_profile_res') if savepath is not None else None
+            ),
         )
 
         # plot IROS vs True residues heatmaps
@@ -853,7 +873,9 @@ def reconstruction_plot(
                     'extent': (-CUT[1] * F_UPX, CUT[1] * F_UPX, -CUT[0] * F_UPY, CUT[0] * F_UPY),
                 },
             ),
-            save_to=savepath(f'{source.upper()}_res_HM'),
+            save_to=(
+                savepath(f'{source.upper()}_res_HM') if savepath is not None else None
+            ),
         )
 
         # remove source from True sky
