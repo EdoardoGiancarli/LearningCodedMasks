@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Literal
 import warnings
 
 import numpy as np
@@ -10,7 +10,12 @@ from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import count
 from bloodmoon.mask import decode
 # from bloodmoon.mask import variance
-from bloodmoon.optim import optimize
+# from bloodmoon.optim import optimize
+
+from scipy.optimize import minimize
+from bloodmoon.optim import _ModelShiftFluence, _ModelShiftFluenceUncached, _Loss
+from bloodmoon.mask import interpmax
+
 from bloodmoon.optim import model_shadowgram
 from bloodmoon.optim import model_sky
 
@@ -21,6 +26,91 @@ from darksun.data import DataLoader
 from darksun.optim import bkg_smoothing
 
 from var import sky_variance as variance
+
+
+def optimize(
+    camera: CodedMaskCamera,
+    sky: NDArray,
+    arg_sky: tuple[int, int],
+    vignetting: bool = True,
+    psfy: bool = True,
+    model: Literal["fast", "accurate"] = "fast",
+) -> tuple[float, float, float]:
+    """
+    Performs the optimization to fit a point source model to sky image data.
+
+    This function performs the optimization by simultaneously fit the candidate
+    position and fluence. The starting position is inferred by interpolating the
+    candidate shifts in an upscaled grid (9, 9), while the starting fluence is
+    represented by the counts at the candidate extracted pixel indexes.
+    The model is cached to balance speed and accuracy.
+
+    Args:
+        camera: CodedMaskCamera instance containing detector and mask parameters
+        sky: 2D array of the reconstructed sky image to fit
+        arg_sky: Initial guess for source position as (row, col) indices
+        vignetting: If true, the model used for optimization will simulate vignetting.
+        psfy: If true, the model used for optimization will simulate detector position
+        reconstruction effects.
+
+    Returns:
+        Tuple containing the best-fit parameters `(x, y, fluence)` where:
+                - x, y are the optimized sky-shift coordinates
+                - fluence is the optimized source intensity
+
+    Notes:
+        - Initial position is refined using interpolation
+        - Bounds are set based on initial guess and physical constraints
+    """
+    # - initialize the function to fluence and position dependent shadowgram model.
+    # - it leverages caches to reduce the number of cross-correlation computations,
+    #   and it is our responsibility to free memory after we will be done.
+    if model == "fast":
+        model_shift_flux, model_shift_flux_clear = _ModelShiftFluence(camera, vignetting, psfy)
+    elif model == "accurate":
+        model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
+    else:
+        raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
+    
+    sx_start, sy_start = interpmax(camera, arg_sky, sky)
+    fluence_start = sky[*arg_sky]
+    print(
+        f"\nFLUENCE START: {fluence_start}\n"
+        f"SHIFTS START: {sx_start, sy_start}\n"
+        f"{arg_sky=}, fluence arg_sky: {sky[*arg_sky]}\n"
+    )
+    loss = _Loss(model_shift_flux)
+    results = minimize(
+        lambda args: loss((args[0], args[1], args[2]), sky, arg_sky, camera),
+        x0=np.array((sx_start, sy_start, fluence_start)),
+        method="Nelder-Mead",
+        bounds=[
+            (
+                max(sx_start - camera.mdl["slit_deltax"], camera.bins_sky.x[0]),
+                min(sx_start + camera.mdl["slit_deltax"], camera.bins_sky.x[-1]),
+            ),
+            (
+                max(sy_start - camera.mdl["slit_deltay"], camera.bins_sky.y[0]),
+                min(sy_start + camera.mdl["slit_deltay"], camera.bins_sky.y[-1]),
+            ),
+            (0.9 * fluence_start, 1.1 * fluence_start),
+        ],
+        options={
+            "xatol": 1e-6,
+        },
+    )
+    # store the final optimized positions and fluence.
+    sx, sy, fluence = map(float, results.x[:3])
+    print(
+        f"FINAL OPTIMIZED FLUENCE: {fluence}\n"
+        f"FLUENCE GAIN: {(fluence - fluence_start) * 100 / fluence_start:.3f}%\n"
+        f"FINAL OPTIMIZED SHIFTS: {sx, sy}\n"
+        f"SHIFTX GAIN: {(sx - sx_start) * 100 / sx_start:.3f}%\n"
+        f"SHIFTY GAIN: {(sy - sy_start) * 100 / sy_start:.3f}%\n"
+    )
+    # releases model cache memory.
+    model_shift_flux_clear()
+    return sx, sy, fluence
 
 
 def iros_singleCAM(
@@ -52,7 +142,7 @@ def iros_singleCAM(
         output (tuple):
             - aaa (bbb):
                 Candidate local-frame sky-shift coords, fluence and significance.
-            - aaa (bbb):
+            - residual (NDArray):
                 Coded-camera residual sky after removing the current candidate.
 
     Raises:
@@ -314,16 +404,16 @@ def run_IROS(
 
     # performing IROS to remove the brightest sources (SNR > SMOOTHING_THRESH)
     print("# Running first loop...")
-    first_loop = iros_singleCAM(
-        skymap=skymap,
-        varmap=varmap,
-        camera=camera,
-        max_iterations=max_iterations,
-        snr_threshold=SMOOTHING_THRESH,
-        vignetting=vignetting,
-        psfy=psfy,
-    )
-    candidates = tuple(c for c, _ in tqdm(first_loop))
+#####    first_loop = iros_singleCAM(
+#####        skymap=skymap,
+#####        varmap=varmap,
+#####        camera=camera,
+#####        max_iterations=max_iterations,
+#####        snr_threshold=SMOOTHING_THRESH,
+#####        vignetting=vignetting,
+#####        psfy=psfy,
+#####    )
+#####    candidates = tuple(c for c, _ in tqdm(first_loop))
     
     # perform detector smoothing and run again IROS on the processed data;
     # to do that, we first remove the stored sources from the original
@@ -334,31 +424,31 @@ def run_IROS(
         df = np.sqrt(f)
         return sx, DSX, sy, DSY, f, df, signf
     
-    def retrieve_detector(candidates: tuple[tuple[float]]) -> NDArray:
-        """Generates detector image from retrieved candidates."""
-        img = np.zeros(camera.shape_detector)
-        for (sx, sy, f, _) in candidates:
-            shadowgram = model_shadowgram(
-                camera=camera,
-                shift_x=sx,
-                shift_y=sy,
-                vignetting=vignetting,
-                psfy=psfy,
-            )
-            img += (f * shadowgram)
-        return img
-
-    smoothed_res_detector = bkg_smoothing(
-        detector=detector - retrieve_detector(candidates),
-        camera=camera,
-    )
-    smoothed_skymap = decode(
-        camera,
-        np.clip(detector - smoothed_res_detector, a_min=0.0, a_max=detector.sum()),
-    )
-    print("# Initializing second loop with smoothed detector...")
+#####    def retrieve_detector(candidates: tuple[tuple[float]]) -> NDArray:
+#####        """Generates detector image from retrieved candidates."""
+#####        img = np.zeros(camera.shape_detector)
+#####        for (sx, sy, f, _) in candidates:
+#####            shadowgram = model_shadowgram(
+#####                camera=camera,
+#####                shift_x=sx,
+#####                shift_y=sy,
+#####                vignetting=vignetting,
+#####                psfy=psfy,
+#####            )
+#####            img += (f * shadowgram)
+#####        return img
+#####
+#####    smoothed_res_detector = bkg_smoothing(
+#####        detector=detector - retrieve_detector(candidates),
+#####        camera=camera,
+#####    )
+#####    smoothed_skymap = decode(
+#####        camera,
+#####        np.clip(detector - smoothed_res_detector, a_min=0.0, a_max=detector.sum()),
+#####    )
+#####    print("# Initializing second loop with smoothed detector...")
     second_loop = iros_singleCAM(
-        skymap=smoothed_skymap,
+        skymap=skymap,
         varmap=varmap,
         camera=camera,
         max_iterations=max_iterations,

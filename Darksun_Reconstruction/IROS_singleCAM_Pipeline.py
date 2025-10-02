@@ -71,7 +71,7 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_testing_smoothing_skyvarlogic_clipdet"
+ANALYSIS_ID: str = "singleCAM_iros_testing_optimizerNoPeak"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 25
