@@ -203,6 +203,9 @@ def iros_singleCAM(
         return (shiftx, shifty, fluence, significance), residual
     
     for i in range(max_iterations):
+        ## account for low-counts level and non-Poisson distr. (assuming Poisson if > 25 counts / px)
+        #skymap_ = skymap[(varmap > 25)]
+
         snrmap = skymap / np.sqrt(varmap)
         candidate = find_candidate(skymap, snrmap)
         if not candidate:
