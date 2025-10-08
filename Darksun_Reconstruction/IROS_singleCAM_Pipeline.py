@@ -52,7 +52,7 @@ PIPELINE SET-UP.
 #### --- WIDE FIELD MONITOR MASK
 #MASK_FITS: str = "wfm_mask_summer2021.fits"
 MASK_FITS: str = "wfm_mask_NTHT_20250725.fits"
-THIN_MASK: bool = False                           # selects if infinitely opaque and thin mask (removes vignetting effects)
+THIN_MASK: bool = True                           # selects if infinitely opaque and thin mask (removes vignetting effects)
 
 #### --- OBSERVATION DATA
 SKYFIELD: str = "GalacticCentre"                                             # skyfield selection
@@ -64,24 +64,24 @@ ID_CAMERA_B: str = "cam1b"
 DATASET: str = "detected"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 10                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 10                 # final upscaling for skies and visualisation
+UPSX_FINAL: int = 5                 # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_testing_optimizerNoPeak_2-10keV_upx10"
+ANALYSIS_ID: str = "singleCAM_iros_testing_optimizerNoPeak_vignettingOFF"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 3
+MAX_ITERATIONS: int = 4
 SNR_THRESHOLD: int | float = 5
 
 WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
 
 #### --- DATA FILTERS SETUP
 # photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = (2, 10)
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = None
 # RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 
