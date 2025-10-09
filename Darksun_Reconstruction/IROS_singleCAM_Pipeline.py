@@ -50,14 +50,12 @@ from bloodmoon.types import CoordEquatorial
 PIPELINE SET-UP.
 """
 #### --- WIDE FIELD MONITOR MASK
-#MASK_FITS: str = "wfm_mask_summer2021.fits"
 MASK_FITS: str = "wfm_mask_NTHT_20250725.fits"
-THIN_MASK: bool = True                           # selects if infinitely opaque and thin mask (removes vignetting effects)
+THIN_MASK: bool = False                           # selects if infinitely opaque and thin mask (removes vignetting effects)
 
 #### --- OBSERVATION DATA
-SKYFIELD: str = "GalacticCentre"                                             # skyfield selection
-#DATA_FITS: str = "galctr_rxte-sax_mask_summer2021_infdet_2-50keV_1ks"       # directory with FITS files from WFM
-DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_infdet_2-50keV_1ks"
+SKYFIELD: str = "GalacticCentre"                                                      # skyfield selection
+DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_opaquemask_infdet_2-50keV_1ks"     # directory with FITS files from WFM
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
@@ -71,10 +69,10 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_testing_optimizerNoPeak_vignettingOFF"
+ANALYSIS_ID: str = "singleCAM_iros_testing_optimizerNoPeak"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 4
+MAX_ITERATIONS: int = 2
 SNR_THRESHOLD: int | float = 5
 
 WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
