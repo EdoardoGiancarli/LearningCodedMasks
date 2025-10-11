@@ -243,6 +243,7 @@ def apply_vignetting(
 
     angle_x_rad = (-1) * np.arctan(shift_x / camera.mdl["mask_detector_distance"])
     red_factorx = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
+    # TODO: fix this comment (depends on what shift is considered, from source or on the detector)
     # since the mask detector distance is defined as the distance between the
     # detector top and the mask top, erosion shall cut on the left-side of the
     # shadowgram when sources have negative `angle_x_rad`.
@@ -318,15 +319,16 @@ def model_shadowgram(
     Generates a normalized shadowgram for a point source
     with fractional shift of the mask pattern.
     """    
-    # apply instrument effects and shift mask pattern
+    # instrumental effects and shift mask pattern
+    # - apply vignetting to mask pattern array
     mask_vignetted = (
         apply_vignetting(camera, camera.mask, shift_x, shift_y)
         if vignetting else camera.mask.astype(float)
     )
-
+    # - shift mask array to match source direction
     fr, fc = _shifts_interp(camera, shift_y, shift_x)
     mask_shifted = fshift(mask_vignetted, fr, fc)
-
+    # - apply detector spatial resolution
     sg = (
         apply_detector_resolution(camera, mask_shifted)
         if psfy else mask_shifted
