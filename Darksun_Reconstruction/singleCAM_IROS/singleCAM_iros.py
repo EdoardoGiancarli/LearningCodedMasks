@@ -6,6 +6,7 @@ from numpy.typing import NDArray
 from tqdm import tqdm
 
 from bloodmoon.coords import angle2shift
+from bloodmoon.coords import shift2pos
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import count
 from bloodmoon.mask import decode
@@ -13,6 +14,7 @@ from bloodmoon.mask import decode
 # from bloodmoon.optim import optimize
 
 from scipy.optimize import minimize
+from scipy.ndimage import center_of_mass
 from bloodmoon.optim import _ModelShiftFluence, _ModelShiftFluenceUncached, _Loss
 from bloodmoon.mask import interpmax
 
@@ -72,8 +74,24 @@ def optimize(
     else:
         raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
     
-    sx_start, sy_start = interpmax(camera, arg_sky, sky)
-    fluence_start = sky[*arg_sky]
+    #sx_start, sy_start = interpmax(camera, arg_sky, sky)
+    
+    i, j = arg_sky
+    yslit, xslit = (
+        int(camera.specs['slit_deltay'] * camera.upscale_f.y / camera.specs['mask_deltay'] + 5),
+        int(camera.specs['slit_deltax'] * camera.upscale_f.x / camera.specs['mask_deltax'] + 5),
+    )
+    labels = np.zeros(camera.shape_sky)
+    labels[i - yslit : i + yslit + 1 , j - xslit : j + xslit + 1] = 1
+    i_cm, j_cm = center_of_mass(sky, labels=labels, index=1)
+    sx0, sy0 = camera.bins_sky.x[0], camera.bins_sky.y[0]
+    ypxdim, xpxdim = (
+        camera.specs['mask_deltay'] / camera.upscale_f.y,
+        camera.specs['mask_deltax'] / camera.upscale_f.x,
+    )
+    sx_start, sy_start = sx0 + xpxdim * j_cm, sy0 + ypxdim * i_cm
+    
+    fluence_start = sky[*shift2pos(camera, sx_start, sy_start)]
     print(
         f"\nFLUENCE START: {fluence_start}\n"
         f"SHIFTS START: {sx_start, sy_start}\n"
@@ -86,12 +104,12 @@ def optimize(
         method="Nelder-Mead",
         bounds=[
             (
-                max(sx_start - camera.mdl["slit_deltax"], camera.bins_sky.x[0]),
-                min(sx_start + camera.mdl["slit_deltax"], camera.bins_sky.x[-1]),
+                max(sx_start - 5 * xpxdim, camera.bins_sky.x[0]),
+                min(sx_start + 5 * xpxdim, camera.bins_sky.x[-1]),
             ),
             (
-                max(sy_start - camera.mdl["slit_deltay"], camera.bins_sky.y[0]),
-                min(sy_start + camera.mdl["slit_deltay"], camera.bins_sky.y[-1]),
+                max(sy_start - 5 * ypxdim, camera.bins_sky.y[0]),
+                min(sy_start + 5 * ypxdim, camera.bins_sky.y[-1]),
             ),
             (0.9 * fluence_start, 1.1 * fluence_start),
         ],
