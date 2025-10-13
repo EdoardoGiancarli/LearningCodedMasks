@@ -270,42 +270,43 @@ def apply_detector_resolution(
     )
 
 
-def _shifts_interp(
-    camera: CodedMaskCamera,
-    shift_y: float,
-    shift_x: float,
-) -> tuple[float, float]:
-    """
-    # NOTE: be careful with sky-shifts sign and array shifting verse
-    """
-    # convert sky-shifts coords [mm] to px indexes
-    # NOTE: px indexes are centered to conserve binning structure
-    n, m = camera.shape_sky
-    i, j = shift2pos(camera, shift_x, shift_y)
-    r, c = (n - 1) // 2 - i, (m - 1) // 2 - j
-
-    # compute pixel indexes decimal parts
-    def fpixel(
-        coord: float,
-        bin_coord: float,
-        px_size: float,
-    ) -> float:
-        """Returns the pixel decimal part for the input sky-shift."""
-        # handle on-axis source case
-        if float(coord) == 0.0:
-            return 0.0
-        return (coord - bin_coord) / px_size
-    
-    binsx, binsy = pos2shift(camera, i, j)
-    pxdimx, pxdimy = (
-        camera.specs['mask_deltax'] / camera.upscale_f.x,
-        camera.specs['mask_deltay'] / camera.upscale_f.y,
-    )
-    fr, fc = (
-        r + fpixel(shift_y, binsy, pxdimy),
-        c + fpixel(shift_x, binsx, pxdimx),
-    )
-    return fr, fc
+#def _shifts_interp(
+#    camera: CodedMaskCamera,
+#    shift_y: float,
+#    shift_x: float,
+#) -> tuple[float, float]:
+#    """
+#    # NOTE: be careful with sky-shifts sign and array shifting verse
+#    """
+#    # convert sky-shifts coords [mm] to px indexes
+#    # NOTE: px indexes are centered to conserve binning structure
+#    # TODO: technically, I can compute the fract px from the shifts as in optimize
+#    n, m = camera.shape_sky
+#    i, j = shift2pos(camera, shift_x, shift_y)
+#    r, c = (n - 1) // 2 - i, (m - 1) // 2 - j
+#
+#    # compute pixel indexes decimal parts
+#    def fpixel(
+#        coord: float,
+#        bin_coord: float,
+#        px_size: float,
+#    ) -> float:
+#        """Returns the pixel decimal part for the input sky-shift."""
+#        # handle on-axis source case
+#        if float(coord) == 0.0:
+#            return 0.0
+#        return (coord - bin_coord) / px_size
+#    
+#    binsx, binsy = pos2shift(camera, i, j)
+#    pxdimx, pxdimy = (
+#        camera.specs['mask_deltax'] / camera.upscale_f.x,
+#        camera.specs['mask_deltay'] / camera.upscale_f.y,
+#    )
+#    fr, fc = (
+#        r + fpixel(shift_y, binsy, pxdimy),
+#        c + fpixel(shift_x, binsx, pxdimx),
+#    )
+#    return fr, fc
 
 
 def model_shadowgram(
@@ -326,7 +327,15 @@ def model_shadowgram(
         if vignetting else camera.mask.astype(float)
     )
     # - shift mask array to match source direction
-    fr, fc = _shifts_interp(camera, shift_y, shift_x)
+    #fr, fc = _shifts_interp(camera, shift_y, shift_x)
+    pxdimy, pxdimx = (
+        camera.specs['mask_deltay'] / camera.upscale_f.y,
+        camera.specs['mask_deltax'] / camera.upscale_f.x,
+    )
+    fr, fc = (
+        (-1) * shift_y / pxdimy,
+        (-1) * shift_x / pxdimx,
+    )
     mask_shifted = fshift(mask_vignetted, fr, fc)
     # - apply detector spatial resolution
     sg = (

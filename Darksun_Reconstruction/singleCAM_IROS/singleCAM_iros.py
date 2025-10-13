@@ -1,4 +1,4 @@
-from typing import Iterable, Literal
+from typing import Callable, Iterable, Literal
 import warnings
 
 import numpy as np
@@ -15,11 +15,12 @@ from bloodmoon.mask import decode
 
 from scipy.optimize import minimize
 from scipy.ndimage import center_of_mass
-from bloodmoon.optim import _ModelShiftFluence, _ModelShiftFluenceUncached, _Loss
+#from bloodmoon.optim import _ModelShiftFluence, _ModelShiftFluenceUncached, _Loss
+from bloodmoon.optim import _Loss
 from bloodmoon.mask import interpmax
 
-from bloodmoon.optim import model_shadowgram
-from bloodmoon.optim import model_sky
+#from bloodmoon.optim import model_shadowgram
+#from bloodmoon.optim import model_sky
 
 from darksun.types import LogEntry
 from darksun.data import Log
@@ -28,6 +29,56 @@ from darksun.data import DataLoader
 from darksun.optim import bkg_smoothing
 
 from var import sky_variance as variance
+from fract_shift2 import model_shadowgram
+
+
+def model_sky(
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+    fluence: float,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> NDArray:
+    """
+    Generate a model of the reconstructed sky image for a point source.
+    """
+    decoded = decode(
+        camera=camera,
+        detector=model_shadowgram(
+            camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy,
+        ),
+    )
+    return decoded * fluence
+
+
+def _ModelShiftFluenceUncached(  # noqa
+    camera: CodedMaskCamera,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> tuple[Callable, Callable]:
+    """
+    A slow, vanilla implementation of the model for both direction and fluence optimization.
+    Intended for debugging and benchmarking.
+    """
+
+    def f(shift_x: float, shift_y: float, fluence: float) -> NDArray:
+        """
+        A simple, slow version of the model for both direction and fluence optimization.
+
+        Args:
+            shift_x: Source position x-coordinate in sky-shift space (mm)
+            shift_y: Source position y-coordinate in sky-shift space (mm)
+            fluence: Source intensity/fluence value
+
+        Returns:
+            2D array representing the modeled sky reconstruction
+        """
+        return model_sky(camera, shift_x, shift_y, fluence, vignetting=vignetting, psfy=psfy)
+
+    # there is no cache here, hence no need to clean anything.
+    # we return a lambda anyway for compatibility with the other models
+    return f, lambda: None
 
 
 def optimize(
@@ -36,7 +87,7 @@ def optimize(
     arg_sky: tuple[int, int],
     vignetting: bool = True,
     psfy: bool = True,
-    model: Literal["fast", "accurate"] = "fast",
+    #model: Literal["fast", "accurate"] = "fast",
 ) -> tuple[float, float, float]:
     """
     Performs the optimization to fit a point source model to sky image data.
@@ -67,12 +118,14 @@ def optimize(
     # - initialize the function to fluence and position dependent shadowgram model.
     # - it leverages caches to reduce the number of cross-correlation computations,
     #   and it is our responsibility to free memory after we will be done.
-    if model == "fast":
-        model_shift_flux, model_shift_flux_clear = _ModelShiftFluence(camera, vignetting, psfy)
-    elif model == "accurate":
-        model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
-    else:
-        raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
+    #if model == "fast":
+    #    model_shift_flux, model_shift_flux_clear = _ModelShiftFluence(camera, vignetting, psfy)
+    #elif model == "accurate":
+    #    model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
+    #else:
+    #    raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
+    
+    model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     
     #sx_start, sy_start = interpmax(camera, arg_sky, sky)
     
@@ -91,10 +144,11 @@ def optimize(
     )
     sx_start, sy_start = sx0 + xpxdim * j_cm, sy0 + ypxdim * i_cm
     
-    fluence_start = sky[*shift2pos(camera, sx_start, sy_start)]
+    #fluence_start = sky[*shift2pos(camera, sx_start, sy_start)]
+    fluence_start = sky[*arg_sky]
     print(
         f"\nFLUENCE START: {fluence_start}\n"
-        f"SHIFTS START: {sx_start, sy_start}\n"
+        f"SHIFTS START: {sx_start, sy_start}, pos: {i_cm, j_cm}\n"
         f"{arg_sky=}, fluence arg_sky: {sky[*arg_sky]}\n"
     )
     loss = _Loss(model_shift_flux)
