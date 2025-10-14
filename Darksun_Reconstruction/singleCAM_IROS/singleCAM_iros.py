@@ -127,28 +127,28 @@ def optimize(
     
     model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     
-    #sx_start, sy_start = interpmax(camera, arg_sky, sky)
+    sx_start, sy_start = interpmax(camera, arg_sky, sky)
     
-    i, j = arg_sky
-    yslit, xslit = (
-        int(camera.specs['slit_deltay'] * camera.upscale_f.y / camera.specs['mask_deltay'] + 5),
-        int(camera.specs['slit_deltax'] * camera.upscale_f.x / camera.specs['mask_deltax'] + 5),
-    )
-    labels = np.zeros(camera.shape_sky)
-    labels[i - yslit : i + yslit + 1 , j - xslit : j + xslit + 1] = 1
-    i_cm, j_cm = center_of_mass(sky, labels=labels, index=1)
-    sx0, sy0 = camera.bins_sky.x[0], camera.bins_sky.y[0]
+    #i, j = arg_sky
+    #yslit, xslit = (
+    #    int(camera.specs['slit_deltay'] * camera.upscale_f.y / camera.specs['mask_deltay'] + 5),
+    #    int(camera.specs['slit_deltax'] * camera.upscale_f.x / camera.specs['mask_deltax'] + 5),
+    #)
+    #labels = np.zeros(camera.shape_sky)
+    #labels[i - yslit : i + yslit + 1 , j - xslit : j + xslit + 1] = 1
+    #i_cm, j_cm = center_of_mass(sky, labels=labels, index=1)
+    #sx0, sy0 = camera.bins_sky.x[0], camera.bins_sky.y[0]
     ypxdim, xpxdim = (
         camera.specs['mask_deltay'] / camera.upscale_f.y,
         camera.specs['mask_deltax'] / camera.upscale_f.x,
     )
-    sx_start, sy_start = sx0 + xpxdim * j_cm, sy0 + ypxdim * i_cm
+    #sx_start, sy_start = sx0 + xpxdim * j_cm, sy0 + ypxdim * i_cm
     
     #fluence_start = sky[*shift2pos(camera, sx_start, sy_start)]
     fluence_start = sky[*arg_sky]
     print(
         f"\nFLUENCE START: {fluence_start}\n"
-        f"SHIFTS START: {sx_start, sy_start}, pos: {i_cm, j_cm}\n"
+        f"SHIFTS START: {sx_start, sy_start}\n" #, pos: {i_cm, j_cm}\n"
         f"{arg_sky=}, fluence arg_sky: {sky[*arg_sky]}\n"
     )
     loss = _Loss(model_shift_flux)

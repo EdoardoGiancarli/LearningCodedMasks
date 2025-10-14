@@ -9,7 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.ndimage import shift as ndshift
 
-from fract_shift2 import fshift
+from fract_shift2 import _shift, fshift
 
 
 def scipy_fshift(
@@ -103,6 +103,41 @@ class TestFractShift(TestCase):
         shifty, shiftx = -0.1, -0.4
         expected = scipy_fshift(arr, shifty, shiftx)
         shifted = fshift(arr, shifty, shiftx)
+        np.testing.assert_array_almost_equal(expected, shifted)
+    
+    def test_int_shift(self):
+        """
+        Test if `_shift()` has the same output of scipy's `shift()`.
+        """
+        arr = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0,],
+                [0, 0, 0, 0, 0, 0, 0,],
+                [0, 0, 1, 1, 1, 0, 0,],
+                [0, 0, 1, 1, 1, 0, 0,],
+                [0, 0, 0, 0, 0, 0, 0,],
+                [0, 0, 0, 0, 0, 0, 0,],
+            ],
+        )
+
+        shifty, shiftx = 1, 1
+        expected = scipy_fshift(arr, shifty, shiftx)
+        shifted = _shift(arr, shifty, shiftx)
+        np.testing.assert_array_almost_equal(expected, shifted)
+
+        shifty, shiftx = -1, 1
+        expected = scipy_fshift(arr, shifty, shiftx)
+        shifted = _shift(arr, shifty, shiftx)
+        np.testing.assert_array_almost_equal(expected, shifted)
+
+        shifty, shiftx = 1, -1
+        expected = scipy_fshift(arr, shifty, shiftx)
+        shifted = _shift(arr, shifty, shiftx)
+        np.testing.assert_array_almost_equal(expected, shifted)
+
+        shifty, shiftx = -1, -1
+        expected = scipy_fshift(arr, shifty, shiftx)
+        shifted = _shift(arr, shifty, shiftx)
         np.testing.assert_array_almost_equal(expected, shifted)
 
 

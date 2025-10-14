@@ -241,7 +241,7 @@ def apply_vignetting(
     """
     bins = camera.bins_detector
 
-    angle_x_rad = (-1) * np.arctan(shift_x / camera.mdl["mask_detector_distance"])
+    angle_x_rad = np.arctan(shift_x / camera.mdl["mask_detector_distance"])
     red_factorx = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
     # TODO: fix this comment (depends on what shift is considered, from source or on the detector)
     # since the mask detector distance is defined as the distance between the
@@ -252,7 +252,7 @@ def apply_vignetting(
     # right side, i.e. `red_factor` should be multiplied by -1.
     sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factorx)
 
-    angle_y_rad = (-1) * np.arctan(shift_y / camera.mdl["mask_detector_distance"])
+    angle_y_rad = np.arctan(shift_y / camera.mdl["mask_detector_distance"])
     red_factory = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
     sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factory)
     return sg1 * sg2.T
@@ -268,45 +268,6 @@ def apply_detector_resolution(
     return convolve(
         shadowgram, _wfm_psfy_kernel_cached(camera), mode="same",
     )
-
-
-#def _shifts_interp(
-#    camera: CodedMaskCamera,
-#    shift_y: float,
-#    shift_x: float,
-#) -> tuple[float, float]:
-#    """
-#    # NOTE: be careful with sky-shifts sign and array shifting verse
-#    """
-#    # convert sky-shifts coords [mm] to px indexes
-#    # NOTE: px indexes are centered to conserve binning structure
-#    # TODO: technically, I can compute the fract px from the shifts as in optimize
-#    n, m = camera.shape_sky
-#    i, j = shift2pos(camera, shift_x, shift_y)
-#    r, c = (n - 1) // 2 - i, (m - 1) // 2 - j
-#
-#    # compute pixel indexes decimal parts
-#    def fpixel(
-#        coord: float,
-#        bin_coord: float,
-#        px_size: float,
-#    ) -> float:
-#        """Returns the pixel decimal part for the input sky-shift."""
-#        # handle on-axis source case
-#        if float(coord) == 0.0:
-#            return 0.0
-#        return (coord - bin_coord) / px_size
-#    
-#    binsx, binsy = pos2shift(camera, i, j)
-#    pxdimx, pxdimy = (
-#        camera.specs['mask_deltax'] / camera.upscale_f.x,
-#        camera.specs['mask_deltay'] / camera.upscale_f.y,
-#    )
-#    fr, fc = (
-#        r + fpixel(shift_y, binsy, pxdimy),
-#        c + fpixel(shift_x, binsx, pxdimx),
-#    )
-#    return fr, fc
 
 
 def model_shadowgram(
@@ -327,7 +288,6 @@ def model_shadowgram(
         if vignetting else camera.mask.astype(float)
     )
     # - shift mask array to match source direction
-    #fr, fc = _shifts_interp(camera, shift_y, shift_x)
     pxdimy, pxdimx = (
         camera.specs['mask_deltay'] / camera.upscale_f.y,
         camera.specs['mask_deltax'] / camera.upscale_f.x,
