@@ -69,7 +69,7 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_testing_optNoP_modelSG_optimCM_peakf_posvign"
+ANALYSIS_ID: str = "singleCAM_iros_testing_optNoP_modelSG_narrowCutout"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 4
