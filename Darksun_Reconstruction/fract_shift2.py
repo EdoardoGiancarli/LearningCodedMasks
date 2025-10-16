@@ -291,8 +291,8 @@ def model_shadowgram(
         camera.specs['mask_deltax'] / camera.upscale_f.x,
     )
     fr, fc = (
-        (-1) * shift_y / pxdimy,
-        (-1) * shift_x / pxdimx,
+        (-1.0) * shift_y / pxdimy,
+        (-1.0) * shift_x / pxdimx,
     )
     mask_shifted = fshift(mask_vignetted, fr, fc)
     # - apply detector spatial resolution
