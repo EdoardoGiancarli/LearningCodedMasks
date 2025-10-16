@@ -29,51 +29,17 @@ def _shift_old(a: NDArray, i: int, j: int) -> NDArray:
     return hpadded
 
 
-def fshift_old(
-    arr: NDArray,
-    shifty: int | float,
-    shiftx: int | float,
-) -> NDArray:
-    """
-    """
-    def apply_decimal_correction(a: NDArray, dec: float) -> NDArray:
-        """Applies decimal correction along columns."""
-        end_mask = (
-            np.array((a > 0), dtype=int) - np.array((_shift_old(a, 0, int(np.sign(dec))) > 0), dtype=int)
-        ) > 0
-        front_mask = (
-            np.array((_shift_old(a, 0, int(np.sign(dec))) > 0), dtype=int) - np.array((a > 0), dtype=int)
-        ) > 0
-        return (
-            a * (1.0 - abs(dec) * end_mask) + _shift_old(a, 0, int(np.sign(dec))) * abs(dec) * front_mask
-        )
-
-    # check no shift
-    if (float(shifty) == 0.0) and (float(shiftx) == 0.0):
-        return arr
-        
-    # apply integer array shift
-    r, c = map(int, (shifty, shiftx))
-    shifted = _shift_old(arr, r, c).astype(float)
-    # correct edges for decimal shift (end-elements and front-elements)
-    rdec, cdec = (shifty - r, shiftx - c)
-    shifted_ = apply_decimal_correction(shifted.T, rdec).T
-    shifted_ = apply_decimal_correction(shifted_, cdec)
-    return shifted_
-
-
 
 if __name__ == '__main__':
 
-    REP = 100
+    REP = 50
 
-    a = np.ones((650, 1040))
+    a = np.ones((300, 10400))
     sy, sx = 100, -100
 
     t1 = timeit('_shift_old(a, sy, sx)', globals=globals(), number=REP)
     t2 = timeit('_shift(a, sy, sx)', globals=globals(), number=REP)
 
-    t3 = timeit('fshift_old(a, sy, sx)', globals=globals(), number=REP)
     t4 = timeit('scipy_fshift(a, sy, sx)', globals=globals(), number=REP)
     t5 = timeit('fshift(a, sy, sx)', globals=globals(), number=REP)
 
@@ -81,7 +47,6 @@ if __name__ == '__main__':
         f'_shift_old: {t1 / REP}s',
         f'_shift: {t2 / REP}s',
 
-        f'fshift_old: {t3 / REP}s', 
         f'scipy_fshift: {t4 / REP}s',
         f'fshift: {t5 / REP}s',
     )
