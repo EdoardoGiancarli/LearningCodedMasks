@@ -7,9 +7,8 @@ from numpy.typing import NDArray
 from scipy.ndimage import shift as ndshift
 from scipy.signal import convolve
 
-from bloodmoon.coords import shift2pos, pos2shift
-from bloodmoon.mask import _detector_footprint, CodedMaskCamera
-from bloodmoon.optim import _wfm_psfy_kernel_cached
+from bloodmoon.optim import CodedMaskCamera
+from bloodmoon.optim import _wfm_psfy_kernel_cached, _detector_footprint_cached
 
 
 def scipy_fshift(
@@ -243,7 +242,6 @@ def apply_vignetting(
 
     angle_x_rad = np.arctan(shift_x / camera.mdl["mask_detector_distance"])
     red_factorx = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
-    # TODO: fix this comment (depends on what shift is considered, from source or on the detector)
     # since the mask detector distance is defined as the distance between the
     # detector top and the mask top, erosion shall cut on the left-side of the
     # shadowgram when sources have negative `angle_x_rad`.
@@ -302,12 +300,12 @@ def model_shadowgram(
         apply_detector_resolution(camera, mask_shifted)
         if psfy else mask_shifted
     )
-
     # extract normalised detector image
-    i_min, i_max, j_min, j_max = _detector_footprint(camera)
+    i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
     detector = sg[i_min:i_max, j_min:j_max]
     detector *= camera.bulk
     detector /= np.sum(detector)
+    
     return detector
 
 
