@@ -7,7 +7,8 @@ from numpy.typing import NDArray
 from scipy.ndimage import shift as ndshift
 from scipy.signal import convolve
 
-from bloodmoon.optim import CodedMaskCamera
+from bloodmoon.mask import decode
+from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.optim import _wfm_psfy_kernel_cached, _detector_footprint_cached
 
 
@@ -213,6 +214,10 @@ def _erosion(
     2D matrix erosion for simulating finite thickness effect in shadow projections.
     It takes a mask array and "thins" the mask elements across the columns' direction.
     """
+    # check if there's erosion
+    if not cut:
+        return arr
+    
     # number of bins to cut
     ncuts = int(cut / step)
     arr_mask = (arr > 0) & (_shift(arr, 0, ncuts) > 0)
@@ -238,22 +243,38 @@ def apply_vignetting(
     """
     Applies vignetting effects to a shadowgram based on source position.
     """
+    def project_mask_thickness(shift: float, bin_dim: float) -> float:
+        """Corrects the mask thickness projection."""
+        # since the mask detector distance is defined as the distance between the
+        # detector top and the mask top, erosion shall cut on the left-side of the
+        # shadowgram when sources have negative `angle`.
+        # if the mask detector distance was defined as the distance between the
+        # detector top and the mask bottom, erosion should have been applied to the
+        # right side, i.e. `proj` should be multiplied by -1.
+        angle = np.arctan(shift / camera.mdl["mask_detector_distance"])
+        proj = camera.mdl["mask_thickness"] * np.tan(angle)
+        shift_px = shift / bin_dim
+        # the mask thickness projection has to be corrected by considering the
+        # erosion pixel start point, due to the discretisation of the projection
+        bin_erosion_start = (1.0 - abs(shift_px - int(shift_px))) * bin_dim
+        return proj + np.sign(proj) * bin_erosion_start
+    
     bins = camera.bins_detector
+    bin_dim_x, bin_dim_y = (
+        bins.x[1] - bins.x[0],
+        bins.y[1] - bins.y[0],
+    )
 
-    angle_x_rad = np.arctan(shift_x / camera.mdl["mask_detector_distance"])
-    red_factorx = camera.mdl["mask_thickness"] * np.tan(angle_x_rad)
-    # since the mask detector distance is defined as the distance between the
-    # detector top and the mask top, erosion shall cut on the left-side of the
-    # shadowgram when sources have negative `angle_x_rad`.
-    # if the mask detector distance was defined as the distance between the
-    # detector top and the mask bottom, erosion should have been applied to the
-    # right side, i.e. `red_factor` should be multiplied by -1.
-    sg1 = _erosion(shadowgram, bins.x[1] - bins.x[0], red_factorx)
+    red_factor_x = project_mask_thickness(shift_x, bin_dim_x)
+    sg_x = _erosion(shadowgram, bin_dim_x, red_factor_x)
 
-    angle_y_rad = np.arctan(shift_y / camera.mdl["mask_detector_distance"])
-    red_factory = camera.mdl["mask_thickness"] * np.tan(angle_y_rad)
-    sg2 = _erosion(shadowgram.T, bins.y[1] - bins.y[0], red_factory)
-    return sg1 * sg2.T
+    # NOTE: we apply the y-axis erosion to `sg_x`, otherwise the decimal
+    #       values of the input shifted shadowgram would be squared
+    # NOTE: the erosion on the two axes is still independent, as it must be
+    red_factor_y = project_mask_thickness(shift_y, bin_dim_y)
+    sg_y = _erosion(sg_x.T, bin_dim_y, red_factor_y)
+
+    return sg_y.T
 
 
 def apply_detector_resolution(
@@ -279,13 +300,7 @@ def model_shadowgram(
     Generates a normalized shadowgram for a point source
     with fractional shift of the mask pattern.
     """    
-    # instrumental effects and shift mask pattern
-    # - apply vignetting to mask pattern array
-    mask_vignetted = (
-        apply_vignetting(camera, camera.mask, shift_x, shift_y)
-        if vignetting else camera.mask.astype(float)
-    )
-    # - shift mask array to match source direction
+    # shift mask pattern and instrumental effects
     pxdimy, pxdimx = (
         camera.specs['mask_deltay'] / camera.upscale_f.y,
         camera.specs['mask_deltax'] / camera.upscale_f.x,
@@ -294,12 +309,18 @@ def model_shadowgram(
         (-1.0) * shift_y / pxdimy,
         (-1.0) * shift_x / pxdimx,
     )
-    mask_shifted = fshift(mask_vignetted, fr, fc)
-    # - apply detector spatial resolution
-    sg = (
-        apply_detector_resolution(camera, mask_shifted)
-        if psfy else mask_shifted
+    mask_shifted = fshift(camera.mask.astype(float), fr, fc)
+
+    mask_vignetted = (
+        apply_vignetting(camera, mask_shifted, shift_x, shift_y)
+        if vignetting else mask_shifted
     )
+
+    sg = (
+        apply_detector_resolution(camera, mask_vignetted)
+        if psfy else mask_vignetted
+    )
+
     # extract normalised detector image
     i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
     detector = sg[i_min:i_max, j_min:j_max]
@@ -307,6 +328,24 @@ def model_shadowgram(
     detector /= np.sum(detector)
     
     return detector
+
+
+def model_sky(
+    camera: CodedMaskCamera,
+    shift_x: float,
+    shift_y: float,
+    fluence: float,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> NDArray:
+    """
+    Generate a model of the reconstructed sky image for a point source.
+    """
+    norm_detector = model_shadowgram(
+        camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy,
+    )
+    decoded = decode(camera, norm_detector * fluence)
+    return decoded
 
 
 # end

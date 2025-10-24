@@ -29,27 +29,7 @@ from darksun.data import DataLoader
 from darksun.optim import bkg_smoothing
 
 from var import sky_variance as variance
-from fract_shift2 import model_shadowgram
-
-
-def model_sky(
-    camera: CodedMaskCamera,
-    shift_x: float,
-    shift_y: float,
-    fluence: float,
-    vignetting: bool = True,
-    psfy: bool = True,
-) -> NDArray:
-    """
-    Generate a model of the reconstructed sky image for a point source.
-    """
-    decoded = decode(
-        camera=camera,
-        detector=model_shadowgram(
-            camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy,
-        ),
-    )
-    return decoded * fluence
+from fract_shift2 import model_shadowgram, model_sky
 
 
 def _ModelShiftFluenceUncached(  # noqa
