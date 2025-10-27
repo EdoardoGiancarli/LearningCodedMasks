@@ -1,8 +1,7 @@
-from timeit import timeit
-
 import numpy as np
 from numpy.typing import NDArray
-from scipy.ndimage import shift as ndshift
+
+from darksun.utils import benchmark_func
 
 from fract_shift2 import _shift, fshift, scipy_fshift
 
@@ -34,21 +33,26 @@ if __name__ == '__main__':
 
     REP = 50
 
-    a = np.ones((300, 10400))
+    a = np.ones((300, 5000))
     sy, sx = 100, -100
 
-    t1 = timeit('_shift_old(a, sy, sx)', globals=globals(), number=REP)
-    t2 = timeit('_shift(a, sy, sx)', globals=globals(), number=REP)
+#    t1 = timeit('_shift_old(a, sy, sx)', globals=globals(), number=REP)
+#    t2 = timeit('_shift(a, sy, sx)', globals=globals(), number=REP)
+#
+#    t4 = timeit('scipy_fshift(a, sy, sx)', globals=globals(), number=REP)
+#    t5 = timeit('fshift(a, sy, sx)', globals=globals(), number=REP)
 
-    t4 = timeit('scipy_fshift(a, sy, sx)', globals=globals(), number=REP)
-    t5 = timeit('fshift(a, sy, sx)', globals=globals(), number=REP)
+    t1, dt1, _ = benchmark_func(_shift_old, a, sy, sx, iterations=REP)
+    t2, dt2, _ = benchmark_func(_shift, a, sy, sx, iterations=REP)
+    t3, dt3, _ = benchmark_func(scipy_fshift, a, sy, sx, iterations=REP)
+    t4, dt4, _ = benchmark_func(fshift, a, sy, sx, iterations=REP)
 
     print(
-        f'_shift_old: {t1 / REP}s',
-        f'_shift: {t2 / REP}s',
+        f'_shift_old: {t1} +/- {dt1} s\n',
+        f'_shift: {t2} +/- {dt2} s\n',
 
-        f'scipy_fshift: {t4 / REP}s',
-        f'fshift: {t5 / REP}s',
+        f'scipy_fshift: {t3} +/- {dt3} s\n',
+        f'fshift: {t4} +/- {dt4} s',
     )
 
 
