@@ -59,7 +59,7 @@ DATA_FITS: str = "galctr_rxte-sax_2-50keV_mask_050_1040x17_opaquemask_infdet"   
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "detected"
+DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
 UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
@@ -69,7 +69,7 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_testing_PSF_newModelSG"
+ANALYSIS_ID: str = "singleCAM_iros_testing_PSF_newVignetting_newPSFY"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 4

@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 from tqdm import tqdm
 
 from bloodmoon.coords import angle2shift
-from bloodmoon.coords import shift2pos
+from bloodmoon.coords import shift2pos, pos2shift
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import count
 from bloodmoon.mask import decode
@@ -29,7 +29,32 @@ from darksun.data import DataLoader
 from darksun.optim import bkg_smoothing
 
 from var import sky_variance as variance
-from fract_shift2 import model_shadowgram, model_sky
+from fract_shift2 import _shift, model_shadowgram, model_sky
+
+
+def bulk_mask(
+    camera: CodedMaskCamera,
+    dataset: str,
+    bulk_els_to_hide: int | float = 1.5,  # [mm]
+) -> NDArray:
+    """
+    Builds a mask for the detector plane, accounting for the reconstructed
+    dataset artefacts from WISEMAN at the DAs edges along the y-axis.
+    """
+    num_px_to_hide = int(bulk_els_to_hide * camera.upscale_f.y / camera.specs['mask_deltay'])
+    mask = np.array((camera.bulk > 0), dtype=int)
+
+    match dataset:
+        case 'detected':
+            return mask
+
+        case 'reconstructed':
+            left_edge = (mask > 0) & (_shift(mask, num_px_to_hide , 0) > 0)
+            right_edge = (mask > 0) & (_shift(mask, -num_px_to_hide, 0) > 0)
+            return mask * left_edge * right_edge
+
+        case _:
+            raise ValueError(f"Invalid input dataset '{dataset}'.")
 
 
 def _ModelShiftFluenceUncached(  # noqa
@@ -107,7 +132,8 @@ def optimize(
     
     model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     
-    sx_start, sy_start = interpmax(camera, arg_sky, sky)
+    #sx_start, sy_start = interpmax(camera, arg_sky, sky)
+    sx_start, sy_start = pos2shift(camera, *arg_sky)
     
     #i, j = arg_sky
     #yslit, xslit = (
@@ -443,7 +469,7 @@ def run_IROS(
     SMOOTHING_THRESH = 25.0
 
     # generating detector image
-    detector = count(camera, sdl.DLdata)[0]
+    detector = count(camera, sdl.DLdata)[0] * bulk_mask(camera, 'reconstructed') # NOTE!!!
     skymap = decode(camera, detector)
     varmap = variance(camera, detector)
     # varmap = np.clip(variance(camera, detector), a_min=1e-8, a_max=detector.sum())

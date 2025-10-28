@@ -9,7 +9,10 @@ from scipy.signal import convolve
 
 from bloodmoon.mask import decode
 from bloodmoon.mask import CodedMaskCamera
-from bloodmoon.optim import _wfm_psfy_kernel_cached, _detector_footprint_cached
+from bloodmoon.optim import _detector_footprint_cached
+
+from psfy_kernel import wfm_psfy_kernel
+from psfy_kernel import _wfm_psfy_kernel_cached
 
 
 def scipy_fshift(
@@ -285,7 +288,7 @@ def apply_detector_resolution(
     Applies finite detector spatial resolution effects to a shadowgram.
     """
     return convolve(
-        shadowgram, _wfm_psfy_kernel_cached(camera), mode="same",
+        shadowgram, wfm_psfy_kernel(camera), mode="same",
     )
 
 
