@@ -342,7 +342,8 @@ def model_sky(
     psfy: bool = True,
 ) -> NDArray:
     """
-    Generate a model of the reconstructed sky image for a point source.
+    Generate a model of the reconstructed sky image for a point
+    source with fractional shift of the mask pattern.
     """
     norm_detector = model_shadowgram(
         camera, shift_x, shift_y, vignetting=vignetting, psfy=psfy,
