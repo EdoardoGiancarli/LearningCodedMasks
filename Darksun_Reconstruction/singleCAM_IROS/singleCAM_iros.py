@@ -1,26 +1,21 @@
-from typing import Callable, Iterable, Literal
+from typing import Callable, Iterable
 import warnings
 
 import numpy as np
 from numpy.typing import NDArray
 from tqdm import tqdm
+from scipy.optimize import minimize
+# from scipy.ndimage import center_of_mass
 
 from bloodmoon.coords import angle2shift
 from bloodmoon.coords import shift2pos, pos2shift
+# from bloodmoon.mask import interpmax
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import count
 from bloodmoon.mask import decode
-# from bloodmoon.mask import variance
 # from bloodmoon.optim import optimize
-
-from scipy.optimize import minimize
-from scipy.ndimage import center_of_mass
-#from bloodmoon.optim import _ModelShiftFluence, _ModelShiftFluenceUncached, _Loss
+# from bloodmoon.optim import model_shadowgram, model_sky
 from bloodmoon.optim import _Loss
-from bloodmoon.mask import interpmax
-
-#from bloodmoon.optim import model_shadowgram
-#from bloodmoon.optim import model_sky
 
 from darksun.types import LogEntry
 from darksun.data import Log
@@ -30,6 +25,7 @@ from darksun.optim import bkg_smoothing
 
 from var import sky_variance as variance
 from fract_shift2 import _shift, model_shadowgram, model_sky
+# from fract_shift2 import _shift
 
 
 def bulk_mask(
@@ -164,12 +160,12 @@ def optimize(
         method="Nelder-Mead",
         bounds=[
             (
-                max(sx_start - 5 * xpxdim, camera.bins_sky.x[0]),
-                min(sx_start + 5 * xpxdim, camera.bins_sky.x[-1]),
+                max(sx_start - 3 * xpxdim, camera.bins_sky.x[0]),
+                min(sx_start + 3 * xpxdim, camera.bins_sky.x[-1]),
             ),
             (
-                max(sy_start - 5 * ypxdim, camera.bins_sky.y[0]),
-                min(sy_start + 5 * ypxdim, camera.bins_sky.y[-1]),
+                max(sy_start - 3 * ypxdim, camera.bins_sky.y[0]),
+                min(sy_start + 3 * ypxdim, camera.bins_sky.y[-1]),
             ),
             (0.9 * fluence_start, 1.1 * fluence_start),
         ],
