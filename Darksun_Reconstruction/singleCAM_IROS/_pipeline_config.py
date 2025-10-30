@@ -75,8 +75,7 @@ def run(params: PipelineParams) -> None:
             sdls = (sdlA, sdlB)
 
             with ds.timer("Compute dets/vars"):
-                from .singleCAM_iros import bulk_mask
-                detectors = tuple(count(wfm, sdl.DLdata)[0] for sdl in sdls) * bulk_mask(wfm, params.dataset)
+                detectors = tuple(count(wfm, sdl.DLdata)[0] for sdl in sdls)
                 variances = tuple(sky_variance(wfm, d) for d in detectors)
 
             # WCS fit (here the camera is upscaled with the final upscaling)
