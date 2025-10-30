@@ -29,6 +29,8 @@ from .io import MaskDataLoader
 from .types import BinsRectangular
 from .types import UpscaleFactor
 
+from .images import _shift
+
 
 def _fold(
     ml: FITS_rec,
@@ -239,13 +241,36 @@ class CodedMaskCamera:
 
     @cached_property
     def bulk(self) -> npt.NDArray:
-        """2D array representing the bulk (sensitivity) array of the mask."""
+        """
+        2D array representing the bulk (sensitivity) array of the mask.
+        """
+        def _bulk_mask(
+            bulk: npt.NDArray,
+            bulk_els_to_hide: int | float,
+        ) -> npt.NDArray:
+            """
+            Builds a mask for the detector plane, accounting for the 'reconstructed'
+            dataset artefacts from WISEMAN at the DAs edges along the y-axis.
+
+            The input `bulk_els_to_hide` is in [mm].
+            """
+            print(f'## USING BULK MASK with {bulk_els_to_hide} mm cover ##')
+            num_px_to_hide = int(bulk_els_to_hide * self.upscale_f.y / self.specs['mask_deltay'])
+            active_elements = np.array((bulk > 0), dtype=int)
+
+            edges_mask = (
+                (_shift(active_elements, (-num_px_to_hide, 0)) > 0) &
+                (_shift(active_elements, (num_px_to_hide , 0)) > 0)
+            )
+            return active_elements * edges_mask
+        
         framed_bulk = _fold(self.mdl.bulk, self._bins_mask(UpscaleFactor(1, 1)))
         framed_bulk[~np.isclose(framed_bulk, np.zeros_like(framed_bulk))] = 1
         bins = self._bins_mask(self.upscale_f)
         xmin, xmax = _bisect_interval(bins.x, self.mdl["detector_minx"], self.mdl["detector_maxx"])
         ymin, ymax = _bisect_interval(bins.y, self.mdl["detector_miny"], self.mdl["detector_maxy"])
-        return _upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
+        upscaled = _upscale(framed_bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
+        return upscaled * _bulk_mask(upscaled, 1.5)
 
     @cached_property
     def balancing(self) -> npt.NDArray:
