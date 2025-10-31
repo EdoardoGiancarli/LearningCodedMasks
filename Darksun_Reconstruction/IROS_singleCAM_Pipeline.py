@@ -62,14 +62,14 @@ ID_CAMERA_B: str = "cam1b"
 DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 5                 # final upscaling for skies and visualisation
+UPSX_FINAL: int = 2                 # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_testing_PSF_bmCFR"
+ANALYSIS_ID: str = "singleCAM_iros_testing_PSF_newSGmodel_upx2upy1"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 10

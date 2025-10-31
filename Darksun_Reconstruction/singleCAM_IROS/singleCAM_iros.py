@@ -22,7 +22,7 @@ from darksun.data import DataLoader
 from darksun.optim import bkg_smoothing
 
 from var import sky_variance as variance
-from fract_shift2 import _shift, model_shadowgram, model_sky
+from fract_shift2 import model_shadowgram, model_sky
 
 
 def _ModelShiftFluenceUncached(  # noqa
@@ -88,16 +88,6 @@ def optimize(
         - Initial position is refined using interpolation
         - Bounds are set based on initial guess and physical constraints
     """
-    # - initialize the function to fluence and position dependent shadowgram model.
-    # - it leverages caches to reduce the number of cross-correlation computations,
-    #   and it is our responsibility to free memory after we will be done.
-    #if model == "fast":
-    #    model_shift_flux, model_shift_flux_clear = _ModelShiftFluence(camera, vignetting, psfy)
-    #elif model == "accurate":
-    #    model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
-    #else:
-    #    raise ValueError("Model value not supported. The `model` arguments should be `fast` or `accurate`.")
-    
     model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
     
     #sx_start, sy_start = interpmax(camera, arg_sky, sky)
@@ -139,7 +129,7 @@ def optimize(
                 max(sy_start - 3 * ypxdim, camera.bins_sky.y[0]),
                 min(sy_start + 3 * ypxdim, camera.bins_sky.y[-1]),
             ),
-            (0.9 * fluence_start, 1.1 * fluence_start),
+            (0.75 * fluence_start, 1.25 * fluence_start),
         ],
         options={
             "xatol": 1e-6,
@@ -163,7 +153,7 @@ def iros_singleCAM(
     skymap: NDArray,
     varmap: NDArray,
     camera: CodedMaskCamera,
-    max_iterations: int,
+    max_iterations: int = 40,
     snr_threshold: float = 0.0,
     vignetting: bool = True,
     psfy: bool = True,
@@ -440,29 +430,18 @@ def run_IROS(
     detector = count(camera, sdl.DLdata)[0]
     skymap = decode(camera, detector)
     varmap = variance(camera, detector)
-    # varmap = np.clip(variance(camera, detector), a_min=1e-8, a_max=detector.sum())
-
-    # define unframe edges to remove sky and significance boundaries
-    # TODO:
-    #   - setup: done
-    #   - implement unframing factors (possible criteria: where not Poisson variance)
-    #   - implement shifts offset (due to framing) in IROS
-    # TODO:
-    #   - OR BETTER: implement sky mask from variance `* (variance > n)`
-    UNFR_X, UNFR_Y = None, None    # 100 * UPX, 70 * UPY
 
     # performing IROS to remove the brightest sources (SNR > SMOOTHING_THRESH)
     print("# Running first loop...")
-#####    first_loop = iros_singleCAM(
-#####        skymap=skymap,
-#####        varmap=varmap,
-#####        camera=camera,
-#####        max_iterations=max_iterations,
-#####        snr_threshold=SMOOTHING_THRESH,
-#####        vignetting=vignetting,
-#####        psfy=psfy,
-#####    )
-#####    candidates = tuple(c for c, _ in tqdm(first_loop))
+####    first_loop = iros_singleCAM(
+####        skymap=skymap,
+####        varmap=varmap,
+####        camera=camera,
+####        snr_threshold=SMOOTHING_THRESH,
+####        vignetting=vignetting,
+####        psfy=psfy,
+####    )
+####    candidates = tuple(c for c, _ in tqdm(first_loop))
     
     # perform detector smoothing and run again IROS on the processed data;
     # to do that, we first remove the stored sources from the original
@@ -473,29 +452,29 @@ def run_IROS(
         df = np.sqrt(f)
         return sx, DSX, sy, DSY, f, df, signf
     
-#####    def retrieve_detector(candidates: tuple[tuple[float]]) -> NDArray:
-#####        """Generates detector image from retrieved candidates."""
-#####        img = np.zeros(camera.shape_detector)
-#####        for (sx, sy, f, _) in candidates:
-#####            shadowgram = model_shadowgram(
-#####                camera=camera,
-#####                shift_x=sx,
-#####                shift_y=sy,
-#####                vignetting=vignetting,
-#####                psfy=psfy,
-#####            )
-#####            img += (f * shadowgram)
-#####        return img
-#####
-#####    smoothed_res_detector = bkg_smoothing(
-#####        detector=detector - retrieve_detector(candidates),
-#####        camera=camera,
-#####    )
-#####    smoothed_skymap = decode(
-#####        camera,
-#####        np.clip(detector - smoothed_res_detector, a_min=0.0, a_max=detector.sum()),
-#####    )
-#####    print("# Initializing second loop with smoothed detector...")
+####    def retrieve_detector(candidates: tuple[tuple[float, ...], ...]) -> NDArray:
+####        """Generates detector image from retrieved candidates."""
+####        img = np.zeros(camera.shape_detector)
+####        for (sx, sy, f, _) in candidates:
+####            shadowgram = model_shadowgram(
+####                camera=camera,
+####                shift_x=sx,
+####                shift_y=sy,
+####                vignetting=vignetting,
+####                psfy=psfy,
+####            )
+####            img += (f * shadowgram)
+####        return img
+####
+####    smoothed_res_detector = bkg_smoothing(
+####        detector=detector - retrieve_detector(candidates),
+####        camera=camera,
+####    )
+####    smoothed_skymap = decode(
+####        camera,
+####        np.clip(detector - smoothed_res_detector, a_min=0.0, a_max=detector.sum()),
+####    )
+####    print("# Initializing second loop with smoothed detector...")
     second_loop = iros_singleCAM(
         skymap=skymap,
         varmap=varmap,
