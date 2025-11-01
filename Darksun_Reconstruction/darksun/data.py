@@ -18,7 +18,7 @@ from astropy.wcs.utils import fit_wcs_from_points
 from bloodmoon.types import CoordEquatorial
 from bloodmoon.coords import pos2equatorial
 from bloodmoon.io import SimulationDataLoader
-from bloodmoon.io import _exists_valid
+from bloodmoon.io import validate_fits
 from bloodmoon.mask import CodedMaskCamera
 
 from .types import LogEntry
@@ -150,7 +150,7 @@ def create_log(
 ) -> Log:
     """
     Initializes a Log instance with the given parameters to manage
-    the logging of the IROS procedure for the WFM cameras.
+    the logging of the IROS procedure for the LEM-X cameras.
 
     Args:
         params (LogEntry | Sequence[LogEntry]):
@@ -170,10 +170,10 @@ def create_log(
 @dataclass(frozen=True)
 class DataLoader(SimulationDataLoader):
     """
-    Container for WFM coded mask simulation data.
+    Container for LEM-X coded mask simulation data.
 
     The class provides access to photon events and instrument configuration
-    from a FITS file containing WFM simulation data for a single camera.
+    from a FITS file containing LEM-X simulation data for a single camera.
 
     This class inherits from bloodmoon's `SimulationDataLoader`, and allows
     for data filtering in the photons energy and incoming direction.
@@ -236,23 +236,23 @@ def get_data(
     """
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
-    if _exists_valid(filepath):
+    if validate_fits(filepath):
         sdl = DataLoader(
             filepath=filepath,
             E_min=E_min,
             E_max=E_max,
             coords=coords,
         )
-        return sdl
+    return sdl
 
 
 @dataclass(frozen=True)
 class CatalogueLoader(SimulationDataLoader):
     """
-    Container for WFM coded mask sources catalog.
+    Container for LEM-X coded mask sources catalog.
 
     The class provides access to the catalog and instrument configuration
-    from a FITS file containing WFM simulation data for a single camera.
+    from a FITS file containing LEM-X simulation data for a single camera.
 
     This class inherits from bloodmoon's `SimulationDataLoader`, and allows
     for catalog filtering in the brightness and flux channels.
@@ -321,7 +321,7 @@ def get_catalogue(
     if not isinstance(filepath, Path):
         filepath = Path(filepath)
     
-    if _exists_valid(filepath):
+    if validate_fits(filepath):
         if n and any((F_min, F_max)):
             raise ValueError("Specify either 'n' OR the flux range to filter the catalogue.")
         
@@ -331,7 +331,7 @@ def get_catalogue(
             F_min=F_min,
             F_max=F_max,
         )
-        return sdl
+    return sdl
 
 
 def fit_WCS(
