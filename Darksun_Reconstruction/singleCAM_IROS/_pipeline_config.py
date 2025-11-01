@@ -15,13 +15,11 @@ import numpy as np
 from bloodmoon.io import simulation_files
 from bloodmoon.mask import decode
 from bloodmoon.mask import count
-#from bloodmoon.mask import variance
-#from bloodmoon.mask import snratio
+from bloodmoon.mask import variance
+from bloodmoon.mask import snratio
 from bloodmoon.mask import codedmask
 
 import darksun as ds
-
-from var import sky_variance, sky_significance
 
 
 def run(params: PipelineParams) -> None:
@@ -76,7 +74,7 @@ def run(params: PipelineParams) -> None:
 
             with ds.timer("Compute dets/vars"):
                 detectors = tuple(count(wfm, sdl.DLdata)[0] for sdl in sdls)
-                variances = tuple(sky_variance(wfm, d) for d in detectors)
+                variances = tuple(variance(wfm, d) for d in detectors)
 
             # WCS fit (here the camera is upscaled with the final upscaling)
             with ds.timer("WCS fit"):
@@ -96,7 +94,7 @@ def run(params: PipelineParams) -> None:
             not is_file(sim_camB)
         ):
             skies = tuple(decode(wfm, d) for d in detectors)
-            snrs = tuple(sky_significance(sky, var_) for sky, var_ in zip(skies, variances))
+            snrs = tuple(snratio(sky, var_) for sky, var_ in zip(skies, variances))
 
             # ups_skies = tuple(upscale(sky, upscale_y=UPY_TO) for sky in skies)
             # ups_snrs = tuple(upscale(snr, upscale_y=UPY_TO) for snr in snrs)
@@ -157,7 +155,7 @@ def run(params: PipelineParams) -> None:
                 )
             # save IROS sky residues
             skies = (skyA, skyB)
-            snrs = tuple(sky_significance(sky, var_) for sky, var_ in zip(skies, variances))
+            snrs = tuple(snratio(sky, var_) for sky, var_ in zip(skies, variances))
 
             # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL - UPSY_0 + 1) for sky in skies)
             # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL - UPSY_0 + 1) for snr in snrs)
@@ -265,7 +263,7 @@ def run(params: PipelineParams) -> None:
                     )
                     for logID, res in zip(logs, skies)
                 )
-                snrs = tuple(sky_significance(sky, var_) for sky, var_ in zip(skies, variances))
+                snrs = tuple(snratio(sky, var_) for sky, var_ in zip(skies, variances))
 
                 # ups_skies = tuple(upscale(sky, upscale_y=UPSY_FINAL - UPSY_0 + 1) for sky in skies)
                 # ups_snrs = tuple(upscale(snr, upscale_y=UPSY_FINAL - UPSY_0 + 1) for snr in snrs)

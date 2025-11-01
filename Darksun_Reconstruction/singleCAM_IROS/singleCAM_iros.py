@@ -13,140 +13,16 @@ from bloodmoon.coords import shift2pos, pos2shift
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import count
 from bloodmoon.mask import decode
-from bloodmoon.optim import _Loss
+from bloodmoon.mask import variance
+from bloodmoon.mask import snratio
+from bloodmoon.optim import model_sky
+from bloodmoon.optim import optimize
 
 from darksun.types import LogEntry
 from darksun.data import Log
 from darksun.data import create_log
 from darksun.data import DataLoader
 from darksun.optim import bkg_smoothing
-
-from var import sky_variance as variance
-from fract_shift2 import model_shadowgram, model_sky
-
-
-def _ModelShiftFluenceUncached(  # noqa
-    camera: CodedMaskCamera,
-    vignetting: bool = True,
-    psfy: bool = True,
-) -> tuple[Callable, Callable]:
-    """
-    A slow, vanilla implementation of the model for both direction and fluence optimization.
-    Intended for debugging and benchmarking.
-    """
-
-    def f(shift_x: float, shift_y: float, fluence: float) -> NDArray:
-        """
-        A simple, slow version of the model for both direction and fluence optimization.
-
-        Args:
-            shift_x: Source position x-coordinate in sky-shift space (mm)
-            shift_y: Source position y-coordinate in sky-shift space (mm)
-            fluence: Source intensity/fluence value
-
-        Returns:
-            2D array representing the modeled sky reconstruction
-        """
-        return model_sky(camera, shift_x, shift_y, fluence, vignetting=vignetting, psfy=psfy)
-
-    # there is no cache here, hence no need to clean anything.
-    # we return a lambda anyway for compatibility with the other models
-    return f, lambda: None
-
-
-def optimize(
-    camera: CodedMaskCamera,
-    sky: NDArray,
-    arg_sky: tuple[int, int],
-    vignetting: bool = True,
-    psfy: bool = True,
-    #model: Literal["fast", "accurate"] = "fast",
-) -> tuple[float, float, float]:
-    """
-    Performs the optimization to fit a point source model to sky image data.
-
-    This function performs the optimization by simultaneously fit the candidate
-    position and fluence. The starting position is inferred by interpolating the
-    candidate shifts in an upscaled grid (9, 9), while the starting fluence is
-    represented by the counts at the candidate extracted pixel indexes.
-    The model is cached to balance speed and accuracy.
-
-    Args:
-        camera: CodedMaskCamera instance containing detector and mask parameters
-        sky: 2D array of the reconstructed sky image to fit
-        arg_sky: Initial guess for source position as (row, col) indices
-        vignetting: If true, the model used for optimization will simulate vignetting.
-        psfy: If true, the model used for optimization will simulate detector position
-        reconstruction effects.
-
-    Returns:
-        Tuple containing the best-fit parameters `(x, y, fluence)` where:
-                - x, y are the optimized sky-shift coordinates
-                - fluence is the optimized source intensity
-
-    Notes:
-        - Initial position is refined using interpolation
-        - Bounds are set based on initial guess and physical constraints
-    """
-    model_shift_flux, model_shift_flux_clear = _ModelShiftFluenceUncached(camera, vignetting, psfy)
-    
-    #sx_start, sy_start = interpmax(camera, arg_sky, sky)
-    sx_start, sy_start = pos2shift(camera, *arg_sky)
-    
-    #i, j = arg_sky
-    #yslit, xslit = (
-    #    int(camera.specs['slit_deltay'] * camera.upscale_f.y / camera.specs['mask_deltay'] + 5),
-    #    int(camera.specs['slit_deltax'] * camera.upscale_f.x / camera.specs['mask_deltax'] + 5),
-    #)
-    #labels = np.zeros(camera.shape_sky)
-    #labels[i - yslit : i + yslit + 1 , j - xslit : j + xslit + 1] = 1
-    #i_cm, j_cm = center_of_mass(sky, labels=labels, index=1)
-    #sx0, sy0 = camera.bins_sky.x[0], camera.bins_sky.y[0]
-    ypxdim, xpxdim = (
-        camera.specs['mask_deltay'] / camera.upscale_f.y,
-        camera.specs['mask_deltax'] / camera.upscale_f.x,
-    )
-    #sx_start, sy_start = sx0 + xpxdim * j_cm, sy0 + ypxdim * i_cm
-    
-    #fluence_start = sky[*shift2pos(camera, sx_start, sy_start)]
-    fluence_start = sky[*arg_sky]
-    print(
-        f"\nFLUENCE START: {fluence_start}\n"
-        f"SHIFTS START: {sx_start, sy_start}\n" #, pos: {i_cm, j_cm}\n"
-        f"{arg_sky=}, fluence arg_sky: {sky[*arg_sky]}\n"
-    )
-    loss = _Loss(model_shift_flux)
-    results = minimize(
-        lambda args: loss((args[0], args[1], args[2]), sky, arg_sky, camera),
-        x0=np.array((sx_start, sy_start, fluence_start)),
-        method="Nelder-Mead",
-        bounds=[
-            (
-                max(sx_start - 3 * xpxdim, camera.bins_sky.x[0]),
-                min(sx_start + 3 * xpxdim, camera.bins_sky.x[-1]),
-            ),
-            (
-                max(sy_start - 3 * ypxdim, camera.bins_sky.y[0]),
-                min(sy_start + 3 * ypxdim, camera.bins_sky.y[-1]),
-            ),
-            (0.75 * fluence_start, 1.25 * fluence_start),
-        ],
-        options={
-            "xatol": 1e-6,
-        },
-    )
-    # store the final optimized positions and fluence.
-    sx, sy, fluence = map(float, results.x[:3])
-    print(
-        f"FINAL OPTIMIZED FLUENCE: {fluence}\n"
-        f"FLUENCE GAIN: {(fluence - fluence_start) * 100 / fluence_start:.3f}%\n"
-        f"FINAL OPTIMIZED SHIFTS: {sx, sy}\n"
-        f"SHIFTX GAIN: {(sx - sx_start) * 100 / sx_start:.3f}%\n"
-        f"SHIFTY GAIN: {(sy - sy_start) * 100 / sy_start:.3f}%\n"
-    )
-    # releases model cache memory.
-    model_shift_flux_clear()
-    return sx, sy, fluence
 
 
 def iros_singleCAM(
@@ -242,7 +118,7 @@ def iros_singleCAM(
         ## account for low-counts level and non-Poisson distr. (assuming Poisson if > 25 counts / px)
         #skymap_ = skymap[(varmap > 25)]
 
-        snrmap = skymap / np.sqrt(varmap)
+        snrmap = snratio(skymap, varmap)
         candidate = find_candidate(skymap, snrmap)
         if not candidate:
             print("\nNo candidates left...")
