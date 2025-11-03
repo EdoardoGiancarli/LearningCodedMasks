@@ -118,12 +118,6 @@ def _wfm_psfy_kernel_bm(camera: CodedMaskCamera) -> NDArray:
     return kernel
 
 
-@lru_cache(maxsize=1)
-def _wfm_psfy_kernel_cached_bm(camera: CodedMaskCamera):
-    """Caching helper."""
-    return _wfm_psfy_kernel_bm(camera)
-
-
 def _erosion_bm(
     arr: NDArray,
     step: float,
@@ -246,12 +240,6 @@ def apply_vignetting_bm(
     return sg1 * sg2.T
 
 
-@lru_cache(maxsize=1)
-def _detector_footprint_cached_bm(camera: CodedMaskCamera):
-    """Caching helper"""
-    return _detector_footprint(camera)
-
-
 def model_shadowgram_bm(
     camera: CodedMaskCamera,
     shift_x: float,
@@ -295,7 +283,7 @@ def model_shadowgram_bm(
         mask_maybe_vignetted_maybe_psfy = (
             convolve(
                 mask_maybe_vignetted,
-                _wfm_psfy_kernel_cached_bm(camera),
+                _wfm_psfy_kernel_bm(camera),
                 mode="same",
             )
             if psfy
@@ -307,7 +295,7 @@ def model_shadowgram_bm(
     components = _rbilinear(shift_x, shift_y, camera.bins_sky.x, camera.bins_sky.y)
     n, m = camera.shape_sky
     detector = np.zeros(camera.shape_detector)
-    i_min, i_max, j_min, j_max = _detector_footprint_cached_bm(camera)
+    i_min, i_max, j_min, j_max = _detector_footprint(camera)
     for (c_i, c_j), weight in components.items():
         r, c = (n // 2 - c_i), (m // 2 - c_j)
         mask_p = process_mask(camera.bins_sky.x[c_j], camera.bins_sky.y[c_i])  # mask processed
