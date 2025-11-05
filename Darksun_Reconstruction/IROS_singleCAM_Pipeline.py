@@ -69,10 +69,10 @@ UPSX_FINAL: int = 2                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_testing_PSF_newSGmodel_upx2upy1"
+ANALYSIS_ID: str = "singleCAM_iros_upx2upy1"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 10
+MAX_ITERATIONS: int = 20
 SNR_THRESHOLD: int | float = 5
 
 WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
