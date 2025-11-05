@@ -1,15 +1,12 @@
-from typing import Callable, Iterable
+from typing import Iterable
 import warnings
 
 import numpy as np
 from numpy.typing import NDArray
 from tqdm import tqdm
-from scipy.optimize import minimize
 # from scipy.ndimage import center_of_mass
 
 from bloodmoon.coords import angle2shift
-from bloodmoon.coords import shift2pos, pos2shift
-# from bloodmoon.mask import interpmax
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import count
 from bloodmoon.mask import decode
