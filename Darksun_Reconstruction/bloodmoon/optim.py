@@ -493,8 +493,8 @@ def optimize(
         f'  - shifts OPTIM. (x, y): {sx}, {sy}\n'
 
         f'  - fluence GAIN %: {(fluence - fluence_start) * 100 / fluence_start:.3f}\n'
-        f'  - shift_x GAIN %: {(sx - sx_start) * 100 / sx_start:.3f}\n'
-        f'  - shift_y GAIN %: {(sy - sy_start) * 100 / sy_start:.3f}\n'
+        f'  - shift_x GAIN %: {np.sign(sx_start) * (sx - sx_start) * 100 / sx_start:.3f}\n'
+        f'  - shift_y GAIN %: {np.sign(sy_start) * (sy - sy_start) * 100 / sy_start:.3f}\n'
     )
 
     return sx, sy, fluence
