@@ -72,7 +72,7 @@ UPSY_FINAL: int = 1
 ANALYSIS_ID: str = "singleCAM_iros_upx2upy1_smoothing"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 15
+MAX_ITERATIONS: int = 20
 SNR_THRESHOLD: int | float = 5
 
 WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky

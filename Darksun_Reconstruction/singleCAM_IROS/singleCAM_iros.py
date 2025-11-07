@@ -43,13 +43,13 @@ class Candidate(NamedTuple):
 
 
 def iros_singleCAM(
-    skymap: NDArray,
-    varmap: NDArray,
+    detector: NDArray,
     camera: CodedMaskCamera,
     max_iterations: int = 40,
     snr_threshold: float = 0.0,
     vignetting: bool = True,
     psfy: bool = True,
+    varmap: NDArray | None = None,
 ) -> Iterable[tuple[Candidate, NDArray]]:
     """
     Performs the Iterative Removal of Sources (IROS) algorithm for a single coded-mask
@@ -130,19 +130,25 @@ def iros_singleCAM(
 
     def subtract(
         candidate: Candidate,
-        sky: NDArray,
+        detector: NDArray,
     ) -> NDArray:
-        """Subtracts candidate from sky image."""
-        model = model_sky(
+        """Subtracts candidate from detector image."""
+        sg_model = model_shadowgram(
             camera=camera,
             shift_x=candidate.shift_x,
             shift_y=candidate.shift_y,
-            fluence=candidate.fluence,
             vignetting=vignetting,
             psfy=psfy,
         )
-        residual = sky - model
+        residual = detector - candidate.fluence * sg_model
         return residual
+    
+    detector_ = detector.copy()
+    skymap = decode(camera, detector)
+    varmap = (
+        varmap if varmap is not None
+        else variance(camera, detector)
+    )
     
     for i in range(max_iterations):
         snrmap = snratio(skymap, varmap)
@@ -158,8 +164,129 @@ def iros_singleCAM(
             warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
             continue
 
-        skymap = subtract(source, skymap)
+        detector_ = subtract(source, detector_)
+        skymap = decode(camera, detector_)
         yield (source, skymap)
+
+
+#def iros_singleCAM(
+#    skymap: NDArray,
+#    varmap: NDArray,
+#    camera: CodedMaskCamera,
+#    max_iterations: int = 40,
+#    snr_threshold: float = 0.0,
+#    vignetting: bool = True,
+#    psfy: bool = True,
+#) -> Iterable[tuple[Candidate, NDArray]]:
+#    """
+#    Performs the Iterative Removal of Sources (IROS) algorithm for a single coded-mask
+#    camera of the Wide Field Monitor observations.
+#
+#    This function implements an iterative source detection and removal procedure.
+#    For each iteration, it:
+#    1. Ranks source candidates by peak intensity
+#    2. Validates candidates by significance
+#    3. Fits source parameters
+#    4. Removes fitted sources from the sky image
+#    5. Repeats until no significant sources remain or max iterations reached
+#
+#    Args:
+#        ...
+#
+#    Yields:
+#        TODO: update here!
+#        output (tuple):
+#            - aaa (bbb):
+#                Candidate local-frame sky-shift coords, fluence and significance.
+#            - residual (NDArray):
+#                Coded-camera residual sky after removing the current candidate.
+#
+#    Raises:
+#        RuntimeError: If source parameter optimization fails (with detailed error message)
+#
+#    ## Notes:
+#        Performance Considerations:
+#        - Computation scales with mask resolution. Keep upscaling factors low
+#          (upscale_x * upscale_y ~< 10) for reasonable performance
+#
+#        Algorithm Details:
+#        - Optimizes source parameters in local windows around candidates
+#        - When using reconstructed data, accounts for vignetting and PSF effects
+#
+#    Example: TODO: update here!
+#    >>> for sources, residuals in iros(camera, sdl_cam1a, sdl_cam1b, max_iterations=2):
+#    >>>     source_1a, source_1b = sources
+#    >>>     residual_1a, residual_1b = residuals
+#    >>>     ...
+#    """
+#    def find_candidate(
+#        sky: NDArray,
+#        snr: NDArray,
+#        batch: int = 1000,
+#    ) -> tuple[int, int] | bool:
+#        """
+#        Returns the position of a valid IROS candidate inside the sky image.
+#        """
+#        reservoir = np.array(
+#            [np.unravel_index(id_, sky.shape) for id_ in np.argsort(sky, axis=None)[-batch:]]
+#        )
+#        for pos in reservoir[::-1]:
+#            if (snr[*pos] > snr_threshold):
+#                return tuple(pos)
+#        return False
+#
+#    def fit_candidate_params(
+#        candidate_pos: tuple[int, int],
+#        sky: NDArray,
+#        snr: NDArray,
+#    ) -> Candidate:
+#        """Performs the optimisation of the source candidate params."""
+#        try:
+#            shift_x, shift_y, fluence = optimize(
+#                camera=camera,
+#                sky=sky,
+#                arg_sky=candidate_pos,
+#                vignetting=vignetting,
+#                psfy=psfy,
+#            )
+#        except Exception as e:
+#            raise RuntimeError(f"Optimization failed: {str(e)}") from e
+#        
+#        significance = float(snr[*candidate_pos])
+#        return Candidate(shift_x, shift_y, fluence, significance)
+#
+#    def subtract(
+#        candidate: Candidate,
+#        sky: NDArray,
+#    ) -> NDArray:
+#        """Subtracts candidate from sky image."""
+#        model = model_sky(
+#            camera=camera,
+#            shift_x=candidate.shift_x,
+#            shift_y=candidate.shift_y,
+#            fluence=candidate.fluence,
+#            vignetting=vignetting,
+#            psfy=psfy,
+#        )
+#        residual = sky - model
+#        return residual
+#    
+#    for i in range(max_iterations):
+#        snrmap = snratio(skymap, varmap)
+#        candidate_pos = find_candidate(skymap, snrmap)
+#
+#        if not candidate_pos:
+#            print("\nNo candidates left...")
+#            break
+#
+#        try:
+#            source = fit_candidate_params(candidate_pos, skymap, snrmap)
+#        except RuntimeError as e:
+#            warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
+#            continue
+#
+#        skymap = subtract(source, skymap)
+#        yield (source, skymap)
 
 
 
@@ -244,9 +371,7 @@ def detector_smoothing(
         vignetting=vignetting,
         psfy=psfy,
     )
-    res_detector = np.clip(
-        detector - retrieved, a_min=0.0, a_max=detector.sum(),
-    )
+    res_detector = detector - retrieved
     # perform smoothing on residual detector image
     res_smoothed = bkg_smoothing(
         detector=res_detector,
@@ -255,9 +380,7 @@ def detector_smoothing(
         kernelsize_x=KERNEL_SIZE['x'],
     )
     # get smoothed detector image
-    smoothed = np.clip(
-        detector - res_smoothed, a_min=0.0, a_max=detector.sum(),
-    )
+    smoothed = np.clip(detector - res_smoothed, a_min=0.0, a_max=None)
     return smoothed
 
 
@@ -340,17 +463,17 @@ def run_IROS(
     
     # generating detector and sky images + variance map
     detector = count(camera, sdl.DLdata)[0]
-    skymap = decode(camera, detector)
+###########    skymap = decode(camera, detector)
     varmap = variance(camera, detector)
     
     # performing IROS to remove the brightest sources (SNR > SMOOTHING_THRESH)
     brightest_cands = iros_pre_smoothing(
-        skymap,
-        varmap,
+        detector,
         camera,
         snr_threshold=SMOOTHING_THRESH,
         vignetting=vignetting,
         psfy=psfy,
+        varmap=varmap,
     )
 
     # perform detector smoothing and run again IROS on the processed data;
@@ -363,17 +486,17 @@ def run_IROS(
         vignetting=vignetting,
         psfy=psfy,
     )
-    smoothed_skymap = decode(camera, smoothed)
+###########    smoothed_skymap = decode(camera, smoothed)
     
     print("# Initialising loop with smoothed detector...")
     loop = iros_singleCAM(
-        skymap=smoothed_skymap,
-        varmap=varmap,
+        detector=smoothed,
         camera=camera,
         max_iterations=max_iterations,
         snr_threshold=snr_threshold,
         vignetting=vignetting,
         psfy=psfy,
+        varmap=varmap,
     )
     print("# Looping around the FOV...")
     for candidate, residual in tqdm(loop):
