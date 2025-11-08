@@ -54,7 +54,7 @@ def _handle_dirpaths(
     
     # check mask FITS file and paths
     if not Path(mask_path).is_file():
-        raise ValueError(f"WFM mask '{mask}' does not exist.")
+        raise ValueError(f"Camera coded-mask '{mask}' does not exist.")
     for name, dirpath in zip(
             ("data_path", "save_path"),
             (data_path, save_path),

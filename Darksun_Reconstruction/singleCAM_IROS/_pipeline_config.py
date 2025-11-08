@@ -10,8 +10,6 @@ from .singleCAM_iros import run_IROS
 from typing import Sequence
 from pathlib import Path
 
-import numpy as np
-
 from bloodmoon.io import simulation_files
 from bloodmoon.mask import decode
 from bloodmoon.mask import count
