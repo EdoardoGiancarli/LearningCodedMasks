@@ -50,19 +50,19 @@ def _Loss(model_f: Callable) -> Callable:
         Returns:
             float: Mean Squared Error between model and truth in local window
         """
-        def process_img(arr: NDArray) -> NDArray:
-            """
-            Centers and normalises the input array in the range [-1, 1].
-            """
-            # centered = (arr - np.mean(arr)) / (np.std(arr) + 1e-8)
-            norm = (arr - np.min(arr))/(np.max(arr) - np.min(arr))
-            return 2 * norm - 1
+        #def process_img(arr: NDArray) -> NDArray:
+        #    """
+        #    Centers and normalises the input array in the range [-1, 1].
+        #    """
+        #    centered = (arr - np.mean(arr)) / (np.std(arr) + 1e-8)
+        #    norm = (arr - np.min(centered))/(np.max(centered) - np.min(centered))
+        #    return 2 * norm - 1
 
-        (min_i, max_i, min_j, max_j), _ = cutout(camera, pos, fx=3, fy=3)
+        (min_i, max_i, min_j, max_j), _ = cutout(camera, pos, fx=2, fy=2)
         model = model_f(*args)
         residual = model - truth
-        mse = np.mean(np.square(process_img(residual[min_i:max_i, min_j:max_j])))
-        return float(mse)
+        metric = np.mean(np.square(residual[min_i:max_i, min_j:max_j]))
+        return float(metric)
 
     return f
 
@@ -107,7 +107,7 @@ def optimize(
     )
 
     sx_start, sy_start = pos2shift(camera, *arg_sky)
-    fluence_start = sky[*arg_sky]
+    fluence_start = sky[*arg_sky] / 0.9                 # camera coding power (Skinner et al. 2008)
 
     results = least_squares(
         lambda args: loss((args[0], args[1], args[2]), sky, arg_sky, camera),
@@ -116,16 +116,16 @@ def optimize(
             (
                 max(sx_start - 3 * px_dim_x, camera.bins_sky.x[0]),
                 max(sy_start - 3 * px_dim_y, camera.bins_sky.y[0]),
-                0.75 * sky[*arg_sky],
+                sky[*arg_sky],
             ),
             (
                 min(sx_start + 3 * px_dim_x, camera.bins_sky.x[-1]),
                 min(sy_start + 3 * px_dim_y, camera.bins_sky.y[-1]),
-                1.25 * sky[*arg_sky],
+                sky[*arg_sky] / 0.8,
             ),
         ],
-        xtol=1e-11,
-        ftol=1e-11,
+        xtol=1e-7,
+        ftol=1e-6,
         x_scale='jac',
     )
     # store the final optimized positions and fluence.

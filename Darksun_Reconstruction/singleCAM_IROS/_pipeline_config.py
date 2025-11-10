@@ -4,6 +4,7 @@ Configuration script for the IROS pipeline.
 
 from ._pipeline_support import PipelineParams
 from ._pipeline_support import config_parameters
+from ._pipeline_support import save_pipeline_params
 from ._pipeline_support import output_files
 from .singleCAM_iros import run_IROS
 
@@ -281,6 +282,8 @@ def run(params: PipelineParams) -> None:
                 )
                 ds.save_sky(comp_sky, comp_snr, sdlA, params.out_comp_name, comp_WCS)
     
+    # save json file with pipeline's parameters
+    save_pipeline_params(params)
 
     # final check on pipeline files
     output_files(params, check_out=False)

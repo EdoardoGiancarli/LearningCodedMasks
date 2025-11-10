@@ -37,8 +37,8 @@ TODO:
     - fix skies upscaling for output visualisation
     - insert possibility to load residuals of proper shapes to act as BKG for output IROS skies (not oversampled)
     - generalize directory paths for all users
-    - setup .json file to give it as input to this module
-    - WARNING: new-sources association must be updated to consider repeating same new-source
+    - setup .json file to give it as input to this module, or as output for the run
+    - NOTE: new-sources association must be updated to consider repeating same new-source
 """
 
 from singleCAM_IROS._pipeline_config import run_pipeline
@@ -49,17 +49,17 @@ from bloodmoon.types import CoordEquatorial
 """
 PIPELINE SET-UP.
 """
-#### --- WIDE FIELD MONITOR MASK
+#### --- LEM-X CAMERAS MASK PATTERN
 MASK_FITS: str = "wfm_mask_NTHT_20250725.fits"
-THIN_MASK: bool = False                           # selects if infinitely opaque and thin mask (removes vignetting effects)
+THIN_MASK: bool = False                                                           # removes vignetting effects
 
 #### --- OBSERVATION DATA
-SKYFIELD: str = "GalacticCentre"                                                      # skyfield selection
+SKYFIELD: str = "GalacticCentre"                                                  # skyfield selection
 DATA_FITS: str = "galctr_rxte-sax_2-50keV_mask_050_1040x17_opaquemask_infdet"     # directory with FITS files from WFM
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "reconstructed"
+DATASET: str = "detected"
 
 #### --- IMAGES UPSCALING
 UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
@@ -69,7 +69,7 @@ UPSX_FINAL: int = 2                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx2upy1_smoothing"
+ANALYSIS_ID: str = "singleCAM_iros_upx2upy1_testingOptimiser_detected"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 20

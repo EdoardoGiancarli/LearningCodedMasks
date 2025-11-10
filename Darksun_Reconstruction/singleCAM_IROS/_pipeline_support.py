@@ -328,6 +328,12 @@ def config_parameters(
     return params
 
 
+def save_pipeline_params(params: PipelineParams) -> None:
+    """Generates a `.json` file with the pipeline parameters."""
+    print('\n\n# TO IMPLEMENT: save pipeline json file\n\n')
+    return None
+
+
 def output_files(
     params: PipelineParams,
     check_out: bool = True,
