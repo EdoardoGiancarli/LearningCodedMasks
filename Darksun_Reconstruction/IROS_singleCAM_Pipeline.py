@@ -59,7 +59,7 @@ DATA_FITS: str = "galctr_rxte-sax_2-50keV_mask_050_1040x17_opaquemask_infdet"   
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "detected"
+DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
 UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
@@ -69,13 +69,13 @@ UPSX_FINAL: int = 2                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx2upy1_testingOptimiser_detected"
+ANALYSIS_ID: str = "singleCAM_iros_upx2upy1_newOptimiser_smoothing"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 20
+MAX_ITERATIONS: int = 15
 SNR_THRESHOLD: int | float = 5
 
-WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
+WFM_SKY_COMPOSITION: bool = True   # selects if the WFM cameras are to be joined to get the composed sky
 
 #### --- DATA FILTERS SETUP
 # photons energy filter - [keV]
