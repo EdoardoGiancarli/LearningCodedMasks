@@ -5,6 +5,7 @@ Configuration script for the IROS pipeline.
 from ._pipeline_support import PipelineParams
 from ._pipeline_support import config_parameters
 from ._pipeline_support import save_pipeline_params
+from ._pipeline_support import save_region_list
 from ._pipeline_support import output_files
 from .singleCAM_iros import run_IROS
 
@@ -35,7 +36,7 @@ def run(params: PipelineParams) -> None:
             filename = Path(filename)
         return filename.is_file()
     
-    CAM_A, CAM_B = params.wfm_cameras
+    CAM_A, CAM_B = params.module_cameras
 
     # upscaling setup
     UPSX_0, UPSY_0 = params.start_ups
@@ -242,6 +243,8 @@ def run(params: PipelineParams) -> None:
                 sdlB=sdlB,
                 save_to=params.DB_name,
             )
+            # save region file with pipeline's associated sources
+            save_region_list()
         else:
             print("# Catalogue comparison already done!")
             log_camA, log_camB = ds.load_database(params.DB_name)
@@ -295,7 +298,7 @@ def run_pipeline(
     thin_mask: bool,
     skyfield: str,
     skydata: str,
-    wfm_cameras: tuple[str, str],
+    module_cameras: tuple[str, str],
     dataset: str,
     start_ups: tuple[int, int],
     final_ups: tuple[int, int],
@@ -322,8 +325,8 @@ def run_pipeline(
             Name of the sky-field simulation (e.g., 'Crab', 'GalacticCenter', ...).
         skydata (str):
             Name of the directory with the sky-data simulation.
-        wfm_cameras (tuple[str, str]):
-            Name of the WFM cameras (e.g., `('cam1a', 'cam1b')`).
+        module_cameras (tuple[str, str]):
+            Name of the LEM-X cameras module (e.g., `('cam1a', 'cam1b')`).
         dataset (str):
             Photons position reconstruction effects. Either 'detected' or 'reconstructed'.
         start_ups (tuple[int, int]):
@@ -337,7 +340,7 @@ def run_pipeline(
         iros_snr_threshold (int | float, optional (default=`5`)):
             Minimum SNR value required to continue the iterative source removal process.
         sky_compositions (bool, optional (default=`False`)):
-            Flag for WFM sky compositions.
+            Flag for LEM-X coded-mask camera module sky compositions.
         energy_range (tuple[int | float | None, int | float | None] | None, optional (default=`None`)):
             Energy range in keV for the data filtering, to be interpreted as (`E_min`, `E_max`).
         coords (tuple[float, float] | Sequence[tuple[float, float]] | None, optional (default=`None`)):
@@ -353,7 +356,7 @@ def run_pipeline(
         thin_mask=thin_mask,
         skyfield=skyfield,
         skydata=skydata,
-        wfm_cameras=wfm_cameras,
+        module_cameras=module_cameras,
         dataset=dataset,
         start_ups=start_ups,
         final_ups=final_ups,

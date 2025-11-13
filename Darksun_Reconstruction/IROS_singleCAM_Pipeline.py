@@ -101,7 +101,7 @@ if __name__ == "__main__":
         thin_mask=THIN_MASK,
         skyfield=SKYFIELD,
         skydata=DATA_FITS,
-        wfm_cameras=(ID_CAMERA_A, ID_CAMERA_B),
+        module_cameras=(ID_CAMERA_A, ID_CAMERA_B),
         dataset=DATASET,
         start_ups=(UPSX_0, UPSY_0),
         final_ups=(UPSX_FINAL, UPSY_FINAL),

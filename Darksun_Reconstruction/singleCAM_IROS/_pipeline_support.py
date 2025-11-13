@@ -26,7 +26,7 @@ def _handle_dirpaths(
 
     # define paths for data and output files
     if Path(base_path := OS_SELECT['DEBIAN']).is_dir():
-        mask_path = f"{base_path}/Simulations/{mask}"                 # dirpath to WFM mask file
+        mask_path = f"{base_path}/Simulations/{mask}"                 # dirpath to cameras mask file
         data_path = f"{base_path}/Simulations/{skyfield}/{simul}/"    # dirpath with simul files
 
         if run_name:
@@ -96,19 +96,19 @@ class PipelineParams:
         psfy (bool):
             Flag for detector PSF effect along the y axis.
         wfm_cameras (tuple[str, str]):
-            Name of the WFM cameras (e.g., `('cam1a', 'cam1b')`).
+            Name of the LEM-X module cameras (e.g., `('cam1a', 'cam1b')`).
         dataset (str):
             Photons position reconstruction effects. Either 'detected' or 'reconstructed'.
         start_ups (tuple[int, int]):
-            Starting upscaling values.
+            Starting upscaling values (fine, coarse) directions.
         final_ups (tuple[int, int]):
-            Final upscaling values.
+            Final upscaling values (fine, coarse) directions.
         iros_max_iterations (int):
             Maximum number of iterations for the IROS loop.
         iros_snr_threshold (int | float):
             Minimum SNR value required to continue the iterative source removal process.
         sky_compositions (bool):
-            Flag for WFM sky compositions.
+            Flag for LEM-X module sky compositions.
         simul_names (tuple[str, str]):
             Names for the simulated skies FITS files.
         simul_comp_name (str):
@@ -175,7 +175,7 @@ def config_parameters(
     thin_mask: bool,
     skyfield: str,
     skydata: str,
-    wfm_cameras: tuple[str, str],
+    module_cameras: tuple[str, str],
     dataset: str,
     start_ups: tuple[int, int],
     final_ups: tuple[int, int],
@@ -200,8 +200,8 @@ def config_parameters(
             Name of the sky-field simulation (e.g., 'Crab', 'GalacticCenter', ...).
         skydata (str):
             Name of the directory with the sky-data simulation.
-        wfm_cameras (tuple[str, str]):
-            Name of the WFM cameras (e.g., `('cam1a', 'cam1b')`).
+        module_cameras (tuple[str, str]):
+            Name of the LEM-X cameras module (e.g., `('cam1a', 'cam1b')`).
         dataset (str):
             Photons position reconstruction effects. Either 'detected' or 'reconstructed'.
         start_ups (tuple[int, int]):
@@ -215,7 +215,7 @@ def config_parameters(
         iros_snr_threshold (int | float):
             Minimum SNR value required to continue the iterative source removal process.
         sky_compositions (bool):
-            Flag for WFM sky compositions.
+            Flag for LEM-X coded-mask camera module sky compositions.
         energy_range (tuple[int | float | None, int | float | None] | None):
             Energy range in keV for the data filtering, to be interpreted as (`E_min`, `E_max`).
         coords (tuple[float, float] | Sequence[tuple[float, float]] | None):
@@ -269,7 +269,7 @@ def config_parameters(
     vignetting, psfy = handle_instrument_effects(thin_mask, dataset)
     
     # output files names (simul skies, iros output DB and sky residuals, sources and catalog-compared DB, IROS skies)
-    cam_a, cam_b = wfm_cameras
+    cam_a, cam_b = module_cameras
 
     simul_names = tuple(save_path + f"sky_SIMUL_{cam.upper()}_TEST_{analysisID}.fits" for cam in (cam_a, cam_b))
     simul_comp_name = save_path + f"COMPOSED_sky_SIMUL_{cam_a.upper()}_{cam_b.upper()}_TEST_{analysisID}.fits"
@@ -301,7 +301,7 @@ def config_parameters(
         save_path=save_path,
         vignetting=vignetting,
         psfy=psfy,
-        wfm_cameras=wfm_cameras,
+        module_cameras=module_cameras,
         dataset=dataset,
         start_ups=start_ups,
         final_ups=final_ups,
@@ -331,6 +331,12 @@ def config_parameters(
 def save_pipeline_params(params: PipelineParams) -> None:
     """Generates a `.json` file with the pipeline parameters."""
     print('\n\n# TO IMPLEMENT: save pipeline json file\n\n')
+    return None
+
+
+def save_region_list() -> None:
+    """Generates a `.reg` file with the pipeline associated sources."""
+    print('\n\n# TO IMPLEMENT: save region file with sources\n\n')
     return None
 
 
