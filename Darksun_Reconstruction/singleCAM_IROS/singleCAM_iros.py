@@ -16,32 +16,14 @@ from bloodmoon.optim import model_shadowgram, model_sky
 from bloodmoon.optim import optimize
 
 from darksun.types import LogEntry
+from darksun.types import Candidate
 from darksun.data import Log
 from darksun.data import create_log
 from darksun.data import DataLoader
-from darksun.optim import bkg_smoothing
+from darksun.optim import retrieve_detector
+from darksun.optim import detector_smoothing
 
 # from new_optimiser import optimize
-
-
-class Candidate(NamedTuple):
-    """
-    Source candidate main info container.
-
-    Attributes:
-        shift_x (float):
-            Coded-mask camera local frame sky-coord along the x-axis [mm].
-        shift_y (float):
-            Coded-mask camera local frame sky-coord along the y-axis [mm].
-        fluence (float):
-            Observed candidate fluence [ph].
-        snr (float):
-            Candidate significance [adim].
-    """
-    shift_x: float
-    shift_y: float
-    fluence: float
-    snr: float
 
 
 def iros_singleCAM(
@@ -94,6 +76,24 @@ def iros_singleCAM(
     >>>     residual_1a, residual_1b = residuals
     >>>     ...
     """
+    SETUP = {
+        'slit_mask_fine': int(
+            camera.specs.slit_deltax * camera.upscale_f.x / camera.specs.mask_deltax
+        ) // 2,
+        'slit_mask_coarse': int(
+            camera.specs.slit_deltay * camera.upscale_f.y / camera.specs.mask_deltay
+        ) // 2,
+        'skymap_mask': np.ones(camera.shape_sky, dtype=int),
+    }
+
+    def _update_skymap_mask(pos: tuple[int, int]) -> None:
+        """Updates the skymap mask with the new candidate position."""
+        SETUP['skymap_mask'][
+            pos[0] - SETUP['slit_mask_coarse'] : pos[0] + SETUP['slit_mask_coarse'] + 1,
+            pos[1] - SETUP['slit_mask_fine'] : pos[1] + SETUP['slit_mask_fine'] + 1,
+        ] = 0
+        return None
+
     def find_candidate(
         sky: NDArray,
         snr: NDArray,
@@ -106,7 +106,8 @@ def iros_singleCAM(
             [np.unravel_index(id_, sky.shape) for id_ in np.argsort(sky, axis=None)[-batch:]]
         )
         for pos in reservoir[::-1]:
-            if (snr[*pos] > snr_threshold):
+            if (snr[*pos] > snr_threshold) and SETUP['skymap_mask'][*pos]:
+                _update_skymap_mask(pos)
                 return tuple(pos)
         return False
 
@@ -208,61 +209,6 @@ def iros_pre_smoothing(*args, **kwargs) -> tuple[Candidate, ...]:
     cands = tuple(c for c, _ in tqdm(loop))
     print("# End pre-process loop...\n")
     return cands
-
-
-def retrieve_detector(
-    candidates: tuple[Candidate, ...],
-    camera: CodedMaskCamera,
-    vignetting: bool,
-    psfy: bool,
-) -> NDArray:
-    """Generates detector image from retrieved candidates."""
-    detector = np.zeros(camera.shape_detector)
-    for (sx, sy, f, _) in candidates:
-        sg = model_shadowgram(
-            camera=camera,
-            shift_x=sx,
-            shift_y=sy,
-            vignetting=vignetting,
-            psfy=psfy,
-        )
-        detector += (f * sg)
-    return detector
-
-
-def detector_smoothing(
-    detector: NDArray,
-    candidates: tuple[Candidate, ...],
-    camera: CodedMaskCamera,
-    vignetting: bool,
-    psfy: bool,
-) -> NDArray:
-    """
-    Process the observed detector image by applying
-    a median smoothing of the background.
-    """
-    KERNEL_SIZE = {
-        'y': 11,
-        'x': 7,
-    }
-    # get residual detector image
-    retrieved = retrieve_detector(
-        candidates=candidates,
-        camera=camera,
-        vignetting=vignetting,
-        psfy=psfy,
-    )
-    res_detector = detector - retrieved
-    # perform smoothing on residual detector image
-    res_smoothed = bkg_smoothing(
-        detector=res_detector,
-        camera=camera,
-        kernelsize_y=KERNEL_SIZE['y'],
-        kernelsize_x=KERNEL_SIZE['x'],
-    )
-    # get smoothed detector image
-    smoothed = detector - res_smoothed
-    return smoothed
 
 
 def run_IROS(
