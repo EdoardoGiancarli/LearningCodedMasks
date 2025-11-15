@@ -4,8 +4,8 @@ Configuration script for the IROS pipeline.
 
 from ._pipeline_support import PipelineParams
 from ._pipeline_support import config_parameters
+from ._pipeline_support import save_region_file
 from ._pipeline_support import save_pipeline_params
-from ._pipeline_support import save_region_list
 from ._pipeline_support import output_files
 from .singleCAM_iros import run_IROS
 
@@ -223,6 +223,9 @@ def run(params: PipelineParams) -> None:
                 camera=wfm,
                 screening=True,
             )
+            # save region files with pipeline's associated sources - Camera A
+            save_region_file(log_camA, catA, params.region_outfiles[0])
+
             catB = ds.get_catalogue(
                 filepath=filepaths[CAM_B]["sources"],
                 n=params.n,
@@ -243,8 +246,8 @@ def run(params: PipelineParams) -> None:
                 sdlB=sdlB,
                 save_to=params.DB_name,
             )
-            # save region file with pipeline's associated sources
-            save_region_list()
+            # save region files with pipeline's associated sources - Camera B
+            save_region_file(log_camB, catB, params.region_outfiles[1])
         else:
             print("# Catalogue comparison already done!")
             log_camA, log_camB = ds.load_database(params.DB_name)
@@ -285,8 +288,8 @@ def run(params: PipelineParams) -> None:
                 )
                 ds.save_sky(comp_sky, comp_snr, sdlA, params.out_comp_name, comp_WCS)
     
-    # save json file with pipeline's parameters
-    save_pipeline_params(params)
+    # save .yaml file with pipeline's parameters
+    save_pipeline_params(params, params.pipeline_outfile)
 
     # final check on pipeline files
     output_files(params, check_out=False)

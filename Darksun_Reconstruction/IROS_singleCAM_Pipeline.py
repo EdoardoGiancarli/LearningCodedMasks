@@ -37,7 +37,7 @@ TODO:
     - fix skies upscaling for output visualisation
     - insert possibility to load residuals of proper shapes to act as BKG for output IROS skies (not oversampled)
     - generalize directory paths for all users
-    - setup .json file to give it as input to this module, or as output for the run
+    - setup .yaml file to give it as input to this module
     - NOTE: new-sources association must be updated to consider repeating same new-source
 """
 
@@ -69,13 +69,13 @@ UPSX_FINAL: int = 2                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx2upy1_newOptimiser_smoothing"
+ANALYSIS_ID: str = "testing_update"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 15
+MAX_ITERATIONS: int = 5
 SNR_THRESHOLD: int | float = 5
 
-WFM_SKY_COMPOSITION: bool = True   # selects if the WFM cameras are to be joined to get the composed sky
+WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
 
 #### --- DATA FILTERS SETUP
 # photons energy filter - [keV]

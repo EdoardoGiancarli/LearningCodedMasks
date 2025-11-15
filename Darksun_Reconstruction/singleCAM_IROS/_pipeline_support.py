@@ -6,8 +6,13 @@ import os
 from typing import Sequence
 from pathlib import Path
 from dataclasses import dataclass
+import yaml
 
 from bloodmoon.types import CoordEquatorial
+
+from darksun.data import Log
+from darksun.data import CatalogueLoader
+from darksun.benchmarking import source_catalogue_data
 
 
 OS_SELECT = {
@@ -95,7 +100,7 @@ class PipelineParams:
             Flag for vignetting effect on the detector.
         psfy (bool):
             Flag for detector PSF effect along the y axis.
-        wfm_cameras (tuple[str, str]):
+        module_cameras (tuple[str, str]):
             Name of the LEM-X module cameras (e.g., `('cam1a', 'cam1b')`).
         dataset (str):
             Photons position reconstruction effects. Either 'detected' or 'reconstructed'.
@@ -127,6 +132,10 @@ class PipelineParams:
             Names for the IROS reconstructed skies FITS files.
         out_comp_name (str):
             Name for the IROS reconstructed sky composition FITS file.
+        region_outfiles (tuple[str, str]):
+            Names for the output `.reg` files of the IROS reconstr for the LEM-X cameras.
+        pipeline_outfile (str):
+            Name for the output `.yaml` file with the pipeline's parameters.
         E_min (int | float | None):
             Minimum photons energy in [keV] for the observed data filtering.
         E_max (int | float | None):
@@ -145,7 +154,7 @@ class PipelineParams:
     save_path: str
     vignetting: bool
     psfy: bool
-    wfm_cameras: tuple[str, str]
+    module_cameras: tuple[str, str]
     dataset: str
     start_ups: tuple[int, int]
     final_ups: tuple[int, int]
@@ -161,6 +170,8 @@ class PipelineParams:
     DB_name: str
     out_names: tuple[str, str]
     out_comp_name: str
+    region_outfiles: tuple[str, str]
+    pipeline_outfile: str
     E_min: int | float | None
     E_max: int | float | None
     coords: CoordEquatorial | Sequence[CoordEquatorial] | None
@@ -268,7 +279,12 @@ def config_parameters(
     # mask/detector corrections
     vignetting, psfy = handle_instrument_effects(thin_mask, dataset)
     
-    # output files names (simul skies, iros output DB and sky residuals, sources and catalog-compared DB, IROS skies)
+    # output files names
+    #   - simulated TRUE skies
+    #   - iros output DB and sky residuals after IROS procedure
+    #   - sources and catalog-compared DB
+    #   - IROS reconstructed skies
+    #   - pipeline output .reg files for camera module and .yaml file with pipeline's params
     cam_a, cam_b = module_cameras
 
     simul_names = tuple(save_path + f"sky_SIMUL_{cam.upper()}_TEST_{analysisID}.fits" for cam in (cam_a, cam_b))
@@ -283,6 +299,9 @@ def config_parameters(
 
     out_names = tuple(save_path + f"OUTsky_IROS_{cam.upper()}_TEST_{analysisID}.fits" for cam in (cam_a, cam_b))
     out_comp_name = save_path + f"COMPOSED_OUTsky_IROS_{cam_a.upper()}_{cam_b.upper()}_TEST_{analysisID}.fits"
+
+    region_outfiles = tuple(save_path + f"OUTregionfile_IROS_{cam.upper()}_TEST_{analysisID}.reg" for cam in (cam_a, cam_b))
+    pipeline_outfile = save_path + f"OUTpipelinefile_TEST_{analysisID}.yaml"
 
     # filters params
     if (energy_range is None) or (not any(energy_range)):
@@ -317,6 +336,8 @@ def config_parameters(
         DB_name=DB_name,
         out_names=out_names,
         out_comp_name=out_comp_name,
+        region_outfiles=region_outfiles,
+        pipeline_outfile=pipeline_outfile,
         E_min=E_min,
         E_max=E_max,
         coords=coords,
@@ -328,15 +349,119 @@ def config_parameters(
     return params
 
 
-def save_pipeline_params(params: PipelineParams) -> None:
-    """Generates a `.json` file with the pipeline parameters."""
-    print('\n\n# TO IMPLEMENT: save pipeline json file\n\n')
+def save_region_file(
+    log: Log,
+    catalogue: CatalogueLoader,
+    save_to: str | Path,
+) -> None:
+    """
+    Saves a `.reg` (region) file with info about the reconstructed
+    IROS sources, i.e., their respective RA/Dec coordinates from
+    the catalogue in the `fk5` reference frame.
+
+    Args:
+        log (Log):
+            IROS reconstructed sources database.
+        catalogue (CatalogueLoader):
+            Catalogue data for the LEM-X coded-mask camera.
+        save_to (str | Path):
+            Path for where to save the `.reg` file.
+    """
+    SETUP = {
+        'format': 'DS9 version 4.1',
+        'refsystem': 'fk5',
+        'circles_size': 400.0,
+
+        'options': {
+            'color': 'green',
+            'dashlist': '8 3',
+            'width': 1,
+            'font': '"helvetica 10 normal roman"',
+            'select': 1,
+            'highlite': 1,
+            'dash': 0,
+            'fixed': 0,
+            'edit': 1,
+            'move': 1,
+            'delete': 1,
+            'include': 1,
+            'source': 1,
+        },
+    }
+
+    # populate list with sources location
+    source_list = []
+    for sourceID in log.log['ID']:
+        source_data = source_catalogue_data(sourceID, catalogue.DLdata)
+        source_list.append(
+            (sourceID, source_data['RA'], source_data['DEC'])
+        )
+    
+    # write .reg file with custom options
+    global_options = [
+        f'{key}={value} ' for key, value in SETUP['options'].items()
+    ]
+    tags = [
+        f'circle({ra}, {dec}, {SETUP['circles_size']}{'"'}) # text={{{sID}}}\n'
+        for (sID, ra, dec) in source_list
+    ]
+    with open(save_to, "w", encoding="utf-8") as f:
+        f.write(f'# Region file format: {SETUP['format']}\n')
+        f.write('global ')
+        f.writelines(global_options)
+        f.write('\n')
+        f.write(f'{SETUP['refsystem']}\n')
+        f.writelines(tags)
+
     return None
 
 
-def save_region_list() -> None:
-    """Generates a `.reg` file with the pipeline associated sources."""
-    print('\n\n# TO IMPLEMENT: save region file with sources\n\n')
+def save_pipeline_params(
+    params: PipelineParams,
+    save_to: str | Path,
+) -> None:
+    """
+    Saves a `.yaml` file with info about the IROS pipeline, indicating all
+    the useful parameters for replicating the reconstruction procedure.
+
+    Args:
+        params (PipelineParams):
+            PipelineParams instance with the initialized parameters for the pipeline.
+        save_to (str | Path):
+            Path for where to save the `.yaml` file.
+    """
+    _init_comment = (
+        f'#### OUTPUT FILE FOR IROS RECONSTRUCTION \n'
+        f'# This file serves as a container for all the parameters/info to replicate the IROS run.\n'
+        f'\n'
+        f'# ARGS:\n'
+        f'#     - `mask_file`, `simul_data` and `save_path` are the paths to the mask and data files;\n'
+        f'#     - `vignetting` and `psfy` represent the active instrumental effects;\n'
+        f'#     - `module_cameras` contains the ID for the two coded-mask cameras of the LEM-X module;\n'
+        f'#     - `dataset` is the photons reconstruction logic-type of the data;\n'
+        f'#     - `start_ups` and `final_ups` are the starting and final images upsampling factors in the (fine, coarse) directions;\n'
+        f'#     - `iros_max_iterations` is the max number of IROS iterations;\n'
+        f'#     - `iros_snr_threshold` is the significance threshold for the candidates validation;\n'
+        f'#     - `sky_compositions` is a flag for the cameras sky images composition;\n'
+        f'#     - `simul_names`, ..., `pipeline_outfile` are the names with which the pipeline files are saved (skies, databases, `.reg`);\n'
+        f'#     - `E_min` and `E_max` are the limits on the data energy range (in keV);\n'
+        f'#     - `coords` contains the sources RA/Dec coords that have been filtered out from the analysis (filtered out photons);\n'
+        f'#     - `F_min` and `F_max` are the limits on the catalogue sources flux range for the candidates comparison (in ph/cm2/s);\n'
+        f'\n\n'
+    )
+    _end_comment = (
+        f'\n\n'
+        f'# end'
+    )
+
+    dict_ = params.__dict__
+    to_yaml = yaml.dump(dict_, indent=4, sort_keys=False)
+
+    with open(save_to, "w", encoding="utf-8") as f:
+        f.write(_init_comment)
+        f.write(to_yaml)
+        f.write(_end_comment)
+    
     return None
 
 
@@ -349,7 +474,7 @@ def output_files(
     def check(filename: str) -> str:
         return "SAVED" if Path(filename).is_file() else "MISSING"
     
-    cam_a, cam_b = params.wfm_cameras
+    cam_a, cam_b = params.module_cameras
     pipeline_files = {
         "Simulation Files": [
             (f"Simulated Sky {cam_a.upper()}", params.simul_names[0]),
