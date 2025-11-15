@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, NamedTuple
 import warnings
 
 import numpy as np
@@ -16,20 +16,24 @@ from bloodmoon.optim import model_shadowgram, model_sky
 from bloodmoon.optim import optimize
 
 from darksun.types import LogEntry
+from darksun.types import Candidate
 from darksun.data import Log
 from darksun.data import create_log
 from darksun.data import DataLoader
-from darksun.optim import bkg_smoothing
+from darksun.optim import retrieve_detector
+from darksun.optim import detector_smoothing
+
+# from new_optimiser import optimize
 
 
 def iros_singleCAM(
-    skymap: NDArray,
-    varmap: NDArray,
+    detector: NDArray,
     camera: CodedMaskCamera,
     max_iterations: int = 40,
     snr_threshold: float = 0.0,
     vignetting: bool = True,
     psfy: bool = True,
+    varmap: NDArray | None = None,
 ) -> Iterable[tuple[Candidate, NDArray]]:
     """
     Performs the Iterative Removal of Sources (IROS) algorithm for a single coded-mask
@@ -72,6 +76,24 @@ def iros_singleCAM(
     >>>     residual_1a, residual_1b = residuals
     >>>     ...
     """
+    SETUP = {
+        'slit_mask_fine': int(
+            camera.specs.slit_deltax * camera.upscale_f.x / camera.specs.mask_deltax
+        ) // 2,
+        'slit_mask_coarse': int(
+            camera.specs.slit_deltay * camera.upscale_f.y / camera.specs.mask_deltay
+        ) // 2,
+        'skymap_mask': np.ones(camera.shape_sky, dtype=int),
+    }
+
+    def _update_skymap_mask(pos: tuple[int, int]) -> None:
+        """Updates the skymap mask with the new candidate position."""
+        SETUP['skymap_mask'][
+            pos[0] - SETUP['slit_mask_coarse'] : pos[0] + SETUP['slit_mask_coarse'] + 1,
+            pos[1] - SETUP['slit_mask_fine'] : pos[1] + SETUP['slit_mask_fine'] + 1,
+        ] = 0
+        return None
+
     def find_candidate(
         sky: NDArray,
         snr: NDArray,
@@ -84,7 +106,8 @@ def iros_singleCAM(
             [np.unravel_index(id_, sky.shape) for id_ in np.argsort(sky, axis=None)[-batch:]]
         )
         for pos in reservoir[::-1]:
-            if (snr[*pos] > snr_threshold):
+            if (snr[*pos] > snr_threshold) and SETUP['skymap_mask'][*pos]:
+                _update_skymap_mask(pos)
                 return tuple(pos)
         return False
 
@@ -110,19 +133,25 @@ def iros_singleCAM(
 
     def subtract(
         candidate: Candidate,
-        sky: NDArray,
+        detector: NDArray,
     ) -> NDArray:
-        """Subtracts candidate from sky image."""
-        model = model_sky(
+        """Subtracts candidate from detector image."""
+        sg_model = model_shadowgram(
             camera=camera,
             shift_x=candidate.shift_x,
             shift_y=candidate.shift_y,
-            fluence=candidate.fluence,
             vignetting=vignetting,
             psfy=psfy,
         )
-        residual = sky - model
+        residual = detector - candidate.fluence * sg_model
         return residual
+    
+    detector_ = detector.copy()
+    skymap = decode(camera, detector)
+    varmap = (
+        varmap if varmap is not None
+        else variance(camera, detector)
+    )
     
     for i in range(max_iterations):
         snrmap = snratio(skymap, varmap)
@@ -138,88 +167,16 @@ def iros_singleCAM(
             warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
             continue
 
-        skymap = subtract(source, skymap)
+        detector_ = subtract(source, detector_)
+        skymap = decode(camera, detector_)
         yield (source, skymap)
-
-
-#def camera_angular_resolution(camera: CodedMaskCamera) -> tuple[float, float]:
-#    """
-#    Computes the camera angular resolution along the axes, in [arcmin].
-#
-#    Args:
-#        camera (CodedMaskCamera):
-#            Instance with info on the camera system geometry.
-#    
-#    Returns:
-#        output (tuple[float, float]):
-#            Camera angular resolution along the (x, y) axes in [arcmin].
-#    
-#    ## Notes:
-#        * From: Skinner, G.K., 2008. Sensitivity of coded mask telescopes.
-#          Applied optics, 47(15), pp.2739-2749.
-#    """
-#    def angular_resolution(m_pitch: float, d_pitch: float, dist: float) -> float:
-#        """
-#        Computes the camera angular resolution along the axis, in [arcmin].
-#
-#        Args:
-#            m_pitch (float): Mask element pitch.
-#            d_pitch (float): Detector element resolution pitch.
-#            dist (float): Mask - Detector distance.
-#        """
-#        dtheta_rad = np.sqrt(
-#            np.square(m_pitch / dist) + np.square(d_pitch / dist)
-#        )
-#        dtheta_arcmin = np.rad2deg(dtheta_rad) * 60
-#        return dtheta_arcmin
-#    
-#    p = camera.specs['mask_detector_distance']
-#    mx, my = (
-#        camera.specs['slit_deltax'],
-#        camera.specs['slit_deltay'],
-#    )
-#    dx, dy = (
-#        camera.specs['...'],
-#        camera.specs['...'],
-#    )
-#    return (
-#        angular_resolution(mx, dx, p),
-#        angular_resolution(my, dy, p),
-#    )
-#
-#
-#def camera_skycoords_errors(camera: CodedMaskCamera) -> tuple[float, float]:
-#    """
-#    Computes the camera local-frame coords NOMINAL* errors along
-#    the axes, taking into account the chosen camera upscaling.
-#
-#    *For now, we are considering a proxy for the camera angular
-#     resolution along the fine and coarse directions.
-#
-#    Args:
-#        camera (CodedMaskCamera):
-#            Instance with info on the camera system geometry.
-#    
-#    Returns:
-#        output (tuple[float, float]):
-#            Camera local-frame cartesian coords errors along
-#            the (x, y) axes in [mm].
-#    """
-#    def arcmin2deg(angle: float) -> float:
-#        """Converts angle from [arcmin] to [deg]."""
-#        return angle / 60
-#    
-#    UPX, UPY = camera.upscale_f
-#    ang_res_x, ang_res_y = camera_angular_resolution(camera)
-#    dsx = abs(angle2shift(camera, arcmin2deg(ang_res_x / UPX)))  # [mm]
-#    dsy = abs(angle2shift(camera, arcmin2deg(ang_res_y / UPY)))  # [mm]
-#    return dsx, dsy
 
 
 def shifts_errors(camera: CodedMaskCamera) -> tuple[float, float]:
     """
     Computes the camera local-frame coords NOMINAL* errors along
-    the axes, taking into account the chosen camera upscaling.
+    the system fine and coarse directions angular resolution,
+    taking into account the chosen camera upscaling.
 
     *For now, we are considering a proxy for the camera angular
      resolution along the fine and coarse directions.
@@ -241,6 +198,17 @@ def shifts_errors(camera: CodedMaskCamera) -> tuple[float, float]:
         (dthetax, dthetay),
     )
     return dsx, dsy
+
+
+def iros_pre_smoothing(*args, **kwargs) -> tuple[Candidate, ...]:
+    """
+    Performs the IROS loop for detector smoothing.
+    """
+    print("# Running pre-process loop...")
+    loop = iros_singleCAM(*args, **kwargs)
+    cands = tuple(c for c, _ in tqdm(loop))
+    print("# End pre-process loop...\n")
+    return cands
 
 
 def run_IROS(
@@ -273,7 +241,7 @@ def run_IROS(
     
     Args:
         IDcam (str | None, optional (default=`None`)):
-                WFM coded-mask camera ID (for the Log).
+            LEM-X module coded-mask camera ID (for the data Log).
         camera (CodedMaskCamera):
             CodedMaskCamera instance used for imaging and reconstruction.
         sdl (DataLoader):
@@ -313,56 +281,40 @@ def run_IROS(
     # define significance threshold for detector smoothing
     SMOOTHING_THRESH = 15.0
 
-    # generating detector image
-    detector = count(camera, sdl.DLdata)[0]
-    # skymap = decode(camera, detector)
-    varmap = variance(camera, detector)
-
-    # performing IROS to remove the brightest sources (SNR > SMOOTHING_THRESH)
-    print("# Running first loop...")
-####    first_loop = iros_singleCAM(
-####        skymap=skymap,
-####        varmap=varmap,
-####        camera=camera,
-####        snr_threshold=SMOOTHING_THRESH,
-####        vignetting=vignetting,
-####        psfy=psfy,
-####    )
-####    candidates = tuple(c for c, _ in tqdm(first_loop))
-    
-    # perform detector smoothing and run again IROS on the processed data;
-    # to do that, we first remove the stored sources from the original
-    # detector, and then we perform the smoothing
-    def callback(output: tuple[float]) -> tuple[float]:
+    # IROS procedure body
+    def callback(output: Candidate) -> tuple[float, ...]:
         """Manage IROS candidate output parameters."""
         sx, sy, f, signf = output
-        df = np.sqrt(f)
+        df: float = np.sqrt(f)
         return sx, DSX, sy, DSY, f, df, signf
     
-####    def retrieve_detector(candidates: tuple[tuple[float, ...], ...]) -> NDArray:
-####        """Generates detector image from retrieved candidates."""
-####        img = np.zeros(camera.shape_detector)
-####        for (sx, sy, f, _) in candidates:
-####            shadowgram = model_shadowgram(
-####                camera=camera,
-####                shift_x=sx,
-####                shift_y=sy,
-####                vignetting=vignetting,
-####                psfy=psfy,
-####            )
-####            img += (f * shadowgram)
-####        return img
-####
-####    smoothed_res_detector = bkg_smoothing(
-####        detector=detector - retrieve_detector(candidates),
-####        camera=camera,
-####    )
-####    smoothed_skymap = decode(
-####        camera,
-####        np.clip(detector - smoothed_res_detector, a_min=0.0, a_max=detector.sum()),
-####    )
-####    print("# Initializing second loop with smoothed detector...")
-    second_loop = iros_singleCAM(
+    # generating detector and sky images + variance map
+    detector = count(camera, sdl.DLdata)[0]
+    varmap = variance(camera, detector)
+    
+    # performing IROS to remove the brightest sources (SNR > SMOOTHING_THRESH)
+############    brightest_cands = iros_pre_smoothing(
+############        detector,
+############        camera,
+############        snr_threshold=SMOOTHING_THRESH,
+############        vignetting=vignetting,
+############        psfy=psfy,
+############        varmap=varmap,
+############    )
+############
+############    # perform detector smoothing and run again IROS on the processed data;
+############    # to do that, we first remove the stored sources from the original
+############    # detector, and then we perform the smoothing
+############    smoothed = detector_smoothing(
+############        detector=detector,
+############        candidates=brightest_cands,
+############        camera=camera,
+############        vignetting=vignetting,
+############        psfy=psfy,
+############    )
+############    
+############    print("# Initialising loop with smoothed detector...")
+    loop = iros_singleCAM(
         detector=detector,
         camera=camera,
         max_iterations=max_iterations,
@@ -372,7 +324,7 @@ def run_IROS(
         varmap=varmap,
     )
     print("# Looping around the FOV...")
-    for candidate, residual in tqdm(second_loop):
+    for candidate, residual in tqdm(loop):
         cam_log.update(
             tuple((p.entry, val) for p, val in zip(params, callback(candidate)))
         )
@@ -380,4 +332,4 @@ def run_IROS(
     return cam_log, residual
 
 
-# end    
+# end
