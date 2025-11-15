@@ -43,6 +43,7 @@ TODO:
 
 from singleCAM_IROS._pipeline_config import run_pipeline
 from typing import Sequence
+from pathlib import Path
 from bloodmoon.types import CoordEquatorial
 
 
@@ -69,23 +70,31 @@ UPSX_FINAL: int = 2                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "testing_update"
+ANALYSIS_ID: str = "testing_smoothing_BASELINE_RUN"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 5
 SNR_THRESHOLD: int | float = 5
 
-WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
+MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
+
+#### --- DETECTOR SMOOTHING SETUP
+# - selects if detector smoothing is to be applied
+SMOOTHING: bool = False
+# - significance threshold for brightest sources in sky-field (min = 5.0)
+SMOOTHING_SNR_THRESHOLD: int | float | None = 35
+# - path to non-smoothed IROS reconstruction directory, if present (written as '../baseline/' <-- NOTE: the ending `/`)
+BASELINE_IROSREC: str | Path | None = '/mnt/d/PhD_AASS/Coding/Images_fits/__smoothing__baseline__/'
 
 #### --- DATA FILTERS SETUP
-# photons energy filter - [keV]
+# - photons energy filter - [keV]
 PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = None
-# RA/Dec filter (sources to filter out) - [deg]
+# - RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 
-# number of sources in the catalog for comparison
+# - number of sources in the catalog for comparison
 CATALOGUE_NUM_BRIGHT_SOURCES: int | tuple[int, int] | None = None
-# sources flux filter for the catalog comparison - [ph/cm2/s]
+# - sources flux filter for the catalog comparison - [ph/cm2/s]
 CATALOGUE_FLUX_RANGE: tuple[int | float | None, int | float | None] | None = (1e-2, None)
 
 
@@ -108,7 +117,10 @@ if __name__ == "__main__":
         analysisID=ANALYSIS_ID,
         iros_max_iterations=MAX_ITERATIONS,
         iros_snr_threshold=SNR_THRESHOLD,
-        sky_compositions=WFM_SKY_COMPOSITION,
+        sky_compositions=MODULE_SKY_COMPOSITION,
+        smoothing=SMOOTHING,
+        smoothing_thresh=SMOOTHING_SNR_THRESHOLD,
+        smoothing_baseline_recnstr=BASELINE_IROSREC,
         energy_range=PHOTONS_ENERGY_RANGE,
         coords=PHOTONS_COORDS,
         n=CATALOGUE_NUM_BRIGHT_SOURCES,

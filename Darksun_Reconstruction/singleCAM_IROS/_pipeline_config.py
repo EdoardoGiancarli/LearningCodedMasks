@@ -133,6 +133,9 @@ def run(params: PipelineParams) -> None:
                 snr_threshold=params.iros_snr_threshold,
                 vignetting=params.vignetting,
                 psfy=params.psfy,
+                smoothing=params.smoothing,
+                smoothing_thresh=params.smoothing_thresh,
+                smoothing_baseline_recnstr=params.smoothing_baseline_recnstr,
             )
             print(f'\nApplying IROS to {CAM_B.upper()}')
             log_camB, skyB = run_IROS(
@@ -143,6 +146,9 @@ def run(params: PipelineParams) -> None:
                 snr_threshold=params.iros_snr_threshold,
                 vignetting=params.vignetting,
                 psfy=params.psfy,
+                smoothing=params.smoothing,
+                smoothing_thresh=params.smoothing_thresh,
+                smoothing_baseline_recnstr=params.smoothing_baseline_recnstr,
             )
             # save output databases
             if not is_file(params.iros_output_name):
@@ -309,6 +315,9 @@ def run_pipeline(
     iros_max_iterations: int = 20,
     iros_snr_threshold: int | float = 5,
     sky_compositions: bool = False,
+    smoothing: bool,
+    smoothing_thresh: int | float | None,
+    smoothing_baseline_recnstr: str | Path | None,
     energy_range: tuple[int | float | None, int | float | None] | None = None,
     coords: tuple[float, float] | Sequence[tuple[float, float]] | None = None,
     n: int | tuple[int, int] | None = None,
@@ -344,6 +353,12 @@ def run_pipeline(
             Minimum SNR value required to continue the iterative source removal process.
         sky_compositions (bool, optional (default=`False`)):
             Flag for LEM-X coded-mask camera module sky compositions.
+        smoothing (bool):
+            Selects if detector smoothing is to be applied.
+        smoothing_thresh (int | float | None):
+            Significance threshold for brightest sources in sky-field (min is set to `5.0` automathically).
+        smoothing_baseline_recnstr (str | Path | None):
+            Path to non-smoothed IROS reconstruction directory, if present.
         energy_range (tuple[int | float | None, int | float | None] | None, optional (default=`None`)):
             Energy range in keV for the data filtering, to be interpreted as (`E_min`, `E_max`).
         coords (tuple[float, float] | Sequence[tuple[float, float]] | None, optional (default=`None`)):
@@ -367,6 +382,9 @@ def run_pipeline(
         iros_max_iterations=iros_max_iterations,
         iros_snr_threshold=iros_snr_threshold,
         sky_compositions=sky_compositions,
+        smoothing=smoothing,
+        smoothing_thresh=smoothing_thresh,
+        smoothing_baseline_recnstr=smoothing_baseline_recnstr,
         energy_range=energy_range,
         coords=coords,
         n=n,

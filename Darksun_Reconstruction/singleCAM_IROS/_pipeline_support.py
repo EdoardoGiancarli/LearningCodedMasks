@@ -114,6 +114,12 @@ class PipelineParams:
             Minimum SNR value required to continue the iterative source removal process.
         sky_compositions (bool):
             Flag for LEM-X module sky compositions.
+        smoothing (bool):
+            Selects if detector smoothing is to be applied.
+        smoothing_thresh (int | float | None):
+            Significance threshold for brightest sources in sky-field (min is set to `5.0` automathically).
+        smoothing_baseline_recnstr (str | Path | None):
+            Path to non-smoothed IROS reconstruction directory, if present.
         simul_names (tuple[str, str]):
             Names for the simulated skies FITS files.
         simul_comp_name (str):
@@ -149,18 +155,26 @@ class PipelineParams:
         F_max (int | float | None):
             Maximum flux range in [ph/cm2/s] for the catalogue data filtering.
     """
+    # path to data (mask, WISEMAN and where to save output files)
     mask_file: str
     simul_data: str
     save_path: str
+    # instrumental effects
     vignetting: bool
     psfy: bool
+    # LEM-X module to apply IROS to, events reconstruction type and images sampling
     module_cameras: tuple[str, str]
     dataset: str
     start_ups: tuple[int, int]
     final_ups: tuple[int, int]
+    # IROS setup (iterations, threshold, module sky images composition and detector smoothing)
     iros_max_iterations: int
     iros_snr_threshold: int | float
     sky_compositions: bool
+    smoothing: bool
+    smoothing_thresh: int | float | None
+    smoothing_baseline_recnstr: str | Path | None
+    # pipeline output files (skyes, databases, info files)
     simul_names: tuple[str, str]
     simul_comp_name: str
     iros_output_name: str
@@ -172,6 +186,7 @@ class PipelineParams:
     out_comp_name: str
     region_outfiles: tuple[str, str]
     pipeline_outfile: str
+    # photons energy range and catalogue fluxes values limits
     E_min: int | float | None
     E_max: int | float | None
     coords: CoordEquatorial | Sequence[CoordEquatorial] | None
@@ -194,6 +209,9 @@ def config_parameters(
     iros_max_iterations: int,
     iros_snr_threshold: int | float,
     sky_compositions: bool,
+    smoothing: bool,
+    smoothing_thresh: int | float | None,
+    smoothing_baseline_recnstr: str | Path | None,
     energy_range: tuple[int | float | None, int | float | None] | None,
     coords: tuple[float, float] | Sequence[tuple[float, float]] | None,
     n: int | tuple[int, int] | None,
@@ -227,6 +245,12 @@ def config_parameters(
             Minimum SNR value required to continue the iterative source removal process.
         sky_compositions (bool):
             Flag for LEM-X coded-mask camera module sky compositions.
+        smoothing (bool):
+            Selects if detector smoothing is to be applied.
+        smoothing_thresh (int | float | None):
+            Significance threshold for brightest sources in sky-field (min is set to `5.0` automathically).
+        smoothing_baseline_recnstr (str | Path | None):
+            Path to non-smoothed IROS reconstruction directory, if present.
         energy_range (tuple[int | float | None, int | float | None] | None):
             Energy range in keV for the data filtering, to be interpreted as (`E_min`, `E_max`).
         coords (tuple[float, float] | Sequence[tuple[float, float]] | None):
@@ -243,6 +267,7 @@ def config_parameters(
     
     Raises:
         ValueError: If `n` or `flux_range` are both specified for catalogs filtering.
+        FileNotFoundError: If invalid `smoothing_baseline_recnstr` path.
     """
     def report(params: PipelineParams) -> None:
         """Prints out IROS pipeline info."""
@@ -258,6 +283,7 @@ def config_parameters(
             f"  - Final upscaling (x, y): {final_ups}\n"
             f"  - Max IROS iteration: {iros_max_iterations}\n"
             f"  - Sky compositions: {sky_compositions}\n"
+            f"  - Detector smoothing: {smoothing}\n"
             f"  - Filtered photons energy range [keV]: {energy_range}\n"
             f"  - Excluded photons RA/Dec [deg]: {coords}\n"
             f"  - Catalog selected brighest sources: {n}\n"
@@ -267,6 +293,21 @@ def config_parameters(
     # configure n and flux_range for catalogs filtering
     if n and flux_range:
         raise ValueError("Specify either 'n' or 'flux_range' to filter the catalog.")
+    
+    # check is smoothing baseline IROS files exist and if databases can be loaded
+    if smoothing and smoothing_baseline_recnstr is not None:
+        _db_file = tuple(Path(smoothing_baseline_recnstr).glob('IROS_sources_database*.fits'))
+        if not _db_file:
+            raise FileNotFoundError(
+                f"Invalid directory for detector smoothing baseline reconstruction: '{smoothing_baseline_recnstr}'. "
+                f"Database file with sources info and data NOT present (i.e., 'IROS_sources_database...' FITS file)."
+            )
+        else:
+            smoothing_baseline_recnstr = _db_file[0]
+    # check smoothing significance threshold value (for physical reasons, must be at least 5.0)
+    if smoothing and smoothing_thresh < 5.0:
+        print('Detector smoothing threshold too small. Automathically setting to 5.0.')
+        smoothing_thresh = max(5.0, smoothing_thresh)
 
     # file directory paths (mask, simulated, where to save output files)
     mask_file, simul_data, save_path = _handle_dirpaths(
@@ -327,6 +368,9 @@ def config_parameters(
         iros_max_iterations=iros_max_iterations,
         iros_snr_threshold=iros_snr_threshold,
         sky_compositions=sky_compositions,
+        smoothing=smoothing,
+        smoothing_thresh=smoothing_thresh,
+        smoothing_baseline_recnstr=smoothing_baseline_recnstr,
         simul_names=simul_names,
         simul_comp_name=simul_comp_name,
         iros_output_name=iros_output_name,
@@ -443,6 +487,9 @@ def save_pipeline_params(
         f'#     - `iros_max_iterations` is the max number of IROS iterations;\n'
         f'#     - `iros_snr_threshold` is the significance threshold for the candidates validation;\n'
         f'#     - `sky_compositions` is a flag for the cameras sky images composition;\n'
+        f'#     - `smoothing` is a flag for performing a smoothing of the observed sky-field detector image;\n'
+        f'#     - `smoothing_thresh` is a SNR threshold for the brightest sources to perform the smoothing with;\n'
+        f'#     - `smoothing_baseline_recnstr` is the path to a non-smoothed IROS reconstruction analysis, if present;\n'
         f'#     - `simul_names`, ..., `pipeline_outfile` are the names with which the pipeline files are saved (skies, databases, `.reg`);\n'
         f'#     - `E_min` and `E_max` are the limits on the data energy range (in keV);\n'
         f'#     - `coords` contains the sources RA/Dec coords that have been filtered out from the analysis (filtered out photons);\n'

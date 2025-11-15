@@ -1,5 +1,6 @@
-from typing import Iterable, NamedTuple
+from typing import Iterable
 import warnings
+from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
@@ -12,7 +13,7 @@ from bloodmoon.mask import count
 from bloodmoon.mask import decode
 from bloodmoon.mask import variance
 from bloodmoon.mask import snratio
-from bloodmoon.optim import model_shadowgram, model_sky
+from bloodmoon.optim import model_shadowgram
 from bloodmoon.optim import optimize
 
 from darksun.types import LogEntry
@@ -20,10 +21,9 @@ from darksun.types import Candidate
 from darksun.data import Log
 from darksun.data import create_log
 from darksun.data import DataLoader
-from darksun.optim import retrieve_detector
+from darksun.handle import load_database
+from darksun.optim import get_candidates
 from darksun.optim import detector_smoothing
-
-# from new_optimiser import optimize
 
 
 def iros_singleCAM(
@@ -48,13 +48,27 @@ def iros_singleCAM(
     5. Repeats until no significant sources remain or max iterations reached
 
     Args:
-        ...
+        detector (NDArray):
+            Encoded sky-fields detector image.
+        camera (CodedMaskCamera):
+            CodedMaskCamera instance containing mask/detector geometry and parameters.
+        max_iterations (int, optional (default=`40`):
+            Maximum number of source removal iterations to perform (default to 40 for precaution).
+        snr_threshold (float, optional (default=`0.0`):
+            If provided, iteration stops when maximum residual SNR falls below this value.
+        vignetting (bool, optional (default=`True`):
+            If `True`, the model used for optimization will simulate vignetting.
+        psfy (bool, optional (default=`True`):
+            If `True`, the model used for optimization will simulate
+            detector position reconstruction effects.
+        varmap (NDArray | None, optional (default=`None`):
+            Variance map of the encoded sky-fields for significance maps computations. If `None`,
+            the sky variance will be computed automathically from the input detector image.
 
     Yields:
-        TODO: update here!
-        output (tuple):
-            - aaa (bbb):
-                Candidate local-frame sky-shift coords, fluence and significance.
+        output (tuple[Candidate, NDArray]):
+            - candidate (Candidate):
+                Source candidate obj with local-frame sky-shift coords, fluence and significance.
             - residual (NDArray):
                 Coded-camera residual sky after removing the current candidate.
 
@@ -70,10 +84,9 @@ def iros_singleCAM(
         - Optimizes source parameters in local windows around candidates
         - When using reconstructed data, accounts for vignetting and PSF effects
 
-    Example: TODO: update here!
-    >>> for sources, residuals in iros(camera, sdl_cam1a, sdl_cam1b, max_iterations=2):
-    >>>     source_1a, source_1b = sources
-    >>>     residual_1a, residual_1b = residuals
+    Examples:
+    >>> for cand, residual in iros(detector, camera, max_iterations=2):
+    >>>     # do your magic here
     >>>     ...
     """
     SETUP = {
@@ -219,6 +232,9 @@ def run_IROS(
     snr_threshold: float = 0.0,
     vignetting: bool = True,
     psfy: bool = True,
+    smoothing: bool = False,
+    smoothing_thresh: int | float | None = 5.0,
+    smoothing_baseline_recnstr: str | Path | None = None,
 ) -> tuple[Log, NDArray]:
     """
     Runs the IROS (Iterative Removal of Sources) loop and stores the output for the
@@ -240,7 +256,7 @@ def run_IROS(
        fluence error is the square root of the fluence.
     
     Args:
-        IDcam (str | None, optional (default=`None`)):
+        IDcam (str | None):
             LEM-X module coded-mask camera ID (for the data Log).
         camera (CodedMaskCamera):
             CodedMaskCamera instance used for imaging and reconstruction.
@@ -255,16 +271,20 @@ def run_IROS(
         psfy (bool, optional (default=`True`)):
             If `True`, the model used for optimization will simulate detector
             position reconstruction effects.
+        smoothing (bool, optional (default=`False`)):
+            Selects if detector smoothing is to be applied.
+        smoothing_thresh (int | float | None, optional (default=`5.0`)):
+            Significance threshold for brightest sources in sky-field (min is set to `5.0` automathically).
+        smoothing_baseline_recnstr (str | Path | None, optional (default=`None`)):
+            Path to non-smoothed IROS reconstruction directory, if present.
 
     Returns:
         output (tuple[Log, NDArray]):
-            - log (Log):
-                Coded-camera log with metadata and results from IROS.
-            - residual (NDArray):
-                Coded-camera residual sky after IROS.
+            - Coded-camera log with metadata and results from IROS.
+            - Coded-camera residual sky after IROS.
     
     TODO:
-        * add smoothing doc
+        * add smoothing doc in **Notes**
     """    
     # generate IROS output log
     params = (
@@ -277,9 +297,6 @@ def run_IROS(
 
     # get camera local-frame coords sensitivity along the axes
     DSX, DSY = shifts_errors(camera)
-    
-    # define significance threshold for detector smoothing
-    SMOOTHING_THRESH = 15.0
 
     # IROS procedure body
     def callback(output: Candidate) -> tuple[float, ...]:
@@ -291,31 +308,52 @@ def run_IROS(
     # generating detector and sky images + variance map
     detector = count(camera, sdl.DLdata)[0]
     varmap = variance(camera, detector)
-    
-    # performing IROS to remove the brightest sources (SNR > SMOOTHING_THRESH)
-############    brightest_cands = iros_pre_smoothing(
-############        detector,
-############        camera,
-############        snr_threshold=SMOOTHING_THRESH,
-############        vignetting=vignetting,
-############        psfy=psfy,
-############        varmap=varmap,
-############    )
-############
-############    # perform detector smoothing and run again IROS on the processed data;
-############    # to do that, we first remove the stored sources from the original
-############    # detector, and then we perform the smoothing
-############    smoothed = detector_smoothing(
-############        detector=detector,
-############        candidates=brightest_cands,
-############        camera=camera,
-############        vignetting=vignetting,
-############        psfy=psfy,
-############    )
-############    
-############    print("# Initialising loop with smoothed detector...")
+
+    # detector smoothing
+    if smoothing:
+        print("# Initialising detector smoothing...")
+        # sky-field brightest sources (SNR > smoothing_thresh)
+        # - if is not possible to retrieve the sky-field brightest sources from
+        #   a pre-made IROS analysis, then a pre-smoothing IROS reconstruction
+        #   will be performed to get the brightest cands in the detector image
+        if smoothing_baseline_recnstr is not None:
+            # load baseline IROS reconstruction data
+            print('Loading baseline IROS reconstruction for smoothing...')
+            logA, logB = load_database(smoothing_baseline_recnstr)
+            camera_log = (
+                logA if IDcam.lower() in logA.name.lower()
+                else logB
+            )
+            brightest_cands = get_candidates(camera_log, smoothing_thresh)
+        else:
+            print('No baseline IROS reconstruction for smoothing selected')
+            brightest_cands = iros_pre_smoothing(
+                detector,
+                camera,
+                snr_threshold=smoothing_thresh,
+                vignetting=vignetting,
+                psfy=psfy,
+                varmap=varmap,
+            )
+
+        # perform detector smoothing and run again IROS on the processed data.
+        # To do that, we first remove the stored sources from the original
+        # detector, and then we perform the smoothing
+        print('Performing detector smoothing...')
+        detector_ = detector_smoothing(
+            detector=detector,
+            candidates=brightest_cands,
+            camera=camera,
+            vignetting=vignetting,
+            psfy=psfy,
+        )
+        print('Detector succesfully smoothed!')
+    else:
+        detector_ = detector
+
+    print(f"# Initialising IROS loop{' with smoothed detector' if smoothing else ''}...")
     loop = iros_singleCAM(
-        detector=detector,
+        detector=detector_,
         camera=camera,
         max_iterations=max_iterations,
         snr_threshold=snr_threshold,
