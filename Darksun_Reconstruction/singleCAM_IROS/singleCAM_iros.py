@@ -92,18 +92,22 @@ def iros_singleCAM(
     SETUP = {
         'slit_mask_fine': int(
             camera.specs.slit_deltax * camera.upscale_f.x / camera.specs.mask_deltax
-        ) // 2,
+        ),
         'slit_mask_coarse': int(
             camera.specs.slit_deltay * camera.upscale_f.y / camera.specs.mask_deltay
-        ) // 2,
+        ),
         'skymap_mask': np.ones(camera.shape_sky, dtype=int),
     }
 
     def _update_skymap_mask(pos: tuple[int, int]) -> None:
-        """Updates the skymap mask with the new candidate position."""
+        """
+        Updates the skymap mask with the new candidate position
+        by covering the candidate half-PSF profile (to account
+        for the camera angular resolution of a source).
+        """
         SETUP['skymap_mask'][
-            pos[0] - SETUP['slit_mask_coarse'] : pos[0] + SETUP['slit_mask_coarse'] + 1,
-            pos[1] - SETUP['slit_mask_fine'] : pos[1] + SETUP['slit_mask_fine'] + 1,
+            pos[0] - SETUP['slit_mask_coarse'] // 2 : pos[0] + SETUP['slit_mask_coarse'] // 2 + 1,
+            pos[1] - SETUP['slit_mask_fine'] // 2 : pos[1] + SETUP['slit_mask_fine'] // 2 + 1,
         ] = 0
         return None
 
