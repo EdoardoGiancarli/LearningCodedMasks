@@ -87,7 +87,10 @@ def handle_instrument_effects(
 @dataclass(frozen=True)
 class PipelineParams:
     """
-    Container for the IROS pipeline parameters.
+    Container for the IROS pipeline parameters, which configures the LEM-X coded-mask cameras
+    module parameters, the IROS setup parameters, handles the pipeline output files setup
+    (skyes, databases, info files), and manage the data photons energy range and catalogue
+    fluxes range to perform the IROS sources candidates association with.
 
     Attributes:
         mask_file (str):
@@ -108,6 +111,7 @@ class PipelineParams:
             Starting upscaling values (fine, coarse) directions.
         final_ups (tuple[int, int]):
             Final upscaling values (fine, coarse) directions.
+        
         iros_max_iterations (int):
             Maximum number of iterations for the IROS loop.
         iros_snr_threshold (int | float):
@@ -120,6 +124,7 @@ class PipelineParams:
             Significance threshold for brightest sources in sky-field (min is set to `5.0` automathically).
         smoothing_baseline_recnstr (str | Path | None):
             Path to non-smoothed IROS reconstruction directory, if present.
+        
         simul_names (tuple[str, str]):
             Names for the simulated skies FITS files.
         simul_comp_name (str):
@@ -142,6 +147,7 @@ class PipelineParams:
             Names for the output `.reg` files of the IROS reconstr for the LEM-X cameras.
         pipeline_outfile (str):
             Name for the output `.yaml` file with the pipeline's parameters.
+        
         E_min (int | float | None):
             Minimum photons energy in [keV] for the observed data filtering.
         E_max (int | float | None):
@@ -155,7 +161,7 @@ class PipelineParams:
         F_max (int | float | None):
             Maximum flux range in [ph/cm2/s] for the catalogue data filtering.
     """
-    # path to data (mask, WISEMAN and where to save output files)
+    # path to data (mask, WISEMAN events and directory to save output files)
     mask_file: str
     simul_data: str
     save_path: str
@@ -186,7 +192,7 @@ class PipelineParams:
     out_comp_name: str
     region_outfiles: tuple[str, str]
     pipeline_outfile: str
-    # photons energy range and catalogue fluxes values limits
+    # WISEMAN photons energy range and catalogue fluxes range setup
     E_min: int | float | None
     E_max: int | float | None
     coords: CoordEquatorial | Sequence[CoordEquatorial] | None
