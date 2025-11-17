@@ -101,14 +101,16 @@ def iros_singleCAM(
 
     def _update_skymap_mask(pos: tuple[int, int]) -> None:
         """
-        Updates the skymap mask with the new candidate position
-        by covering the candidate half-PSF profile (to account
-        for the camera angular resolution of a source).
+        Updates the skymap mask with the new candidate position by covering the candidate
+        half-PSF profile (to account for the camera angular resolution of a source).
         """
-        SETUP['skymap_mask'][
-            pos[0] - SETUP['slit_mask_coarse'] // 2 : pos[0] + SETUP['slit_mask_coarse'] // 2 + 1,
-            pos[1] - SETUP['slit_mask_fine'] // 2 : pos[1] + SETUP['slit_mask_fine'] // 2 + 1,
-        ] = 0
+        rows = slice(
+            pos[0] - SETUP['slit_mask_coarse'] // 2, pos[0] + SETUP['slit_mask_coarse'] // 2 + 1,
+        )
+        cols = slice(
+            pos[1] - SETUP['slit_mask_fine'] // 2, pos[1] + SETUP['slit_mask_fine'] // 2 + 1,
+        )
+        SETUP['skymap_mask'][rows, cols] = 0
         return None
 
     def find_candidate(
