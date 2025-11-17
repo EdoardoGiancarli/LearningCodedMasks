@@ -41,6 +41,7 @@ TODO:
     - NOTE: new-sources association must be updated to consider repeating same new-source
 """
 
+import os
 from singleCAM_IROS._pipeline_config import run_pipeline
 from typing import Sequence
 from pathlib import Path
@@ -56,7 +57,7 @@ THIN_MASK: bool = False                                                         
 
 #### --- OBSERVATION DATA
 SKYFIELD: str = "GalacticCentre"                                                  # skyfield selection
-DATA_FITS: str = "galctr_rxte-sax_2-50keV_mask_050_1040x17_opaquemask_infdet"     # directory with FITS files from WFM
+DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"     # directory with FITS files from WFM
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
@@ -70,21 +71,25 @@ UPSX_FINAL: int = 2                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "testing_smoothing_BASELINE_RUN"
+ANALYSIS_ID: str = "singleCAM_iros_upx2upy1_newOptimiser_smoothing"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 5
+MAX_ITERATIONS: int = 40
 SNR_THRESHOLD: int | float = 5
 
-MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
+MODULE_SKY_COMPOSITION: bool = True   # selects if the LEM-X module cameras are to be joined to get the composed sky
 
 #### --- DETECTOR SMOOTHING SETUP
 # - selects if detector smoothing is to be applied
-SMOOTHING: bool = False
+SMOOTHING: bool = True
 # - significance threshold for brightest sources in sky-field (min = 5.0)
-SMOOTHING_SNR_THRESHOLD: int | float | None = 35
+SMOOTHING_SNR_THRESHOLD: int | float | None = 15
 # - path to non-smoothed IROS reconstruction directory, if present (written as '../baseline/' <-- NOTE: the ending `/`)
-BASELINE_IROSREC: str | Path | None = '/mnt/d/PhD_AASS/Coding/Images_fits/__smoothing__baseline__/'
+BASELINE_IROSREC: str | Path | None = os.path.join(
+    '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7',
+    f'Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Outputs/Out{SKYFIELD}',
+    f'{DATA_FITS}/singleCAM_iros_upx2upy1_newOptimiser/',
+)
 
 #### --- DATA FILTERS SETUP
 # - photons energy filter - [keV]
