@@ -8,6 +8,8 @@ from pathlib import Path
 from dataclasses import dataclass
 import yaml
 
+import numpy as np
+
 from bloodmoon.types import CoordEquatorial
 
 from darksun.data import Log
@@ -441,11 +443,16 @@ def save_region_file(
 
     # populate list with sources location
     source_list = []
-    for sourceID in log.log['ID']:
-        source_data = source_catalogue_data(sourceID, catalogue.DLdata)
-        source_list.append(
-            (sourceID, source_data['RA'], source_data['DEC'])
-        )
+    for idx, sourceID in enumerate(log.log['ID']):
+        if sourceID in catalogue.DLdata['ID']:
+            source_data = source_catalogue_data(sourceID, catalogue.DLdata)
+            source_list.append(
+                (sourceID, source_data['RA'], source_data['DEC'])
+            )
+        else:
+            source_list.append(
+                (sourceID, log.log['ra'][idx], log.log['dec'][idx])
+            )
     
     # write .reg file with custom options
     global_options = [
