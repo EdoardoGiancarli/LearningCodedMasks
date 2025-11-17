@@ -310,7 +310,7 @@ def config_parameters(
             )
         else:
             smoothing_baseline_recnstr = _db_file[0]
-    # check smoothing significance threshold value (for physical reasons, must be at least 5.0)
+    # check smoothing significance threshold value (must be at least 5.0)
     if smoothing and smoothing_thresh < 5.0:
         print('Detector smoothing threshold too small. Automathically setting to 5.0.')
         smoothing_thresh = max(5.0, smoothing_thresh)
