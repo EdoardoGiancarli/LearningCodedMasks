@@ -53,11 +53,12 @@ PIPELINE SET-UP.
 """
 #### --- LEM-X CAMERAS MASK PATTERN
 MASK_FITS: str = "wfm_mask_NTHT_20250725.fits"
-THIN_MASK: bool = False                                                           # removes vignetting effects
+THIN_MASK: bool = False                                                      # removes vignetting effects
 
 #### --- OBSERVATION DATA
-SKYFIELD: str = "GalacticCentre"                                                  # skyfield selection
-DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"     # directory with FITS files from WFM
+SKYFIELD: str = "GalacticCentre"                                             # skyfield selection
+#DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"             # directory with FITS files from WISEMAN
+DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_fmin0.0945_2-50keV_1ks"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
@@ -86,9 +87,10 @@ SMOOTHING: bool = True
 SMOOTHING_SNR_THRESHOLD: int | float | None = 15
 # - path to non-smoothed IROS reconstruction directory, if present (written as '../baseline/' <-- NOTE: the ending `/`)
 BASELINE_IROSREC: str | Path | None = os.path.join(
-    '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7',
-    f'Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Outputs/Out{SKYFIELD}',
-    f'{DATA_FITS}/singleCAM_iros_upx2upy1_newOptimiser/',
+    #'/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7',
+    #f'Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Outputs/Out{SKYFIELD}',
+    #f'{DATA_FITS}/singleCAM_iros_upx2upy1_newOptimiser/',
+    '/mnt/d/PhD_AASS/Coding/Images_fits/singleCAM_iros_upx2upy1_newOptimiser/'
 )
 
 #### --- DATA FILTERS SETUP
@@ -100,7 +102,7 @@ PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 # - number of sources in the catalog for comparison
 CATALOGUE_NUM_BRIGHT_SOURCES: int | tuple[int, int] | None = None
 # - sources flux filter for the catalog comparison - [ph/cm2/s]
-CATALOGUE_FLUX_RANGE: tuple[int | float | None, int | float | None] | None = (1e-2, None)
+CATALOGUE_FLUX_RANGE: tuple[int | float | None, int | float | None] | None = (None, None)
 
 
 
