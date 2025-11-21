@@ -72,7 +72,7 @@ UPSX_FINAL: int = 5                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx5upy1_10um_smoothing"
+ANALYSIS_ID: str = "singleCAM_iros_upx5upy1_2-10keV_asymbounds_smoothing"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 40
@@ -84,13 +84,13 @@ MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are
 # - selects if detector smoothing is to be applied
 SMOOTHING: bool = True
 # - significance threshold for brightest sources in sky-field (min = 5.0)
-SMOOTHING_SNR_THRESHOLD: int | float | None = 15
+SMOOTHING_SNR_THRESHOLD: int | float | None = 10
 # - path to non-smoothed IROS reconstruction directory, if present (written as '../baseline/' <-- NOTE: the ending `/`)
 BASELINE_IROSREC: str | Path | None = os.path.join(
     #'/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7',
     #f'Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Outputs/Out{SKYFIELD}',
     #f'{DATA_FITS}/singleCAM_iros_upx2upy1_newOptimiser/',
-    '/mnt/d/PhD_AASS/Coding/Images_fits/singleCAM_iros_upx5upy1_10um/'
+    '/mnt/d/PhD_AASS/Coding/Images_fits/singleCAM_iros_upx5upy1_2-10keV_asymbounds/'
 )
 
 #### --- DATA FILTERS SETUP
