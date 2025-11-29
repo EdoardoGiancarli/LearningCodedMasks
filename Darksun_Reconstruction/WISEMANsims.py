@@ -60,16 +60,16 @@ def init_cameras_mask(path: str | Path) -> CodedMaskCamera:
     UPS_Y: int = 1
     return codedmask(path, UPS_X, UPS_Y)
 
-def flux_pdf(
+def config_pdf(
     pdf: Callable[[Any], NDArray],
     *args: Any,
     **kwargs: Any,
 ) -> Callable[[NDArray], NDArray]:
-    """Initialises a sky-field sources flux PDF in [Crab]."""
+    """Configures a PDF with the given parameters."""
     
-    def f(flux: NDArray) -> NDArray:
-        """Sky-field sources flux distribution in [Crab]."""
-        return pdf(flux, *args, **kwargs)
+    def f(x: NDArray) -> NDArray:
+        """Sky-field sources parameter distribution, with explicit unit."""
+        return pdf(x, *args, **kwargs)
     
     return f
 
@@ -77,7 +77,8 @@ def flux_pdf(
 # --- module funcs (sources sim)
 class Source(NamedTuple):
     """
-    Local frame coded-mask camera angular coordinates.
+    Source field with ID, local frame coded-mask
+    camera angular coordinates and flux.
 
     Args:
         ID (str): Source name.
@@ -92,10 +93,27 @@ class Source(NamedTuple):
 
 def simul_coords(
     n_sources: int,
-    fov: tuple[int | float, int | float] = (-45, 45),
+    *,
+    fov_along_x: tuple[int | float, int | float] = (-45, 45),
+    fov_along_y: tuple[int | float, int | float] = (-45, 45),
+    pdf: Callable[[NDArray], NDArray] | None = None,
+    sampling: int = 10_000,
 ) -> tuple[tuple[float, float], ...]:
-    """Simulates sources camera local-frame angular coords."""
-    txs, tys = tuple(np.random.uniform(*fov, n_sources) for _ in range(2))
+    """
+    Simulates sources camera local-frame angular coords
+    in [deg] (also from custom PDF, if given).
+    """
+    def extract_coords(fov: tuple[float, float]) -> tuple[float, ...]:
+        """Returns sources local-frame angular coords along single axis."""
+        ground: NDArray = np.linspace(*fov, sampling + 1)
+        weights: NDArray | None = pdf(ground) if pdf is not None else None
+        return tuple(choices(ground, weights, k=n_sources))
+
+    # NOTE: here is a little tricky, since this logic assumes a 1D PDF
+    #   - should be generalised to a 2D PDF (where the axes are linked...)
+    #   - otherwise, should insert as input `pdf_along_x`, and `pdf_along_y`
+    txs: tuple[float, ...] = extract_coords(fov_along_x)
+    tys: tuple[float, ...] = extract_coords(fov_along_y)
     return tuple((tx, ty) for tx, ty in zip(txs, tys))
 
 def simul_fluxes(
