@@ -2,9 +2,8 @@
 Module with support objects and funcs.
 """
 
-from typing import Any, Callable, NamedTuple
+from typing import Any, Callable
 from pathlib import Path
-from dataclasses import dataclass
 from random import choices
 
 import numpy as np
@@ -19,35 +18,19 @@ import darksun as ds
 from darksun.types import LogEntry
 from darksun.data import Log
 
+from .fields import CameraPointer
+from .fields import Source
+from .fields import Coords
+
 
 # --- SETUP ---
-@dataclass(frozen=True)
-class CameraPointer:
-    """Instance with LEM-X coded-mask cameras pointings."""
-    CAMZRA: float
-    CAMZDEC: float
-    CAMXRA: float
-    CAMXDEC: float
-
-    @property
-    def pointings(self) -> dict[str, CoordEquatorial]:
-        """
-        Camera axis pointing information in equatorial frame.
-        Angles are expressed in degrees.
-        """
-        return {
-            "z": CoordEquatorial(ra=self.CAMZRA, dec=self.CAMZDEC),
-            "x": CoordEquatorial(ra=self.CAMXRA, dec=self.CAMXDEC),
-        }
-
-
 def define_unit_pointings(
     z_axis_RA: float,
     z_axis_DEC: float,
     x_axis_RA: float,
     x_axis_DEC: float,
 ) -> CameraPointer:
-    """LEM-X Unit pointing initialisation."""
+    """LEM-X Unit pointing initialisation (axes RA/Dec coords in [deg])."""
     return CameraPointer(
         z_axis_RA, z_axis_DEC, x_axis_RA, x_axis_DEC,
     )
@@ -77,53 +60,27 @@ def config_pdf(
 
 
 # --- SOURCE SIM ---
-class Source(NamedTuple):
-    """
-    Source field with ID, local frame coded-mask
-    camera angular coordinates and flux.
-
-    Args:
-        ID (str): Source name.
-        angle_x (float): Angular coord along x-axis [deg]
-        angle_y (float): Angular coord along y-axis [deg]
-        flux (float): Source incoming flux [Crab]
-    """
-    ID: str
-    angle_x: float
-    angle_y: float
-    flux: float
-
-
 def simul_coords(
     n_sources: int,
     *,
-    fov_along_x: tuple[int | float, int | float] = (-45, 45),
-    fov_along_y: tuple[int | float, int | float] = (-45, 45),
-    pdf: Callable[[NDArray], NDArray] | None = None,
-    sampling: int = 10_000,
-) -> tuple[tuple[float, float], ...]:
+    fov_along_x: tuple[float, float] = (-45.0, 45.0),
+    fov_along_y: tuple[float, float] = (-45.0, 45.0),
+) -> tuple[Coords, ...]:
     """
     Simulates sources camera local-frame angular coords
-    in [deg] (also from custom PDF, if given).
+    from uniform distribution, in [deg].
     """
-    def extract_coords(fov: tuple[float, float]) -> tuple[float, ...]:
-        """Returns sources local-frame angular coords along single axis."""
-        ground: NDArray = np.linspace(*fov, sampling + 1)
-        weights: NDArray | None = pdf(ground) if pdf is not None else None
-        return tuple(choices(ground, weights, k=n_sources))
-
-    # NOTE: here is a little tricky, since this logic assumes a 1D PDF
-    #   - should be generalised to a 2D PDF (where the axes are linked...)
-    #   - otherwise, should insert as input `pdf_along_x`, and `pdf_along_y`
-    txs: tuple[float, ...] = extract_coords(fov_along_x)
-    tys: tuple[float, ...] = extract_coords(fov_along_y)
+    txs, tys = map(
+        lambda fov: np.random.uniform(*fov, n_sources),
+        (fov_along_x, fov_along_y)
+    )
     return tuple((tx, ty) for tx, ty in zip(txs, tys))
 
 
 def simul_fluxes(
     n_sources: int,
-    f_min: int | float,
-    f_max: int | float,
+    f_min: float,
+    f_max: float,
     pdf: Callable[[NDArray], NDArray] | None = None,
     sampling: int = 10_000,
 ) -> tuple[float, ...]:
@@ -134,7 +91,7 @@ def simul_fluxes(
 
 
 def get_sources(
-    coords: tuple[tuple[float, float], ...],
+    coords: tuple[Coords, ...],
     fluxes: tuple[float, ...],
     IDs: tuple[str, ...] | None = None,
 ) -> tuple[Source, ...]:
@@ -199,7 +156,7 @@ def make_catalog(
     sdl: CameraPointer,
     camera: CodedMaskCamera,
     save_to: str | Path | None = None,
-) -> None:
+) -> DataFrame:
     """Creates the catalog for the WISEMAN simulator."""
     record: np.recarray = build_record(sources, sdl, camera)
     df: DataFrame = DataFrame(record)
