@@ -4,7 +4,7 @@ Module with support objects and funcs.
 
 from typing import Any, Callable
 from pathlib import Path
-from random import choices
+import random
 
 import numpy as np
 from numpy.typing import NDArray
@@ -87,7 +87,32 @@ def simul_fluxes(
     """Simulates sources fluxes in [Crab] (also from custom PDF, if given)."""
     f: NDArray = np.linspace(f_min, f_max, sampling + 1)
     weights: NDArray | None = pdf(f) if pdf is not None else None
-    return tuple(choices(f, weights, k=n_sources))
+    return tuple(random.choices(f, weights, k=n_sources))
+
+
+def handmade_fluxes(
+    n_sources: tuple[int, ...],
+    flux_lims: tuple[tuple[float, float], ...],
+    shuffle: bool = True,
+) -> tuple[float, ...]:
+    """
+    Custom handmade sources flux simul from uniform PDF.
+    Flux limits must be inserted in [Crab] unit.
+    """
+    # adjust inputs for lazy people (like me, lol)
+    n_sources_ = (n_sources,) if isinstance(n_sources, int) else n_sources
+    flux_lims_ = (flux_lims,) if isinstance(flux_lims[0], (int, float)) else flux_lims
+
+    if not len(n_sources_) == len(flux_lims_):
+        raise ValueError("Input 'n_sources' and 'flux_lims' must have same length.")
+    
+    fluxes: list[float] = []
+    for idx, n in enumerate(n_sources_):
+        fluxes += list(simul_fluxes(n, *flux_lims_[idx]))
+    
+    if shuffle: random.shuffle(fluxes)
+    
+    return tuple(fluxes)
 
 
 def get_sources(

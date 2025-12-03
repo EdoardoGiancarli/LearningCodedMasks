@@ -25,6 +25,7 @@ from .sims import config_pdf
 # --- SOURCE SIM ---
 from .sims import simul_coords
 from .sims import simul_fluxes
+from .sims import handmade_fluxes
 from .sims import get_sources
 
 # --- DATABASE HANDLING ---
