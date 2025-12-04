@@ -9,7 +9,7 @@ This module provides algorithms for:
 """
 
 from functools import lru_cache
-from typing import Callable, Iterable, Literal
+from typing import Callable, Iterable
 import warnings
 
 from numpy import typing as npt
