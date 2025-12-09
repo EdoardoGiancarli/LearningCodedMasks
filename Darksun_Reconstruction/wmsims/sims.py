@@ -11,10 +11,14 @@ from numpy.typing import NDArray
 from pandas import DataFrame
 
 from bloodmoon.types import CoordEquatorial
-from bloodmoon.coords import angle2shift, shift2equatorial
+from bloodmoon.coords import angle2shift, shift2pos, shift2equatorial
 from bloodmoon.mask import CodedMaskCamera, codedmask
+from bloodmoon.mask import solid_angle_profile
+from bloodmoon.mask import decode, variance, snratio
+from bloodmoon.optim import model_shadowgram
 
 import darksun as ds
+from darksun.analyze import get_effective_area
 from darksun.types import LogEntry
 from darksun.data import Log
 
@@ -135,6 +139,77 @@ def get_sources(
     return sources
 
 
+def sky_significance(
+    camera: CodedMaskCamera,
+    sources: Source | tuple[Source, ...],
+    exposure: float,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> NDArray:
+    """
+    Computes the simulated sky-field significance (with coding noise and CXB).
+    """
+    # flux values for LEM-X single coded-mask camera, from WM sims
+    # https://github.com/yuri-evangelista/CodedMasks/blob/main/mask_050_1040x17/Sensitivity_cross_correlation.ipynb
+    SETUP: dict[str, float] = {
+        #'bkg_instr_fluence': 6.3799,    # bkg instr. flux [ph/cm2/s] (for on-axis eff area)
+        #'crab_instr_fluence': 2.5737,   # 1 Crab instr. flux [ph/cm2/s] (for on-axis eff area)
+        'bkg_instr_fluence': 6.7,    # bkg instr. flux [ph/cm2/s] (for on-axis eff area)
+        'crab_instr_fluence': 2.5,   # 1 Crab instr. flux [ph/cm2/s] (for on-axis eff area)
+    }
+
+    def model_single_source_sg(source: Source) -> NDArray:
+        """Computes the shadowgram for a single source."""
+        shift_x, shift_y = map(
+            lambda x: angle2shift(camera, x),
+            (source.angle_x, source.angle_y),
+        )
+        off_axis_eff_area: float = get_effective_area(camera, shift_x, shift_y, vignetting)
+        counts: float = (
+            source.flux * SETUP['crab_instr_fluence'] * off_axis_eff_area * exposure
+        )
+        source_sg: NDArray = model_shadowgram(
+            camera, shift_x, shift_y, vignetting, psfy,
+        )
+        return source_sg * counts
+
+    # bkg fluence (cts / detector unit area) and dome-shaped bkg profile
+    bkg_fluence: float = SETUP['bkg_instr_fluence'] * exposure
+    on_axis_eff_area: float = get_effective_area(camera, 0.0, 0.0, vignetting)
+    omega: NDArray = solid_angle_profile(camera)
+    bkg: NDArray = (
+        bkg_fluence * on_axis_eff_area * omega / omega.sum()
+    )
+
+    # compute sources shadowgrams
+    sources_: tuple = (sources,) if isinstance(sources, Source) else sources
+    sources_sgs: NDArray = np.zeros_like(bkg)
+    for source in sources_:
+        sources_sgs += model_single_source_sg(source)
+
+    # compute significance
+    detector: NDArray = bkg + sources_sgs
+    sky: NDArray = decode(camera, detector)
+    varmap: NDArray = variance(camera, detector)
+    snrmap: NDArray = snratio(sky, varmap)
+
+    return snrmap
+
+
+def get_source_snr(
+    camera: CodedMaskCamera,
+    source: Source,
+    snrmap: NDArray,
+) -> float:
+    """Returns the significance of the source from the sky-field SNR map."""
+    shift_x, shift_y = map(
+        lambda x: angle2shift(camera, x),
+        (source.angle_x, source.angle_y),
+    )
+    pos: tuple[int, int] = shift2pos(camera, shift_x, shift_y)
+    return snrmap[*pos]
+
+
 # --- DATABASE HANDLING ---
 def gen_data_log(sources: tuple[Source, ...]) -> Log:
     """Generates the Log structure for the simulated sources."""
@@ -152,38 +227,44 @@ def gen_data_log(sources: tuple[Source, ...]) -> Log:
 
 def build_record(
     sources: tuple[Source, ...],
+    snrmap: NDArray,
     sdl: CameraPointer,
     camera: CodedMaskCamera,
 ) -> np.recarray:
     """
     Builds the sources record structure.
     """
-    def angle2equatorial(anglex, angley) -> CoordEquatorial:
+    def angle2equatorial(anglex: float, angley: float) -> CoordEquatorial:
         """Converts camera local-frame angular coords in RA/Dec coords."""
         sx, sy = map(lambda x: angle2shift(camera, x), (anglex, angley))
         return shift2equatorial(sdl, camera, sx, sy)
-
+    
+    snrvalues = tuple(
+        get_source_snr(camera, s, snrmap) for s in sources
+    )
     rec = np.rec.array(
         obj=[
-            (name, tx, ty, *angle2equatorial(tx, ty), f)
-            for (name, tx, ty, f) in sources
+            (name, tx, ty, *angle2equatorial(tx, ty), f, snr)
+            for (name, tx, ty, f), snr in zip(sources, snrvalues)
         ],
         dtype=[
             ('ID', 'U10'), ('ANGLE_X', 'f8'), ('ANGLE_Y', 'f8'),
-            ('RA', 'f8'), ('DEC', 'f8'), ('FLUX', 'f8'),
+            ('RA', 'f8'), ('DEC', 'f8'), ('FLUX', 'f8'), ('SNR', 'f16'),
         ],
     )
     return rec
 
 
 def make_catalog(
-    sources: tuple[Source, ...],
+    sources: Source | tuple[Source, ...],
+    snrmap: NDArray,
     sdl: CameraPointer,
     camera: CodedMaskCamera,
     save_to: str | Path | None = None,
 ) -> DataFrame:
     """Creates the catalog for the WISEMAN simulator."""
-    record: np.recarray = build_record(sources, sdl, camera)
+    sources_: tuple[Source, ...] = (sources,) if isinstance(sources, Source) else sources
+    record: np.recarray = build_record(sources_, snrmap, sdl, camera)
     df: DataFrame = DataFrame(record)
     if save_to is not None:
         df.to_csv(path_or_buf=save_to, index=False)

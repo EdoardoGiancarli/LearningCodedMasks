@@ -27,6 +27,8 @@ from .sims import simul_coords
 from .sims import simul_fluxes
 from .sims import handmade_fluxes
 from .sims import get_sources
+from .sims import sky_significance
+from .sims import get_source_snr
 
 # --- DATABASE HANDLING ---
 from .sims import gen_data_log
