@@ -65,24 +65,24 @@ ID_CAMERA_B: str = "cam1b"
 DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 5                 # final upscaling for skies and visualisation
+UPSX_FINAL: int = 2                 # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx5upy1_2-10keV_asymbounds_smoothing"
+ANALYSIS_ID: str = "singleCAM_iros_fluenceStartValNoCP"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 40
+MAX_ITERATIONS: int = 20
 SNR_THRESHOLD: int | float = 5
 
 MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
 
 #### --- DETECTOR SMOOTHING SETUP
 # - selects if detector smoothing is to be applied
-SMOOTHING: bool = True
+SMOOTHING: bool = False
 # - significance threshold for brightest sources in sky-field (min = 5.0)
 SMOOTHING_SNR_THRESHOLD: int | float | None = 10
 # - path to non-smoothed IROS reconstruction directory, if present (written as '../baseline/' <-- NOTE: the ending `/`)
@@ -101,8 +101,8 @@ PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 
 # - number of sources in the catalog for comparison
 CATALOGUE_NUM_BRIGHT_SOURCES: int | tuple[int, int] | None = None
-# - sources flux filter for the catalog comparison - [ph/cm2/s]
-CATALOGUE_FLUX_RANGE: tuple[int | float | None, int | float | None] | None = (None, None)
+# - sources flux filter for the catalog comparison - [Crab]
+CATALOGUE_FLUX_RANGE: tuple[float | None, float | None] | None = (None, None)
 
 
 

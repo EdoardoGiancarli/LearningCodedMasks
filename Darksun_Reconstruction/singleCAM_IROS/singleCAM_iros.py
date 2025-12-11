@@ -143,6 +143,7 @@ def iros_singleCAM(
                 arg_sky=candidate_pos,
                 vignetting=vignetting,
                 psfy=psfy,
+                verbose=True,
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
