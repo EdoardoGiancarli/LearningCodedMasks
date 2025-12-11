@@ -72,10 +72,10 @@ UPSX_FINAL: int = 2                 # final upscaling for skies and visualisatio
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_fluenceStartValNoCP"
+ANALYSIS_ID: str = "singleCAM_iros_asymFitBounds"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 20
+MAX_ITERATIONS: int = 25
 SNR_THRESHOLD: int | float = 5
 
 MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
