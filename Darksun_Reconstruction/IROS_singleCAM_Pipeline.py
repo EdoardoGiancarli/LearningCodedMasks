@@ -38,7 +38,6 @@ TODO:
     - insert possibility to load residuals of proper shapes to act as BKG for output IROS skies (not oversampled)
     - generalize directory paths for all users
     - setup .yaml file to give it as input to this module
-    - NOTE: new-sources association must be updated to consider repeating same new-source
 """
 
 import os
@@ -56,33 +55,34 @@ MASK_FITS: str = "wfm_mask_NTHT_20250725.fits"
 THIN_MASK: bool = False                                                      # removes vignetting effects
 
 #### --- OBSERVATION DATA
-SKYFIELD: str = "GalacticCentre"                                             # skyfield selection
+SKYFIELD: str = "IROSDummy"                                             # skyfield selection
 #DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"             # directory with FITS files from WISEMAN
-DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_fmin0.0945_2-50keV_1ks"
+#DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_fmin0.0945_2-50keV_1ks"
+DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_1ks"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
 DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 2                 # final upscaling for skies and visualisation
+UPSX_FINAL: int = 5                 # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_asymFitBounds"
+ANALYSIS_ID: str = "singleCAM_iros_benchmark_smoothing"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 25
+MAX_ITERATIONS: int = 45
 SNR_THRESHOLD: int | float = 5
 
 MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
 
 #### --- DETECTOR SMOOTHING SETUP
 # - selects if detector smoothing is to be applied
-SMOOTHING: bool = False
+SMOOTHING: bool = True
 # - significance threshold for brightest sources in sky-field (min = 5.0)
 SMOOTHING_SNR_THRESHOLD: int | float | None = 10
 # - path to non-smoothed IROS reconstruction directory, if present (written as '../baseline/' <-- NOTE: the ending `/`)
@@ -90,7 +90,7 @@ BASELINE_IROSREC: str | Path | None = os.path.join(
     #'/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7',
     #f'Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Outputs/Out{SKYFIELD}',
     #f'{DATA_FITS}/singleCAM_iros_upx2upy1_newOptimiser/',
-    '/mnt/d/PhD_AASS/Coding/Images_fits/singleCAM_iros_upx5upy1_2-10keV_asymbounds/'
+    '/mnt/d/PhD_AASS/Coding/Images_fits/singleCAM_iros_benchmark/'
 )
 
 #### --- DATA FILTERS SETUP
