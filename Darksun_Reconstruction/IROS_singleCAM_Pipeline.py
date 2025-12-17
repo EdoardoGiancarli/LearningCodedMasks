@@ -62,20 +62,20 @@ DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_1ks"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "detected"
+DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 5                 # final upscaling for skies and visualisation
+UPSX_FINAL: int = 2                 # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_benchmark_detected"
+ANALYSIS_ID: str = "singleCAM_iros_upx2y1_benchmark"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 45
+MAX_ITERATIONS: int = 40
 SNR_THRESHOLD: int | float = 5
 
 MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
