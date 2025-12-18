@@ -62,17 +62,17 @@ DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_1ks"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "reconstructed"
+DATASET: str = "detected"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 2                 # final upscaling for skies and visualisation
+UPSX_FINAL: int = 5                 # final upscaling for skies and visualisation
 UPSY_FINAL: int = 1
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx2y1_benchmark"
+ANALYSIS_ID: str = "singleCAM_iros_benchmark_2-6keV_detected"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 40
@@ -95,7 +95,7 @@ BASELINE_IROSREC: str | Path | None = os.path.join(
 
 #### --- DATA FILTERS SETUP
 # - photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = None
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = (2.0, 6.0)
 # - RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 
