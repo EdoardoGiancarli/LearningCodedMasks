@@ -62,20 +62,20 @@ DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_1ks"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "detected"
+DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 5                 # final upscaling for skies and visualisation
-UPSY_FINAL: int = 1
+UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisation
+UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_benchmark_2-6keV_detected"
+ANALYSIS_ID: str = "singleCAM_iros_upx2y1_benchmark_2-10keV_smallerFitCropping"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 40
+MAX_ITERATIONS: int = 10
 SNR_THRESHOLD: int | float = 5
 
 MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
@@ -87,15 +87,15 @@ SMOOTHING: bool = False
 SMOOTHING_SNR_THRESHOLD: int | float | None = 10
 # - path to non-smoothed IROS reconstruction directory, if present (written as '../baseline/' <-- NOTE: the ending `/`)
 BASELINE_IROSREC: str | Path | None = os.path.join(
-    #'/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7',
-    #f'Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Outputs/Out{SKYFIELD}',
-    #f'{DATA_FITS}/singleCAM_iros_upx2upy1_newOptimiser/',
-    '/mnt/d/PhD_AASS/Coding/Images_fits/singleCAM_iros_benchmark_detected/'
+    '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7',
+    f'Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Outputs/Out{SKYFIELD}',
+    f'{DATA_FITS}/singleCAM_iros_upx2y1_benchmark_2-10keV/',
+    #'/mnt/d/PhD_AASS/Coding/Images_fits/singleCAM_iros_benchmark_detected/'
 )
 
 #### --- DATA FILTERS SETUP
 # - photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = (2.0, 6.0)
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = (2.0, 10.0)
 # - RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 
