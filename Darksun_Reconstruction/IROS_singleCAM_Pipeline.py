@@ -62,7 +62,7 @@ DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_infdet_1ks"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "reconstructed"
+DATASET: str = "detected"
 
 #### --- IMAGES UPSCALING
 UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
@@ -72,7 +72,7 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx2y1_benchmark_infDenseDet"
+ANALYSIS_ID: str = "singleCAM_iros_upx2y1_benchmark_infDenseDet_detected"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 38
