@@ -58,7 +58,7 @@ THIN_MASK: bool = False                                                      # r
 SKYFIELD: str = "IROSDummy"                                             # skyfield selection
 #DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"             # directory with FITS files from WISEMAN
 #DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_fmin0.0945_2-50keV_1ks"
-DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_1ks"
+DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_infdet_1ks"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
@@ -72,10 +72,10 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx2y1_benchmark_2-10keV_smallerFitCropping"
+ANALYSIS_ID: str = "singleCAM_iros_upx2y1_benchmark_infDenseDet"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 10
+MAX_ITERATIONS: int = 38
 SNR_THRESHOLD: int | float = 5
 
 MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
@@ -95,7 +95,7 @@ BASELINE_IROSREC: str | Path | None = os.path.join(
 
 #### --- DATA FILTERS SETUP
 # - photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = (2.0, 10.0)
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = None
 # - RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 
