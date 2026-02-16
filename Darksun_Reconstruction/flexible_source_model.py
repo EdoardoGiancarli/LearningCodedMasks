@@ -16,7 +16,7 @@ from bloodmoon.optim import apply_vignetting
 from bloodmoon.optim import apply_detector_resolution
 
 
-def shift_mask_pattern(
+def _shift_mask_pattern(
     camera: CodedMaskCamera,
     shift_x: float,
     shift_y: float,
@@ -33,7 +33,28 @@ def shift_mask_pattern(
     mask_shifted = fshift(camera.mask.astype(float), fr, fc)
     return mask_shifted
 
-def extract_detector(
+def _process_mask_pattern(
+    camera: CodedMaskCamera,
+    shadowgram: NDArray,
+    shift_x: float,
+    shift_y: float,
+    vignetting: bool | Callable[[CodedMaskCamera, NDArray, float, float], NDArray],
+    psfy: bool | Callable[[CodedMaskCamera, NDArray], NDArray],
+) -> NDArray:
+    """Applies instrumental effects to the mask pattern projection."""
+    # vignetting effect
+    if vignetting is True:
+        shadowgram = apply_vignetting(camera, shadowgram, shift_x, shift_y)
+    elif callable(vignetting):
+        shadowgram = vignetting(camera, shadowgram, shift_x, shift_y)
+    # detector spatial resolution effect
+    if psfy is True:
+        shadowgram = apply_detector_resolution(camera, shadowgram)
+    elif callable(psfy):
+        shadowgram = psfy(camera, shadowgram)
+    return shadowgram
+
+def _extract_detector(
     camera: CodedMaskCamera,
     shadowgram: NDArray,
 ) -> NDArray:
@@ -55,34 +76,17 @@ def model_shadowgram(
     psfy: bool | Callable[[CodedMaskCamera, NDArray], NDArray] = True,
 ) -> NDArray:
     """Generates a normalized shadowgram for a point source."""
-    # shifts camera mask pattern wrt source local-frame coords
-    mask_shifted = shift_mask_pattern(camera, shift_x, shift_y)
-
+    for key, val in {'vignetting': vignetting, 'psfy': psfy}.items():
+        if not (isinstance(val, bool) or callable(val)):
+            raise ValueError(f"'{key}' must be bool or Callable, got {type(val)} instead.")
+    # shift camera mask pattern wrt source local-frame coords
+    mask_shifted = _shift_mask_pattern(camera, shift_x, shift_y)
     # apply instrumental effects
-    # - vignetting effect
-    if isinstance(vignetting, bool):
-        mask_vignetted = (
-            apply_vignetting(camera, mask_shifted, shift_x, shift_y)
-            if vignetting else mask_shifted
-        )
-    elif isinstance(vignetting, Callable):
-        mask_vignetted = vignetting(camera, mask_shifted, shift_x, shift_y)
-    else:
-        raise ValueError(f"Invalid 'vignetting' type: {type(vignetting)}, must be bool or Callable.")
-    # - detector spatial resolution effect
-    if isinstance(psfy, bool):
-        mask_projected = (
-            apply_detector_resolution(camera, mask_vignetted)
-            if psfy else mask_vignetted
-        )
-    elif isinstance(psfy, Callable):
-        mask_projected = psfy(camera, mask_vignetted)
-    else:
-        raise ValueError(f"Invalid 'psfy' type: {type(psfy)}, must be bool or Callable.")
-
+    mask_projected = _process_mask_pattern(
+        camera, mask_shifted, shift_x, shift_y, vignetting, psfy,
+    )
     # extract normalised source detector image
-    detector = extract_detector(camera, mask_projected)
-
+    detector = _extract_detector(camera, mask_projected)
     return detector
 
 def model_sky(
