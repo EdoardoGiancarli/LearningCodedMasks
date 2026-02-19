@@ -4,18 +4,6 @@ In this version, the sub-logics are made flexible by allowing for customisation.
 The IROS routine is now intended as a "wrapper" for the main logics (source finding process, parameters fitting and source subtraction).
 """
 
-# search for updated versions of:
-#   - finder, fitter, subtractor methods
-#   - optimiser method
-#
-# NOTE: inside the finder there is the sky pos masking
-# NOTE: the optimiser is called inside the fitter
-#
-# NOTE (optimiser): custom obj for `curve_fit` output for `verbose` func input
-# NOTE (optimiser): general custom obj for optimising procedure? Some scipy routine have their own output obj...
-# NOTE (optimiser): make `verbose` func flexible by again giving it as input
-
-
 from typing import Any, Callable, Iterable, NamedTuple
 import warnings
 
@@ -28,7 +16,8 @@ from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.mask import decode
 from bloodmoon.mask import variance
 from bloodmoon.mask import snratio
-from bloodmoon.optim import process_skyimg
+
+from flexible_source_model import model_shadowgram, model_sky
 
 
 class OptResult(NamedTuple):
@@ -98,29 +87,74 @@ def solver(
     return OptResult(popt, errs)
 
 
-def config_optimiser(
+def default_optimiser(
     camera: CodedMaskCamera,
-    model_initialiser: Callable[[tuple[int, int]], Callable[[NDArray, *tuple[float, ...]], NDArray]],
+    vignetting: bool | Callable[[CodedMaskCamera, NDArray, float, float], NDArray],
+    psfy: bool | Callable[[CodedMaskCamera, NDArray], NDArray],
     fit_weights: NDArray | Callable[[NDArray], NDArray] | None = None,
+    verbose: bool = False,
     camera_coding_power: float = 0.85,
-) -> Callable[[NDArray, tuple[int, int], bool], OptResult]:
+) -> Callable[[NDArray, tuple[int, int]], OptResult]:
     """
     Configures the IROS optimiser for source parameters fitting.
     """
-    def optimise(
+    def process_skyimg(
+        sky: NDArray,
+        pos: tuple[int, int],
+    ) -> NDArray:
+        """
+        Processes the sky image for optimisation.
+        """
+        # here we crop the source PSF slit plus an offset to account for
+        # shifts and to accomodate the `curve_fit` optimisation:
+        #   - along y (coarse dir) we insert an offset of `5 * upscaling`, which
+        #     is ~ 1/6 of the upsampled PSF slit dimension;
+        #   - along x (fine dir) we insert an offset of `2 + upscaling`, to
+        #     avoid the bkg contributes from the surrounding pixels;
+        # NOTE: if the offset is smaller than at least the shifts bounds in
+        # `optimize()`, the optimisation procedure may fail for some sources
+        psf_slit_px_y, psf_slit_px_x = (
+            int(camera.specs.slit_deltay * camera.upscale_f.y / camera.specs.mask_deltay),
+            int(camera.specs.slit_deltax * camera.upscale_f.x / camera.specs.mask_deltax),
+        )
+        offset_y, offset_x = (
+            5 * camera.upscale_f.y, 2 + camera.upscale_f.x,
+        )
+
+        i, j = pos
+        crop_y, crop_x = (
+            psf_slit_px_y + offset_y, psf_slit_px_x + offset_x,
+        )
+        slice_y, slice_x = (
+            slice(i - crop_y, i + crop_y + 1), slice(j - crop_x, j + crop_x + 1),
+        )
+        cropped = sky[slice_y, slice_x]
+        return cropped.flatten()
+
+    def _ModelShiftFluence(arg_sky: tuple[int, int]) -> Callable[[NDArray, float, float, float], NDArray]:
+        """
+        Initialises the source model.
+        """
+        def f(x: NDArray, shift_x: float, shift_y: float, fluence: float) -> NDArray:
+            """Models the source sky image."""
+            modeled = model_sky(camera, shift_x, shift_y, fluence, vignetting, psfy)
+            return process_skyimg(modeled, arg_sky)
+        
+        return f
+
+    def optimiser(
         sky: NDArray,
         arg_sky: tuple[int, int],
-        verbose: bool = False,
     ) -> OptResult:
         """
         Performs the optimization to fit a point source model to sky image data.
         """
-        model_func = model_initialiser(arg_sky)
+        model_func = _ModelShiftFluence(arg_sky)
         sky_peak = sky[*arg_sky]
 
         # setup solver params
         # * setup source data + std
-        sky_ydata = process_skyimg(camera, sky, arg_sky)
+        sky_ydata = process_skyimg(sky, arg_sky)
         if fit_weights is not None:
             weights = (
                 fit_weights if isinstance(fit_weights, np.ndarray)
@@ -184,23 +218,18 @@ def config_optimiser(
 
         return result
     
-    return optimise
+    return optimiser
 
 
 
 
-def config_IROS_operations(
+def default_finder(
     camera: CodedMaskCamera,
-    src_sg_model: Callable[[CodedMaskCamera, float, float], NDArray],
-    optimiser: Callable[[NDArray, tuple[int, int], bool], OptResult],
-    snr_threshold: float = 0.0,
-) -> tuple[
-    Callable[[NDArray, NDArray, int], tuple[int, int] | bool],
-    Callable[[tuple[int, int], NDArray, NDArray], Source],
-    Callable[[Source, NDArray], NDArray],
-]:
+    snr_threshold: float,
+    batch: int = 1000,
+) -> Callable[[NDArray, NDArray], tuple[int, int] | bool]:
     """
-    Configures the operative funcs (source finder, fit and subtractor) for the IROS procedure.
+    Defines default IROS source candidates finder.
     """
     SETUP: dict[str, Any] = {
         'slit_mask_fine': int(
@@ -229,7 +258,6 @@ def config_IROS_operations(
     def finder(
         sky: NDArray,
         snr: NDArray,
-        batch: int = 1000,
     ) -> tuple[int, int] | bool:
         """
         Returns the position of a valid IROS candidate inside the sky image.
@@ -243,6 +271,15 @@ def config_IROS_operations(
                 return tuple(arg_sky)
         return False
     
+    return finder
+
+
+def default_fitter(
+    optimiser: Callable[[NDArray, tuple[int, int]], OptResult],
+) -> Callable[[tuple[int, int], NDArray, NDArray], Source]:
+    """
+    Defines default IROS source candidates parameters fitter.
+    """
     def fitter(
         arg_sky: tuple[int, int],
         sky: NDArray,
@@ -253,7 +290,6 @@ def config_IROS_operations(
             params: OptResult = optimiser(
                 sky=sky,
                 arg_sky=arg_sky,
-                verbose=True,
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
@@ -261,20 +297,33 @@ def config_IROS_operations(
         significance = float(snr[*arg_sky])
         return Source(*params.params, significance)
     
+    return fitter
+
+
+def default_subtractor(
+    camera: CodedMaskCamera,
+    vignetting: bool | Callable[[CodedMaskCamera, NDArray, float, float], NDArray],
+    psfy: bool | Callable[[CodedMaskCamera, NDArray], NDArray],
+) -> Callable[[Source, NDArray], NDArray]:
+    """
+    Defines default IROS source shadowgram subtractor.
+    """
     def subtractor(
         candidate: Source,
         detector: NDArray,
     ) -> NDArray:
         """Subtracts candidate from detector image."""
-        sg_model: NDArray = src_sg_model(
+        sg_model: NDArray = model_shadowgram(
             camera=camera,
             shift_x=candidate.shift_x,
             shift_y=candidate.shift_y,
+            vignetting=vignetting,
+            psfy=psfy,
         )
         residual = detector - candidate.cts * sg_model
         return residual
     
-    return finder, fitter, subtractor
+    return subtractor
 
 
 
@@ -282,38 +331,58 @@ def config_IROS_operations(
 def iros_singleCAM(
     detector: NDArray,
     camera: CodedMaskCamera,
-    max_iterations: int = 5,
+    max_iterations: int,
+    snr_threshold: float = 5.0,
+    vignetting: bool | Callable[[CodedMaskCamera, NDArray, float, float], NDArray] = True,
+    psfy: bool | Callable[[CodedMaskCamera, NDArray], NDArray] = True,
+    fit_weights: NDArray | Callable[[NDArray], NDArray] | None = None,
     finder: Callable[[NDArray, NDArray], tuple[int, int] | bool] | None = None,
     fitter: Callable[[tuple[int, int], NDArray, NDArray], Source] | None = None,
     subtractor: Callable[[Source, NDArray], NDArray] | None = None,
     varmap: NDArray | None = None,
+    optimiser: Callable[[NDArray, tuple[int, int]], OptResult] | None = None,
 ) -> Iterable[tuple[Source, NDArray]]:
     """
     Performs the Iterative Removal of Sources (IROS) algorithm for a single coded-mask
     camera of the Wide Field Monitor observations.
     """
+    # intern logic setup
+    find_candidate = (
+        finder if finder is not None
+        else default_finder(camera, snr_threshold)
+    )
+    optimise = (
+        optimiser if optimiser is not None
+        else default_optimiser(camera, vignetting, psfy, fit_weights, verbose=True)
+    )
+    fit_cand_params = (
+        fitter if fitter is not None else default_fitter(optimise)
+    )
+    subtract_cand_sg = (
+        subtractor if subtractor is not None
+        else default_subtractor(camera, vignetting, psfy)
+    )
     # arrs setup
     detector_ = detector.copy()
     skymap = decode(camera, detector)
     varmap = (
-        varmap if varmap is not None
-        else variance(camera, detector)
+        varmap if varmap is not None else variance(camera, detector)
     )
     # looping as there's no tomorrow
     for i in range(max_iterations):
         snrmap = snratio(skymap, varmap)
-        candidate_pos = finder(skymap, snrmap)
+        candidate_pos = find_candidate(skymap, snrmap)
 
         if not candidate_pos:
             print("\nNo candidates left...")
             break
         try:
-            source = fitter(candidate_pos, skymap, snrmap)
+            source = fit_cand_params(candidate_pos, skymap, snrmap)
         except RuntimeError as e:
             warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
             continue
 
-        detector_ = subtractor(source, detector_)
+        detector_ = subtract_cand_sg(source, detector_)
         skymap = decode(camera, detector_)
         yield (source, skymap)
 
