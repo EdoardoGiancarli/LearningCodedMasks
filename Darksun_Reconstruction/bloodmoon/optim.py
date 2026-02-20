@@ -188,8 +188,13 @@ def apply_vignetting(
         # the mask thickness projection has to be corrected by considering the
         # erosion pixel start point, due to the discretisation of the projection
         # https://github.com/yuri-evangelista/CodedMasks/blob/main/mask_050_1040x17/new_erosion_20251024.ipynb
-        bin_erosion_start = (1.0 - abs(shift_px - int(shift_px))) * bin_dim
-        return proj + np.sign(proj) * bin_erosion_start
+        # if the erosion is positive, it has to start from the left bin edge;
+        # if negative, it has to start from the right edge of the bin
+        bin_erosion_start = (
+            abs(shift_px - int(shift_px)) if (shift_px > 0)
+            else abs(shift_px - int(shift_px)) - 1.0
+        )
+        return proj + bin_erosion_start * bin_dim
     
     bins = camera.bins_detector
     bin_dim_x, bin_dim_y = (
@@ -438,6 +443,7 @@ def optimize(
     vignetting: bool = True,
     psfy: bool = True,
     verbose: bool = False,
+    camera_coding_power: float = 0.85
 ) -> tuple[float, float, float]:
     """
     Performs the optimization to fit a point source model to sky image data.
@@ -469,8 +475,6 @@ def optimize(
         camera.specs.mask_deltax / camera.upscale_f.x,
         camera.specs.mask_deltay / camera.upscale_f.y,
     )
-    camera_coding_power = 0.85
-
     model_shift_flux = _ModelShiftFluence(camera, arg_sky, vignetting, psfy)
     sx_start, sy_start = pos2shift(camera, *arg_sky)
     sky_peak = sky[*arg_sky]
