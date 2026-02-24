@@ -6,6 +6,7 @@ mechanics upon the mask ribs.
 import unittest
 from unittest import TestCase
 from dataclasses import dataclass
+import warnings
 
 from numpy.typing import NDArray
 import numpy as np
@@ -99,43 +100,35 @@ def apply_std_vignetting(
         - The effect is calculated separately for x and y directions then combined
         - The mask thickness parameter from the camera model determines the strength
           of the effect
-    """
-    def project_mask_thickness(shift: float, bin_dim: float) -> float:
-        """
-        Projects the mask thickness on the mask binning elements, and
-        corrects the projection value to allows for correct erosion
-        of the mask physical elements starting from the pixels' edges.
-        """
-        # - since the mask detector distance is defined as the distance between the
-        #   detector top and the mask top, erosion shall cut on the left-side of the
-        #   shadowgram when sources have negative `angle`.
-        # - if the mask detector distance was defined as the distance between the
-        #   detector top and the mask bottom, erosion should have been applied to the
-        #   right side, i.e. `proj` should be multiplied by -1.
-        angle = np.arctan(shift / camera.specs.mask_detector_distance)
-        proj = camera.specs.mask_thickness * np.tan(angle)
-        shift_px = shift / bin_dim
-        # - the mask thickness projection has to be corrected by considering the
-        #   erosion pixel start point, due to the discretisation of the projection
-        #   https://github.com/yuri-evangelista/CodedMasks/blob/main/mask_050_1040x17/new_erosion_20251024.ipynb
-        # - when generating the source shadowgram, the mask array is shifted in the
-        #   opposite direction wrt the coords values, so here we have to multiply
-        #   the shift (in px) by -1.0 to compute the exact array shifting
-        return correct_erosion_value(proj / bin_dim, -1.0 * shift_px) * bin_dim
-    
+    """    
     bins = camera.bins_detector
     bin_dim_x, bin_dim_y = (
         bins.x[1] - bins.x[0],
         bins.y[1] - bins.y[0],
     )
-
-    red_factor_x = project_mask_thickness(shift_x, bin_dim_x)
+    # - since the mask detector distance is defined as the distance between the
+    #   detector top and the mask top, erosion shall cut on the left-side of the
+    #   shadowgram when sources have negative `angle`.
+    # - if the mask detector distance was defined as the distance between the
+    #   detector top and the mask bottom, erosion should have been applied to the
+    #   right side, i.e. `proj` should be multiplied by -1.
+    angle_x = shift2angle(camera, shift_x)
+    mask_thick_proj_x = camera.specs.mask_thickness * np.tan(np.deg2rad(angle_x))
+    # - the mask thickness projection has to be corrected by considering the
+    #   erosion pixel start point, due to the discretisation of the projection
+    #   https://github.com/yuri-evangelista/CodedMasks/blob/main/mask_050_1040x17/new_erosion_20251024.ipynb
+    # - when generating the source shadowgram, the mask array is shifted in the
+    #   opposite direction wrt the coords values, so here we have to multiply
+    #   the shift (in px) by -1.0 to compute the exact array shifting
+    red_factor_x = correct_erosion_value(mask_thick_proj_x / bin_dim_x, -1.0 * shift_x / bin_dim_x) * bin_dim_x
     sg_x = _erosion(shadowgram, bin_dim_x, red_factor_x)
 
     # - we apply the y-axis erosion to `sg_x`, otherwise the decimal
     #   values of the input shifted shadowgram would be squared
     # - the erosion on the two axes is still independent, as it must be
-    red_factor_y = project_mask_thickness(shift_y, bin_dim_y)
+    angle_y = shift2angle(camera, shift_y)
+    mask_thick_proj_y = camera.specs.mask_thickness * np.tan(np.deg2rad(angle_y))
+    red_factor_y = correct_erosion_value(mask_thick_proj_y / bin_dim_y, -1.0 * shift_y / bin_dim_y) * bin_dim_y
     sg_y = _erosion(sg_x.T, bin_dim_y, red_factor_y)
 
     return sg_y.T
@@ -157,16 +150,23 @@ class RibsStructure:
     ribs_dim: float
     supp_heigth: float
     supp_equiv_thickness: float
+    supp_bump_heigth: float
 
 def get_ribs_struct(
     ribs_dim: float = 2.5,
     supp_heigth: float = 1.75,
     supp_equiv_thickness: float = 0.25,
+    supp_bump_heigth: float = 0.1,
 ) -> RibsStructure:
+    """
+    Creates an obj representing the camera mask ribs support architecture.\n
+    NOTE: The given measurements for the structure are in [mm].
+    """
     ribs = RibsStructure(
         ribs_dim=ribs_dim,
         supp_heigth=supp_heigth,
         supp_equiv_thickness=supp_equiv_thickness,
+        supp_bump_heigth=supp_bump_heigth,
     )
     return ribs
 
@@ -250,6 +250,12 @@ def apply_vignetting(
     
     # * apply ribs support correction
     else:
+        # - compute specs for support end-bump (assumed to be triangular shaped)
+        crit_angle_bump = np.rad2deg(np.atan(2 * ribs_struct.supp_bump_heigth / ribs_struct.supp_equiv_thickness))
+        if (abs(angle_y) >= 90 - crit_angle_bump):
+            # in the current design, the supports bump is effective for angles > 51° (outside cameras FoV)
+            warnings.warn(f'Ribs supports end-bump vignetting effect is not being accounted for.')
+         
         # - upper support correction: induce erosion on following mask element projection (along coarse axis)
         upsupp_erosion_dist = ribs_struct.supp_heigth * np.tan(np.deg2rad(abs(angle_y))) - struct_eff_base
         # since the ribs correction is applied before the mask close elements, `upsupp_erosion_dist` must be
