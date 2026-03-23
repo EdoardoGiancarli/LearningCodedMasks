@@ -55,13 +55,13 @@ def plot_shape(
     plt.close()
     return None
 
-def randomize_shape(arr_dim: int) -> dict[str, Any]:
-    """Initialises random values for polygon."""
+def randomize_shape(n: int, arr_dim: int) -> dict[str, NDArray]:
+    """Initialises `n` random values for polygon."""
     vals =  {
-        'pos': np.random.randint(int(0.25 * arr_dim), int(0.75 * arr_dim), 2),
-        'radius': np.random.randint(int(0.125 * arr_dim), int(0.4 * arr_dim)),
-        'rot_angle': np.random.randint(0, 45),
-        'alpha': 0.9,
+        'pos': np.random.randint(int(0.25 * arr_dim), int(0.75 * arr_dim), (n, 2)),
+        'radius': np.random.randint(int(0.125 * arr_dim), int(0.4 * arr_dim), n),
+        'rot_angle': np.random.randint(0, 45, n),
+        'alpha': 0.9 * np.ones(n),
     }
     return vals
 
@@ -89,16 +89,17 @@ def simulate_imgs(
         raise ValueError(f"Invalid polygon vertices '{polygonVertices}'. Supported polygons are: {list(SHAPES_MAP.values())}.")
     
     if polygonVertices == -1:
-        draw_shape = lambda vals: draw_circle(vals['pos'], vals['radius'], vals['alpha'])
+        draw_shape = lambda vals, idx: draw_circle(vals['pos'][idx], vals['radius'][idx], vals['alpha'][idx])
     else:
-        draw_shape = lambda vals: draw_polygon(
-            vals['pos'], polygonVertices, vals['radius'], vals['rot_angle'], vals['alpha'],
+        draw_shape = lambda vals, idx: draw_polygon(
+            vals['pos'][idx], polygonVertices, vals['radius'][idx], vals['rot_angle'][idx], vals['alpha'][idx],
         )
     
+    arr = 0.9 * np.ones((arr_dim, arr_dim))
+    vals = randomize_shape(num_imgs, arr_dim)
+    
     for n in tqdm(range(num_imgs)):
-        arr = 0.9 * np.ones((arr_dim, arr_dim))
-        vals = randomize_shape(arr_dim)
-        shape = draw_shape(vals)
+        shape = draw_shape(vals, n)
         figname = f'{SHAPES_MAP[polygonVertices]}{n + start_num}'
         plot_shape(arr, shape, f'{save_to_dir}/{figname}.{frmt}')
     
@@ -106,18 +107,19 @@ def simulate_imgs(
 
 
 if __name__ == '__main__':
-    benchmark: bool = False
+    benchmark: bool = True
 
-    dirpath: str = '/mnt/d/'
-    num_imgs: int = 2
-    polygonVertices: int = 10
+    dirpath: str = '/home/edoardo/Desktop/test_imgs_gen'
+    # dirpath: str = '/mnt/d/'
+    num_imgs: int = 5
+    polygonVertices: int = 3
 
     if benchmark:
         simulate_imgs(
             num_imgs=num_imgs,
             polygonVertices=polygonVertices,
             save_to_dir=dirpath,
-            start_num=99999,
+            start_num=0,
         )
     else:
         print('Dataset already generated!')
