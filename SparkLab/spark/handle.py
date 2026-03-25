@@ -33,9 +33,7 @@ def save_dataset(
     overwrite: bool = False,
     **kwargs,
 ) -> None:
-    """
-    Saves given dataset to '.pt' file.
-    """
+    """Saves given dataset to '.pt' file."""
     if Path(save_to).exists() and not overwrite:
         print("Dataset already saved!")
         return
@@ -46,9 +44,7 @@ def save_dataset(
 
 
 def load_dataset(filepath: str | Path, **kwargs) -> Dataset:
-    """
-    Load given dataset from '.pt' file.
-    """
+    """Load given dataset from '.pt' file."""
     print("Loading dataset...")
     dataset = torch.load(filepath, weights_only=False, **kwargs)
     print("Dataset loaded!")
@@ -80,7 +76,6 @@ def load_model(filepath: str | Path, **kwargs) -> dict[str, Any]:
     model_state: dict = torch.load(filepath, weights_only=False, **kwargs)
     print("Model loaded!")
     return model_state
-
 
 
 # end
