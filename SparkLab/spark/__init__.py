@@ -9,7 +9,7 @@ r"""
 """
 
 __author__ = 'Edoardo Giancarli'
-__version__ = '0.1'
+__version__ = '0.1.0'
 
 
 from .handle import save_dataset
@@ -19,6 +19,8 @@ from .handle import load_model
 
 from .processing import process_data
 from .processing import get_dataloaders
+
+from .inspect import forward_data_capture
 
 
 # end
