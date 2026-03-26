@@ -11,6 +11,8 @@ from matplotlib.patches import RegularPolygon, Circle
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+FACECOLOR: str = 'white'
+
 
 def draw_polygon(
     pos: tuple[int, int],
@@ -24,7 +26,7 @@ def draw_polygon(
         'radius': radius,
         'orientation': np.deg2rad(rot_angle),
         'alpha': alpha,
-        'facecolor': 'black',
+        'facecolor': FACECOLOR,
     }
     return RegularPolygon(pos, numVertices, **kwargs)
 
@@ -36,13 +38,14 @@ def draw_circle(
     """Circle representation."""
     kwargs = {
         'alpha': alpha,
-        'facecolor': 'black',
+        'facecolor': FACECOLOR,
     }
     return Circle(pos, radius, **kwargs)
 
 def plot_shape(
     arr: NDArray,
     shape: RegularPolygon | Circle,
+    dpi: int | float,
     save_to: str | Path,
 ) -> None:
     """Draw given polygon on input arr."""
@@ -51,7 +54,7 @@ def plot_shape(
     ax.add_patch(shape)
     ax.axis('off')
     plt.title('')
-    plt.savefig(save_to, dpi=48, bbox_inches='tight', pad_inches=0.0)
+    plt.savefig(save_to, dpi=dpi, bbox_inches='tight', pad_inches=0.0)
     plt.close()
     return None
 
@@ -69,25 +72,23 @@ def simulate_imgs(
     num_imgs: int,
     polygonVertices: int,
     save_to_dir: str | Path,
-    arr_dim: int = 32,
     start_num: int = 0,
+    dpi: int | float = 120,
     frmt: str = 'png',
+    arr_dim: int = 128,
 ) -> None:
     """Image simulation."""
     SHAPES_MAP = {
-        -1: 'circle',
-        3: 'triangle',
-        4: 'square',
-        5: 'pentagon',
-        6: 'hexagon',
-        7: 'heptagon',
-        8: 'octagon',
-        9: 'nonagon',
-        10: 'decagon',
+        -1: 'circle', 3: 'triangle', 4: 'square',
+        5: 'pentagon', 6: 'hexagon', 7: 'heptagon',
+        8: 'octagon', 9: 'nonagon', 10: 'decagon',
     }
     if polygonVertices not in list(SHAPES_MAP.keys()):
         raise ValueError(f"Invalid polygon vertices '{polygonVertices}'. Supported polygons are: {list(SHAPES_MAP.values())}.")
     
+    arr = np.zeros((arr_dim, arr_dim))
+    vals = randomize_shape(num_imgs, arr_dim)
+
     if polygonVertices == -1:
         draw_shape = lambda vals, idx: draw_circle(vals['pos'][idx], vals['radius'][idx], vals['alpha'][idx])
     else:
@@ -95,34 +96,41 @@ def simulate_imgs(
             vals['pos'][idx], polygonVertices, vals['radius'][idx], vals['rot_angle'][idx], vals['alpha'][idx],
         )
     
-    arr = 0.9 * np.ones((arr_dim, arr_dim))
-    vals = randomize_shape(num_imgs, arr_dim)
-    
     for n in tqdm(range(num_imgs)):
         shape = draw_shape(vals, n)
         figname = f'{SHAPES_MAP[polygonVertices]}{n + start_num}'
-        plot_shape(arr, shape, f'{save_to_dir}/{figname}.{frmt}')
+        plot_shape(arr, shape, dpi, f'{save_to_dir}/{figname}.{frmt}')
     
-    return None
+    return
+
+
+
+
+def main() -> None:
+    DIRPATH: str = '/home/edoardo/Desktop/MockDataForDMs/ImgsMockDatasetDMs'
+    # DIRPATH: str = '/mnt/d/MockDataForDMs/ImgsMockDatasetDMs'
+
+    GEN_DATASET: bool = False
+
+    if GEN_DATASET:
+        num_imgs: int = 1000
+        polygonVertices: tuple = (-1, 3, 4, 6)
+
+        for pv in polygonVertices:
+            simulate_imgs(
+                num_imgs=num_imgs,
+                polygonVertices=pv,
+                save_to_dir=DIRPATH,
+                start_num=0,
+                dpi=110,
+            )
+    else:
+        print('Dataset already generated!')
+    return
 
 
 if __name__ == '__main__':
-    benchmark: bool = True
-
-    dirpath: str = '/home/edoardo/Desktop/test_imgs_gen'
-    # dirpath: str = '/mnt/d/'
-    num_imgs: int = 5
-    polygonVertices: int = 3
-
-    if benchmark:
-        simulate_imgs(
-            num_imgs=num_imgs,
-            polygonVertices=polygonVertices,
-            save_to_dir=dirpath,
-            start_num=0,
-        )
-    else:
-        print('Dataset already generated!')
+    main()
 
 
 # end
