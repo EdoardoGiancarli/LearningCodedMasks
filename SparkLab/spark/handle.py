@@ -2,16 +2,18 @@
 Module for data and torch tensor handling.
 """
 
-from typing import Any, OrderedDict
 from pathlib import Path
 import random
+from typing import Any, OrderedDict
+import warnings
 
 import torch
 from torch.utils.data import Dataset
 
 
 __all__ = [
-    'get_data_filespaths',
+    'gather_data_filepaths',
+    'gather_data_labels',
     'save_dataset',
     'save_model',
     'load_dataset',
@@ -19,12 +21,32 @@ __all__ = [
 ]
 
 
-def get_data_filespaths(dirpath: str | Path, data_frmt: str = 'png', shuffle: bool = False) -> list[str]:
+def gather_data_filepaths(dirpath: str | Path, data_frmt: str = 'png', shuffle: bool = False) -> list[str]:
     """Groups all the data file-paths (of the given format) inside the specified directory."""
     dirpath_ = Path(dirpath)
     paths_list: list[str] = [str(path) for path in dirpath_.glob(f'*.{data_frmt}')]
     if shuffle: random.shuffle(paths_list)
     return paths_list
+
+
+def gather_data_labels(
+    data_paths: list[str | Path],
+    class_lbls: dict[int, str],
+) -> list[int]:
+    """Gathers the data labels from given data filepaths."""
+    lbls: list[int] = []
+    
+    for path in data_paths:
+        file_name = Path(path).name
+        match = next(
+            (id_ for id_, cls_name in class_lbls.items() if cls_name in file_name), 
+            None,
+        )        
+        if match is None:
+            warnings.warn(f"Could not find a valid class name in: {file_name}")
+        lbls.append(match)
+        
+    return lbls
 
 
 def save_dataset(

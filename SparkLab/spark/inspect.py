@@ -93,11 +93,17 @@ class OutputManager:
     Manager for a model output data object. This class acts as a manager for data,
     and when called stores module output tensor, detaching it from the operations
     graph and moving it to the CPU to avoid GPU memory RAM overload.
+    It is also possible to store the output data labels for benchmark routines.
     NOTE:
         * As of now, only Tensor data type handling is supported as module output.
     """
-    def __init__(self, storage: list[Tensor] | None = None) -> None:
-        self.storage = storage if storage is not None else []
+    def __init__(
+        self,
+        output: list[Tensor] | None = None,
+        labels: list[Tensor] | None = None,
+    ) -> None:
+        self.output = output if output is not None else []
+        self.labels = labels if labels is not None else []
     
     def __call__(self, module: nn.Module, in_data: Any, out_data: Tensor) -> None:
         # # NOTE: manage PyTorch multi-tensor outputs
@@ -108,17 +114,22 @@ class OutputManager:
             raise ValueError(
                 f"Invalid 'out_data' type {type(out_data)}, must be 'torch.Tensor'."
             )
-        self.storage.append(out_data.detach().cpu())
+        self.output.append(out_data.detach().cpu())
+    
+    def add_labels(self, data_labels: Tensor):
+        """Adds the data labels to intern labels storage."""
+        self.labels.append(data_labels.detach().cpu())
     
     def clear(self) -> None:
         """Clears the whole storage content."""
-        self.storage = []
+        self.output = []
+        self.labels = []
     
-    def merge(self) -> Tensor:
-        """Merges the storage content to single `torch.Tensor`."""
-        if not self.storage:
-            return torch.empty(0)
-        return torch.cat(self.storage, dim=0)
+    def merge(self) -> tuple[Tensor, Tensor]:
+        """Merges the output and labels storage content to `torch.Tensor`s."""
+        if not self.output:
+            return torch.empty(0), torch.empty(0)
+        return torch.cat(self.output, dim=0), torch.cat(self.labels, dim=0)
 
 
 def config_out_storing_hook(storage: list[Tensor] | None = None) -> tuple[Callable[[Any], None], list[Tensor]]:
