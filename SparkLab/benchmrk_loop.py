@@ -137,16 +137,16 @@ def main() -> None:
     train_dl, valid_dl = sp.get_dataloaders(dataset, BATCH_SIZE, VALID_SIZE)
 
     ITERATIONS: int = 3
-    # b1 = benchmark_func(train_loop_separated, train_dl, valid_dl, EPOCHS, iterations=ITERATIONS)
-    # b2 = benchmark_func(train_loop_itertools, train_dl, valid_dl, EPOCHS, iterations=ITERATIONS)
+    b1 = benchmark_func(train_loop_separated, train_dl, valid_dl, EPOCHS, iterations=ITERATIONS)
+    b2 = benchmark_func(train_loop_itertools, train_dl, valid_dl, EPOCHS, iterations=ITERATIONS)
     b3 = benchmark_func(train_loop_hybrid, train_dl, valid_dl, EPOCHS, iterations=ITERATIONS)
 
     print(
-        # f'Explicit loop takes: {b1[0]} +/- {b1[1]} s\n'
-        # f'Itertools loop takes: {b2[0]} +/- {b2[1]} s\n'
+        f'Explicit loop takes: {b1[0]} +/- {b1[1]} s\n'
+        f'Itertools loop takes: {b2[0]} +/- {b2[1]} s\n'
         f'Hybrid loop takes: {b3[0]} +/- {b3[1]} s\n'
-        # f'DeltaT(b1, b2) = {abs(b1[0] - b2[0])} +/- {math.sqrt(b1[1] ** 2 + b2[1] ** 2)} s\n'
-        # f'DeltaT(b1, b3) = {abs(b1[0] - b3[0])} +/- {math.sqrt(b1[1] ** 2 + b3[1] ** 2)} s\n'
+        f'DeltaT(b1, b2) = {abs(b1[0] - b2[0])} +/- {math.sqrt(b1[1] ** 2 + b2[1] ** 2)} s\n'
+        f'DeltaT(b1, b3) = {abs(b1[0] - b3[0])} +/- {math.sqrt(b1[1] ** 2 + b3[1] ** 2)} s\n'
     )
     return
 
