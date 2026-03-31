@@ -92,10 +92,13 @@ class OutputManager:
     """
     Manager for a model output data object. This class acts as a manager for data,
     and when called stores module output tensor, detaching it from the operations
-    graph and moving it to the CPU to avoid GPU memory RAM overload.
+    graph and moving a copy to the CPU to avoid GPU memory RAM overload.
     It is also possible to store the output data labels for benchmark routines.
     NOTE:
-        * As of now, only Tensor data type handling is supported as module output.
+        * As of now, only Tensor data type handling is supported. If the model's
+          output is a Tensor, it works as it is. If the model's output is a tuple
+          of Tensors, ONLY the FIRST element of the sequence is considered, and
+          it must be a Tensor obj.
     """
     def __init__(
         self,
@@ -105,11 +108,9 @@ class OutputManager:
         self.output = output if output is not None else []
         self.labels = labels if labels is not None else []
     
-    def __call__(self, module: nn.Module, in_data: Any, out_data: Tensor) -> None:
-        # # NOTE: manage PyTorch multi-tensor outputs
-        # if isinstance(out_data, tuple):
-        #     out_data = out_data[0]
-        
+    def __call__(self, module: nn.Module, in_data: Any, out_data: Tensor | tuple[Tensor, ...]) -> None:
+        if isinstance(out_data, tuple):
+            out_data = out_data[0]
         if not isinstance(out_data, Tensor):
             raise ValueError(
                 f"Invalid 'out_data' type {type(out_data)}, must be 'torch.Tensor'."
