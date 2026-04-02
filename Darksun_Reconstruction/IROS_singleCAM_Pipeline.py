@@ -51,14 +51,14 @@ from bloodmoon.types import CoordEquatorial
 PIPELINE SET-UP.
 """
 #### --- LEM-X CAMERAS MASK PATTERN
-MASK_FITS: str = "wfm_mask_NTHT_20250725.fits"
+MASK_FITS: str = "wfm_mask_NTHT_20260129_CORRECTED.fits"
 THIN_MASK: bool = False                                                      # removes vignetting effects
 
 #### --- OBSERVATION DATA
 SKYFIELD: str = "IROSDummy"                                             # skyfield selection
 #DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"             # directory with FITS files from WISEMAN
 #DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_fmin0.0945_2-50keV_1ks"
-DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_infdet_1ks"
+DATA_FITS: str = "gw170817_static_30deg_1s"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
@@ -72,13 +72,13 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "singleCAM_iros_upx2y1_benchmark_infDenseDet_detected"
+ANALYSIS_ID: str = "test_burst_gw170817_IROS_noSCOX1"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 38
-SNR_THRESHOLD: int | float = 5
+MAX_ITERATIONS: int = 15
+SNR_THRESHOLD: int | float = 3
 
-MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
+MODULE_SKY_COMPOSITION: bool = True   # selects if the LEM-X module cameras are to be joined to get the composed sky
 
 #### --- DETECTOR SMOOTHING SETUP
 # - selects if detector smoothing is to be applied
@@ -97,7 +97,7 @@ BASELINE_IROSREC: str | Path | None = os.path.join(
 # - photons energy filter - [keV]
 PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = None
 # - RA/Dec filter (sources to filter out) - [deg]
-PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
+PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = CoordEquatorial(244.9797, -15.6401)
 
 # - number of sources in the catalog for comparison
 CATALOGUE_NUM_BRIGHT_SOURCES: int | tuple[int, int] | None = None
