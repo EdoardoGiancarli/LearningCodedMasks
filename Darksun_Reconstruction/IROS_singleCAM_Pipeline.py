@@ -51,18 +51,18 @@ from bloodmoon.types import CoordEquatorial
 PIPELINE SET-UP.
 """
 #### --- LEM-X CAMERAS MASK PATTERN
-MASK_FITS: str = "wfm_mask_NTHT_20260129_CORRECTED.fits"
+MASK_FITS: str = "mask_050_1040x17_20260129_CORRECTED.fits"
 THIN_MASK: bool = False                                                      # removes vignetting effects
 
 #### --- OBSERVATION DATA
-SKYFIELD: str = "IROSDummy"                                             # skyfield selection
+SKYFIELD: str = "Crab"                                             # skyfield selection
 #DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"             # directory with FITS files from WISEMAN
 #DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_fmin0.0945_2-50keV_1ks"
-DATA_FITS: str = "gw170817_static_30deg_1s"
+DATA_FITS: str = "crab_30deg_100s"
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "detected"
+DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
 UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
@@ -72,10 +72,10 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "test_burst_gw170817_IROS_noSCOX1"
+ANALYSIS_ID: str = f"test_burst_{DATA_FITS}"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 15
+MAX_ITERATIONS: int = 2
 SNR_THRESHOLD: int | float = 3
 
 MODULE_SKY_COMPOSITION: bool = True   # selects if the LEM-X module cameras are to be joined to get the composed sky
