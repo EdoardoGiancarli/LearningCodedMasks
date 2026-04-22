@@ -16,7 +16,6 @@ __all__ = [
     'DiffusionRegistry',
     'get_diff_registry',
     'extract',
-    'Diffuser',
     'Sampler',
     'sample',
 ]
@@ -108,11 +107,11 @@ def extract(vals: Tensor, t: Tensor, x_dims: int) -> Tensor:
     return out.reshape(b, *((1,) * (x_dims - 1)))
 
 
-class Diffuser(nn.Module):
+class Sampler(nn.Module):
     """
-    Defines the forward diffusion process.
+    Defines the sampling process from the model for inference.
     """
-    def __init__(self, betas: Tensor):
+    def __init__(self, betas: Tensor) -> None:
         super().__init__()
         registry = get_diff_registry(betas)
         # register buffers for pre-comp quantities
@@ -128,37 +127,26 @@ class Diffuser(nn.Module):
         sqrt_one_minus_alphas_cumprod_t = extract(self.sqrt_one_minus_alphas_cumprod, t, len(x.shape))
         
         return sqrt_alphas_cumprod_t * x + sqrt_one_minus_alphas_cumprod_t * noise
-
-
-class Sampler(nn.Module):
-    """
-    Defines the sampling process from the model for inference.
-    """
-    def __init__(
-        self,
-        model: nn.Module,
-        diffuser: Diffuser,
-    ) -> None:
-        super().__init__()
-        self.model = model
-        self.diffuser = diffuser
     
     @torch.no_grad()
-    def p_sample(self, x: Tensor, t: Tensor, eta: float) -> Tensor:
+    def p_sample(self, model: nn.Module, x: Tensor, t: Tensor, eta: float) -> Tensor:
         """
         Samples the signal from the model at step `t - 1`, from
         DDIM (Song et al, 2021): https://arxiv.org/pdf/2010.02502.
         """
         if len(t) != x.shape[0]:
-            raise ValueError(f'Invalid timestep shape {t.shape}: must be equal to input batch {x.shape[0]}.')
+            raise ValueError(
+                f'Invalid timestep shape {t.shape}: must be equal to input batch {x.shape[0]}.'
+            )
 
         x_dims = len(x.shape)
-        pred_noise = self.model(x, t)
+        pred_noise = model(x, t)
 
-        a_t_prev = extract(self.diffuser.alphas_cumprod_prev, t, x_dims)
-        sqrt_a_t = extract(self.diffuser.sqrt_alphas_cumprod, t, x_dims)
-        sqrt_one_m_a_t = extract(self.diffuser.sqrt_one_minus_alphas_cumprod, t, x_dims)
-        sigma = eta * extract(self.diffuser.posterior_sigma, t, x_dims)
+        # see https://github.com/lucidrains/denoising-diffusion-pytorch/blob/main/denoising_diffusion_pytorch/denoising_diffusion_pytorch.py
+        a_t_prev = extract(self.alphas_cumprod_prev, t, x_dims)
+        sqrt_a_t = extract(self.sqrt_alphas_cumprod, t, x_dims)
+        sqrt_one_m_a_t = extract(self.sqrt_one_minus_alphas_cumprod, t, x_dims)
+        sigma = eta * extract(self.posterior_sigma, t, x_dims)
 
         x0_pred = (x - sqrt_one_m_a_t * pred_noise) / sqrt_a_t
         dir_to_x = torch.sqrt(1.0 - a_t_prev - sigma ** 2) * pred_noise
@@ -169,9 +157,10 @@ class Sampler(nn.Module):
 
 @torch.no_grad()
 def _sample(
+    model: nn.Module,
+    sampler: Sampler,
     x_start: Tensor,
     timesteps: list[int],
-    sampler: Sampler,
     batch_size: int,
     eta: float,
     full_process: bool,
@@ -181,7 +170,7 @@ def _sample(
     diff_process: list[Tensor] = []
     for idx in tqdm(timesteps, desc=f'Sampling from model, eta={eta}', total=len(timesteps)):
         t = torch.full((batch_size,), idx, device=x_start.device, dtype=torch.long)
-        img = sampler.p_sample(img, t, eta)
+        img = sampler.p_sample(model, img, t, eta)
         if full_process: diff_process.append(img.cpu())
     
     out = img if not full_process else diff_process
@@ -190,6 +179,7 @@ def _sample(
 
 @torch.no_grad()
 def sample(
+    model: nn.Module,
     sampler: Sampler,
     timesteps: int | list[int],
     x_shape: torch.Size,
@@ -198,17 +188,17 @@ def sample(
     full_process: bool = False,
 ) -> Tensor | list[Tensor]:
     """Samples images from the model through denoising diffusion process."""
-    device = next(sampler.model.parameters()).device
+    device = next(model.parameters()).device
     batch_size = x_shape[0]
     x_start = (
         x_t if x_t is not None
         else torch.randn(x_shape, device=device)
     )
     timesteps_ = (
-        list(range(0, timesteps))[::-1] if isinstance(timesteps, int)
-        else timesteps
+        list(range(0, timesteps))[::-1] if isinstance(timesteps, int) else timesteps
     )
-    return _sample(x_start, timesteps_, sampler, batch_size, eta, full_process)
+    sampler = sampler.to(device)
+    return _sample(model, sampler, x_start, timesteps_, batch_size, eta, full_process)
 
 
 # end

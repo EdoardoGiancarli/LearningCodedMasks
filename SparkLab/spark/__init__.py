@@ -14,7 +14,6 @@ __version__ = '0.1.0'
 
 from .diffusion import NoiseScheduler
 from .diffusion import extract
-from .diffusion import Diffuser
 from .diffusion import Sampler
 from .diffusion import sample
 
