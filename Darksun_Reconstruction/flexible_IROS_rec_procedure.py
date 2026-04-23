@@ -346,22 +346,24 @@ def iros_singleCAM(
     Performs the Iterative Removal of Sources (IROS) algorithm for a single coded-mask
     camera of the Wide Field Monitor observations.
     """
+    def set_func(
+        fn: Callable | None,
+        default: Callable[[], Callable],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Callable:
+        """IROS operations setup."""
+        if fn is not None:
+            return fn
+        return default(*args, **kwargs)
+
     # intern logic setup
-    find_candidate = (
-        finder if finder is not None
-        else default_finder(camera, snr_threshold)
+    find_candidate = set_func(finder, default_finder, camera, snr_threshold)
+    optimise = set_func(
+        optimiser, default_optimiser, camera, vignetting, psfy, fit_weights, verbose=True,
     )
-    optimise = (
-        optimiser if optimiser is not None
-        else default_optimiser(camera, vignetting, psfy, fit_weights, verbose=True)
-    )
-    fit_cand_params = (
-        fitter if fitter is not None else default_fitter(optimise)
-    )
-    subtract_cand_sg = (
-        subtractor if subtractor is not None
-        else default_subtractor(camera, vignetting, psfy)
-    )
+    fit_cand_params = set_func(fitter, default_fitter, optimise)
+    subtract_cand_sg = set_func(subtractor, default_subtractor, camera, vignetting, psfy)
     # arrs setup
     detector_ = detector.copy()
     skymap = decode(camera, detector)
