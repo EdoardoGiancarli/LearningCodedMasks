@@ -3,8 +3,9 @@ Module for sky images diffusion to detector images.
 """
 
 from dataclasses import dataclass
-from tqdm import tqdm
+from typing import Callable
 
+from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -157,21 +158,20 @@ class Sampler(nn.Module):
 
 @torch.no_grad()
 def _sample(
-    model: nn.Module,
-    sampler: Sampler,
+    sample_fn: Callable[[Tensor, Tensor], Tensor], 
     x_start: Tensor,
     timesteps: list[int],
     batch_size: int,
-    eta: float,
     full_process: bool,
 ) -> Tensor | list[Tensor]:
     """Sampling algorithm for signal denoising through time steps."""
     img = x_start
     diff_process: list[Tensor] = []
-    for idx in tqdm(timesteps, desc=f'Sampling from model, eta={eta}', total=len(timesteps)):
+    for idx in tqdm(timesteps, desc=f'Sampling', total=len(timesteps)):
         t = torch.full((batch_size,), idx, device=x_start.device, dtype=torch.long)
-        img = sampler.p_sample(model, img, t, eta)
-        if full_process: diff_process.append(img.cpu())
+        img = sample_fn(img, t)
+        if full_process:
+            diff_process.append(img.cpu())
     
     out = img if not full_process else diff_process
     return out
@@ -195,10 +195,11 @@ def sample(
         else torch.randn(x_shape, device=device)
     )
     timesteps_ = (
-        list(range(0, timesteps))[::-1] if isinstance(timesteps, int) else timesteps
+        list(range(0, timesteps))[::-1] if isinstance(timesteps, int) else timesteps[::-1]
     )
     sampler = sampler.to(device)
-    return _sample(model, sampler, x_start, timesteps_, batch_size, eta, full_process)
+    sample_fn = lambda x, t: sampler.p_sample(model, x, t, eta)
+    return _sample(sample_fn, x_start, timesteps_, batch_size, full_process)
 
 
 # end
