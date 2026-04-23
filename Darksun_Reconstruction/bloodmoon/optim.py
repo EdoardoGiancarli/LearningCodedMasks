@@ -437,8 +437,8 @@ def optimize(
     arg_sky: tuple[int, int],
     vignetting: bool = True,
     psfy: bool = True,
-    verbose: bool = False,
     camera_coding_power: float = 0.85,
+    verbose: bool = False,
 ) -> tuple[float, float, float]:
     """
     Performs the optimization to fit a point source model to sky image data.
