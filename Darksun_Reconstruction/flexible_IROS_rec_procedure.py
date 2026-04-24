@@ -120,11 +120,10 @@ def default_optimiser(
         offset_y, offset_x = (
             5 * camera.upscale_f.y, 2 + camera.upscale_f.x,
         )
-
-        i, j = pos
         crop_y, crop_x = (
             psf_slit_px_y + offset_y, psf_slit_px_x + offset_x,
         )
+        i, j = pos
         slice_y, slice_x = (
             slice(i - crop_y, i + crop_y + 1), slice(j - crop_x, j + crop_x + 1),
         )
