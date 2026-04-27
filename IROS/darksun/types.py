@@ -43,7 +43,7 @@ class Tag(NamedTuple):
     x: int | float
 
 
-class Candidate(NamedTuple):
+class Source(NamedTuple):
     """
     Source candidate parameters container.
 
@@ -55,7 +55,7 @@ class Candidate(NamedTuple):
         fluence (float):
             Observed candidate fluence [ph].
         snr (float):
-            Candidate significance [adim].
+            Source significance [adim].
     """
     shift_x: float
     shift_y: float

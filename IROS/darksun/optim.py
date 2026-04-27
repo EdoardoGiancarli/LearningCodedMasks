@@ -9,7 +9,7 @@ from scipy.ndimage import median_filter
 from bloodmoon.mask import CodedMaskCamera
 from bloodmoon.optim import model_shadowgram
 
-from .types import Candidate
+from .types import Source
 from .data import Log
 
 __all__ = [
@@ -113,12 +113,12 @@ def get_candidates(
     log: Log,
     thresh: int | float,
     verbose: bool = True,
-) -> tuple[Candidate, ...]:
+) -> tuple[Source, ...]:
     """
     Extracts the source candidates from the IROS log with a significance lower than
     the input threshold. This function finds the index of the first log entry where
     'snr' is strictly less than the provided threshold, and then returns all prior
-    entries as Candidate objects.
+    entries as Source objects.
     This assumes that the log data is sorted by 'snr' in descending order.
 
     Args:
@@ -134,7 +134,7 @@ def get_candidates(
             found and the SNR values around the threshold index.
 
     Returns:
-        output (tuple[Candidate, ...]):
+        output (tuple[Source, ...]):
             List of source candidates with significance higher than threshold.
 
     Raises:
@@ -146,8 +146,8 @@ def get_candidates(
 
     _idxs: NDArray = np.argwhere(_snrs < thresh)
     idx: int = _idxs[0, 0] if _idxs.size > 0 else None
-    candidates: tuple[Candidate, ...] = tuple(
-        Candidate(sx, sy, f, signf) for sx, sy, f, signf in zip(
+    candidates: tuple[Source, ...] = tuple(
+        Source(sx, sy, f, signf) for sx, sy, f, signf in zip(
             log.log['shift_x'][:idx],
             log.log['shift_y'][:idx],
             log.log['fluence'][:idx],
@@ -171,7 +171,7 @@ def get_candidates(
 
 
 def retrieve_detector(
-    candidates: tuple[Candidate, ...],
+    candidates: tuple[Source, ...],
     camera: CodedMaskCamera,
     vignetting: bool,
     psfy: bool,
@@ -182,8 +182,8 @@ def retrieve_detector(
     simulates the detector counts produced by the list of identified sources.
 
     Args:
-        candidates (tuple[Candidate, ...]):
-            Tuple of Candidate objects with candidates parameters info.
+        candidates (tuple[Source, ...]):
+            Tuple of Source objects with candidates parameters info.
         camera (CodedMaskCamera):
             CodedMaskCamera instance with instrument geometry.
         vignetting (bool):
@@ -211,7 +211,7 @@ def retrieve_detector(
 
 def detector_smoothing(
     detector: NDArray,
-    candidates: tuple[Candidate, ...],
+    candidates: tuple[Source, ...],
     camera: CodedMaskCamera,
     vignetting: bool,
     psfy: bool,
@@ -224,8 +224,8 @@ def detector_smoothing(
     Args:
         detector (NDArray):
             Input coded-mask camera detector image.
-        candidates (tuple[Candidate, ...]):
-            Tuple of Candidate objects with candidates parameters info.
+        candidates (tuple[Source, ...]):
+            Tuple of Source objects with candidates parameters info.
         camera (CodedMaskCamera):
             CodedMaskCamera instance with instrument geometry.
         vignetting (bool):
