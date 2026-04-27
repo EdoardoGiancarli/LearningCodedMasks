@@ -9,7 +9,7 @@ This module provides algorithms for:
 """
 
 from functools import lru_cache
-from typing import Any, Callable, Iterable
+from typing import Callable, Iterable
 import warnings
 
 from numpy import typing as npt
@@ -31,8 +31,6 @@ from .mask import cutout
 from .mask import decode
 from .mask import snratio
 from .mask import variance
-from .types import OptResult
-from .types import Source
 
 
 def _modsech(
@@ -256,6 +254,7 @@ def _process_mask_pattern(
 def _extract_detector(
     camera: CodedMaskCamera,
     shadowgram: npt.NDArray,
+    normalise: bool = True,
 ) -> npt.NDArray:
     """
     Extracts the detector image from the mask pattern projection on the detector plane.
@@ -263,7 +262,8 @@ def _extract_detector(
     i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
     detector = shadowgram[i_min:i_max, j_min:j_max]
     detector *= camera.bulk
-    detector /= np.sum(detector)
+    if normalise:
+        detector /= np.sum(detector)
     return detector
 
 
@@ -369,603 +369,437 @@ jesus pleasee look upon it
 """
 
 
-def solver(
-    func: Callable[[npt.NDArray, *tuple[float, ...]], Any],
-    xdata: npt.NDArray,
-    ydata: npt.NDArray,
-    verbose: bool = False,
-    **kwargs: Any,
-) -> OptResult:
-    """
-    Defines the fit solver for the source model parameters optimisation.
-    The optimisation routine is performed with scipy's `curve_fit`.
-    """
-    popt, pcov, info, msg, iflag = curve_fit(
-        f=func,
-        xdata=xdata,
-        ydata=ydata,
-        full_output=True,
-        **kwargs,
-    )
-    errs = np.sqrt(np.diag(pcov))
-    if verbose:
-        def comp_param_gain(start: float, optm: float) -> float:
-            """Computes the optimised parameter value gain wrt start."""
-            return float(np.sign(start) * (optm - start) * 100 / start)
-
-        routine_status = [
-            'Convergence in chi-square values',
-            'Convergence in parameter values',
-            'Convergence in both chi-square and parameter values',
-            'Convergence in orthogonality',
-        ]
-        print('## Optimisation Results:')
-        start_vals = (
-            kwargs['p0'] if 'p0' in kwargs.keys() else np.ones_like(popt)
-        )
-        for idx, (s, p, dp) in enumerate(zip(start_vals, popt, errs)):
-            print(
-                f'  * p[{idx}]:\n'
-                f'      - START.: {float(s):.7f}\n'
-                f'      - OPTIM.: {float(p):.7f} +/- {float(dp):.7f}\n'
-                f'      - GAIN.: {comp_param_gain(s, p):.3f} %'
-            )
-        print(
-            f'\n## Fit Report:\n'
-            f'  - func calls (also # of iters): {info['nfev']}\n'
-            f'  - procedure msg: {msg}\n'
-            f'  - success status {iflag}: {routine_status[iflag - 1]}\n'
-        )
-    return OptResult(popt, errs)
-
-
-def default_optimiser(
+def process_skyimg(
     camera: CodedMaskCamera,
-    vignetting: bool | Callable[[CodedMaskCamera, npt.NDArray, float, float], npt.NDArray],
-    psfy: bool | Callable[[CodedMaskCamera, npt.NDArray], npt.NDArray],
-    fit_weights: npt.NDArray | Callable[[npt.NDArray], npt.NDArray] | None = None,
+    sky: npt.NDArray,
+    pos: tuple[int, int],
+) -> npt.NDArray:
+    """
+    Processes the sky image for optimisation.
+    Specifically, it crops the input sky 2D array around the extracted
+    source position with an extension proportional to the system source
+    PSF, and then it flattens the cropped array.
+
+    Args:
+        camera: CodedMaskCamera intance with system geometry info.
+        sky: 2D array representing the sky image.
+        pos: Pixel indexes for the cropping.
+    
+    Returns:
+        output: 1D source-cropped and flattened sky image.
+    """
+    # here we crop the source PSF slit plus an offset to account for
+    # shifts and to accomodate the `curve_fit` optimisation:
+    #   - along y (coarse dir) we insert an offset of `5 * upscaling`, which
+    #     is ~ 1/6 of the upsampled PSF slit dimension;
+    #   - along x (fine dir) we insert an offset of `2 + upscaling`, to
+    #     avoid the bkg contributes from the surrounding pixels;
+    # NOTE: if the offset is smaller than at least the shifts bounds in
+    # `optimize()`, the optimisation procedure may fail for some sources
+    psf_slit_px_y, psf_slit_px_x = (
+        int(camera.specs.slit_deltay * camera.upscale_f.y / camera.specs.mask_deltay),
+        int(camera.specs.slit_deltax * camera.upscale_f.x / camera.specs.mask_deltax),
+    )
+    offset_y, offset_x = (
+        5 * camera.upscale_f.y, 2 + camera.upscale_f.x,
+    )
+
+    i, j = pos
+    crop_y, crop_x = (
+        psf_slit_px_y + offset_y, psf_slit_px_x + offset_x,
+    )
+    slice_y, slice_x = (
+        slice(i - crop_y, i + crop_y + 1), slice(j - crop_x, j + crop_x + 1),
+    )
+    cropped = sky[slice_y, slice_x]
+    return cropped.flatten()
+
+
+# this is essentially a wrapper to `mask.model_sky`, i am creating it
+# because its interface # follows the rules required by `optimize`.
+def _ModelShiftFluence(
+    camera: CodedMaskCamera,
+    pos: tuple[int, int],
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> Callable[[npt.NDArray, float, float, float], npt.NDArray]:
+    """
+    A slow, vanilla implementation of the model for both direction and fluence optimization.
+    Intended for debugging and benchmarking.
+
+    Args:
+        camera: CodedMaskCamera instance containing all geometric parameters
+        pos: tuple of row, col indexes indicating the source peak position. The source
+        sky image is cropped around `pos`.
+        vignetting: If true, shadowgram model simulates vignetting.
+        psfy: If true, the model used for optimization will simulate detector position
+        reconstruction effects.
+
+    Returns:
+        A Callable, which is the routine for computing the model.
+    """
+
+    def f(x: npt.NDArray, shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
+        """
+        A simple, slow version of the model for both direction and fluence optimization.
+        The input `x` represents an independent variable, and it has only been inserted
+        to match the inputs of the scipy `curve_fit` procedure.
+
+        Args:
+            x: Placeholder for independent variable as in `curve_fit` doc
+            shift_x: Source position x-coordinate in sky-shift space (mm)
+            shift_y: Source position y-coordinate in sky-shift space (mm)
+            fluence: Source intensity/fluence value
+
+        Returns:
+            Flattened and cropped 2D source-modeled sky image
+        """
+        modeled = model_sky(camera, shift_x, shift_y, fluence, vignetting, psfy)
+        return process_skyimg(camera, modeled, pos)
+    
+    return f
+
+
+def optimize(
+    camera: CodedMaskCamera,
+    sky: npt.NDArray,
+    arg_sky: tuple[int, int],
+    vignetting: bool = True,
+    psfy: bool = True,
     camera_coding_power: float = 0.85,
     verbose: bool = False,
-) -> Callable[[npt.NDArray, tuple[int, int]], OptResult]:
+) -> tuple[float, float, float]:
     """
-    Configures the IROS optimiser for source parameters fitting.
+    Performs the optimization to fit a point source model to sky image data.
+
+    This function performs the optimization by simultaneously fit the candidate
+    position and fluence. The starting position is inferred from the candidate
+    pixel position, while the starting fluence is represented by the counts at
+    the candidate extracted pixel indexes. If the `psfy` effect is active, the
+    fluence start value is corrected for the camera coding power.
+
+    Args:
+        camera: CodedMaskCamera instance containing detector and mask parameters
+        sky: 2D array of the reconstructed sky image to fit
+        arg_sky: Initial guess for source position as (row, col) indices
+        vignetting: If true, the model used for optimization will simulate vignetting.
+        psfy: If true, the model used for optimization will simulate detector position
+        reconstruction effects.
+        verbose: If True, the optimisation results are printed out.
+
+    Returns:
+        Tuple containing the best-fit parameters `(x, y, fluence)` where:
+                - x, y are the optimized sky-shift coordinates
+                - fluence is the optimized source intensity
+
+    Notes:
+        - Bounds are set based on initial guess and physical constraints
     """
-    def process_skyimg(
-        sky: npt.NDArray,
-        pos: tuple[int, int],
-    ) -> npt.NDArray:
-        """
-        Processes the sky image for optimisation.
-        """
-        # here we crop the source PSF slit plus an offset to account for
-        # shifts and to accomodate the `curve_fit` optimisation:
-        #   - along y (coarse dir) we insert an offset of `5 * upscaling`, which
-        #     is ~ 1/6 of the upsampled PSF slit dimension;
-        #   - along x (fine dir) we insert an offset of `2 + upscaling`, to
-        #     avoid the bkg contributes from the surrounding pixels;
-        # NOTE: if the offset is smaller than at least the shifts bounds in
-        # `optimize()`, the optimisation procedure may fail for some sources
-        psf_slit_px_y, psf_slit_px_x = (
-            int(camera.specs.slit_deltay * camera.upscale_f.y / camera.specs.mask_deltay),
-            int(camera.specs.slit_deltax * camera.upscale_f.x / camera.specs.mask_deltax),
-        )
-        offset_y, offset_x = (
-            5 * camera.upscale_f.y, 2 + camera.upscale_f.x,
-        )
-        crop_y, crop_x = (
-            psf_slit_px_y + offset_y, psf_slit_px_x + offset_x,
-        )
-        i, j = pos
-        slice_y, slice_x = (
-            slice(i - crop_y, i + crop_y + 1), slice(j - crop_x, j + crop_x + 1),
-        )
-        cropped = sky[slice_y, slice_x]
-        return cropped.flatten()
-
-    def _ModelShiftFluence(arg_sky: tuple[int, int]) -> Callable[[npt.NDArray, float, float, float], npt.NDArray]:
-        """
-        Initialises the source model.
-        """
-        def f(x: npt.NDArray, shift_x: float, shift_y: float, fluence: float) -> npt.NDArray:
-            """Models the source sky image."""
-            modeled = model_sky(camera, shift_x, shift_y, fluence, vignetting, psfy)
-            return process_skyimg(modeled, arg_sky)
-        
-        return f
-
-    def optimiser(
-        sky: npt.NDArray,
-        arg_sky: tuple[int, int],
-    ) -> OptResult:
-        """
-        Performs the optimization to fit a point source model to sky image data.
-        """
-        model_func = _ModelShiftFluence(arg_sky)
-        sky_peak = sky[*arg_sky]
-
-        # setup solver params
-        # * setup source data + std
-        sky_ydata = process_skyimg(sky, arg_sky)
-        if fit_weights is not None:
-            weights = (
-                fit_weights if isinstance(fit_weights, np.ndarray)
-                else fit_weights(sky_ydata)
-            )
-        else:
-            weights = np.ones_like(sky_ydata)
-        # * extract source coords and counts starting values
-        sx_start, sy_start = pos2shift(camera, *arg_sky)
-        cts_start = sky_peak / camera_coding_power
-        start_params_vals = np.array([sx_start, sy_start, cts_start])
-        # * setup fit params boundaries
-        #    - the shifts are allowed to fluctuate in a small pixel box since
-        #      the extracted position is close enough to the true source pos
-        #      A small box also account for superimposed or close sources,
-        #      which may introduce biases in the source fit procedure
-        #    - the box is built from the digital upsampling since in the worst
-        #      case (source at 45 deg wrt optical axis) the high energy detected
-        #      photons median absorption distance is 225um. The projection of this
-        #      distance on the camera plane is always smaller than `px_size / ups`  
-        #    - the fluence cannot be smaller than the one observed at the peak,
-        #      and we insert a lower value just for precaution (if simulating
-        #      for example an infinite detector spatial resolution)
-        px_dim_x, px_dim_y = (
-            camera.specs.mask_deltax / camera.upscale_f.x,
-            camera.specs.mask_deltay / camera.upscale_f.y,
-        )
-        bounds = [
+    px_dim_x, px_dim_y = (
+        camera.specs.mask_deltax / camera.upscale_f.x,
+        camera.specs.mask_deltay / camera.upscale_f.y,
+    )
+    model_shift_flux = _ModelShiftFluence(camera, arg_sky, vignetting, psfy)
+    sx_start, sy_start = pos2shift(camera, *arg_sky)
+    sky_peak = sky[*arg_sky]
+    fluence_start = (
+        sky_peak / camera_coding_power if psfy else sky_peak
+    )
+    sky_ydata = process_skyimg(camera, sky, arg_sky)
+    
+    # - the shifts are allowed to fluctuate in a 3 x 3 pixel box since
+    #   the extracted position is close enough to the true source pos
+    #   Also, since multiple sources may be superimposed or close, the
+    #   optimisation procedure may introduce biases in the source fit
+    # - the fluence cannot be smaller than the one observed at the peak,
+    #   and we insert a lower value just for precaution (if simulating
+    #   for example an infinite detector spatial resolution)
+    results, _ = curve_fit(
+        model_shift_flux,
+        xdata=np.arange(len(sky_ydata)),
+        ydata=sky_ydata,
+        p0=[sx_start, sy_start, fluence_start],
+        bounds=[
             (
-                max(sx_start - camera.upscale_f.x * px_dim_x, camera.bins_sky.x[0]),
-                max(sy_start - camera.upscale_f.y * px_dim_y, camera.bins_sky.y[0]),
+                max(sx_start - 1.5 * px_dim_x, camera.bins_sky.x[0]),
+                max(sy_start - 1.5 * px_dim_y, camera.bins_sky.y[0]),
                 0.95 * sky_peak,
             ),
             (
-                min(sx_start + camera.upscale_f.x * px_dim_x, camera.bins_sky.x[-1]),
-                min(sy_start + camera.upscale_f.y * px_dim_y, camera.bins_sky.y[-1]),
+                min(sx_start + 1.5 * px_dim_x, camera.bins_sky.x[-1]),
+                min(sy_start + 1.5 * px_dim_y, camera.bins_sky.y[-1]),
                 1.25 * sky_peak,
             ),
-        ]
-        # perform optimisation
-        slvr_kwargs = {
-            # - solver kwargs
-            'p0': start_params_vals,
-            'sigma': weights,
-            'bounds': bounds,
-            'method': 'trf',
-            # - least square kwargs
-            'jac': '3-point',
-            'ftol': 1e-8,
-            'xtol': 1e-8,
-            'x_scale': 'jac',
-            'loss': 'linear',
-        }
-        result = solver(
-            func=model_func,
-            xdata=np.arange(len(sky_ydata)),
-            ydata=sky_ydata,
-            verbose=verbose,
-            **slvr_kwargs,
+        ],
+    )
+    # store the final optimized positions and fluence
+    sx, sy, fluence = map(float, results)
+
+    if verbose:
+        print(
+            f'\n'
+            f'## Optimisation Results:\n'
+            f'  - fluence START: {fluence_start}\n'
+            f'  - shifts START (x, y): {sx_start}, {sy_start}\n'
+
+            f'  - fluence OPTIM.: {fluence}\n'
+            f'  - shifts OPTIM. (x, y): {sx}, {sy}\n'
+
+            f'  - fluence GAIN %: {(fluence - fluence_start) * 100 / fluence_start:.3f}\n'
+            f'  - shift_x GAIN %: {np.sign(sx_start) * (sx - sx_start) * 100 / sx_start:.3f}\n'
+            f'  - shift_y GAIN %: {np.sign(sy_start) * (sy - sy_start) * 100 / sy_start:.3f}\n'
         )
 
-        return result
-    
-    return optimiser
+    return sx, sy, fluence
 
 
-
-
-def default_finder(
+def iros(
     camera: CodedMaskCamera,
-    snr_threshold: float,
-    batch: int = 1000,
-) -> Callable[[npt.NDArray, npt.NDArray], tuple[int, int] | bool]:
+    sdl_cam1a: SimulationDataLoader,
+    sdl_cam1b: SimulationDataLoader,
+    max_iterations: int,
+    snr_threshold: float = 0.0,
+    vignetting: bool = True,
+    psfy: bool = True,
+) -> Iterable:
+    """Performs Iterative Removal of Sources (IROS) for dual-camera WFM observations.
+
+    This function implements an iterative source detection and removal algorithm for
+    the WFM coded mask instrument. For each iteration, it:
+    1. Ranks source candidates by SNR and integrated intensity
+    2. Matches compatible source positions between orthogonal cameras
+    3. Fits source parameters
+    4. Removes fitted sources from the sky image
+    5. Repeats until no significant sources remain or max iterations reached
+
+    Args:
+        camera: CodedMaskCamera instance containing mask/detector geometry and parameters
+        sdl_cam1a: SimulationDataLoader for the first WFM  camera
+        sdl_cam1b: SimulationDataLoader for the second WFM camera
+        max_iterations: Maximum number of source removal iterations to perform
+        snr_threshold: Optional float. If provided, iteration stops when maximum
+            residual SNR falls below this value. Defaults to 0. (no threshold).
+        vignetting: Optional bool. If `True`, the model used for optimization will simulate vignetting.
+        psfy: Optional bool. If `True`, the model used for optimization will simulate detector
+        position reconstruction effects.
+
+    Yields:
+        For each iteration, yields:
+            - A tuple of two (x, y, fluence, significance) tuples, one for each camera's
+              detected source, where x,y are sky-shift coordinates in mm, fluence is source intensity,
+               significance in standard deviations.
+            - A tuple of two residual sky images after source removal, one for each camera
+            Note: Results are ordered to match sdl_cam1a, sdl_cam1b order
+
+    Raises:
+        ValueError: If cameras are not oriented orthogonally (90° rotation in azimuth)
+        RuntimeError: If source parameter optimization fails (with detailed error message)
+
+    Notes:
+        Performance Considerations:
+        - Computation scales with mask resolution. Keep upscaling factors low
+          (upscale_x * upscale_y ~< 10) for reasonable performance
+
+        Algorithm Details:
+        - Requires orthogonal camera views (90° rotation) for source localization
+        - Ranks candidates by SNR and integrated intensity within aperture
+        - Optimizes source parameters in local windows around candidates
+        - When using reconstructed data, accounts for vignetting and PSF effects
+
+    Example:
+    >>> for sources, residuals in iros(camera, sdl_cam1a, sdl_cam1b, max_iterations=2):
+    >>>     source_1a, source_1b = sources
+    >>>     residual_1a, residual_1b = residuals
+    >>>     ...
     """
-    Defines default IROS source candidates finder.
-    """
-    SETUP: dict[str, Any] = {
-        'slit_mask_fine': int(
-            camera.specs.slit_deltax * camera.upscale_f.x / camera.specs.mask_deltax
+    from astropy.coordinates import angular_separation
+
+    # verify cameras are oriented orthogonally (90° rotation in azimuth).
+    # this is required for the source position matching algorithm.
+    # then sort the data loaders into a tuple so that the second's data loader
+    # x axis is at +90° from the first one.
+    # fmt: off
+    if not np.isclose(
+        angular_separation(
+            *map(np.deg2rad, (*sdl_cam1a.rotations["z"], *sdl_cam1b.rotations["z"]))
         ),
-        'slit_mask_coarse': int(
-            camera.specs.slit_deltay * camera.upscale_f.y / camera.specs.mask_deltay
+        0.
+    ) or not np.isclose(
+        np.abs(
+            delta_rot_x := angular_separation(
+                *map(np.deg2rad, (*sdl_cam1a.rotations["x"], *sdl_cam1b.rotations["x"])))
         ),
-        'skymap_mask': np.ones(camera.shape_sky, dtype=int),
-    }
+        np.pi / 2
+    ):
+        raise ValueError("Cameras must be rotated by 90° degrees over azimuth.")
+    else:
+        if delta_rot_x > 0:
+            sdls = (sdl_cam1a, sdl_cam1b)
+        else:
+            sdls = (sdl_cam1b, sdl_cam1a)
+    # fmt: on
 
-    def _update_skymap_mask(arg_sky: tuple[int, int]) -> None:
+    def direction_match(
+        a: tuple[int, int],
+        b: tuple[int, int],
+    ) -> bool:
+        """Determines if source positions from both cameras correspond to the same sky location.
+        Compares source positions accounting for the 90° camera rotation. Positions are
+        considered matching if they are within one slit width from each other after rotation.
+        TODO: not urgent, but in a future we should make this work for arbitrary camera rotations.
         """
-        Updates the skymap mask with the new candidate position by covering the candidate
-        half-PSF profile (to account for the camera angular resolution of a source).
-        """
-        rows = slice(
-            arg_sky[0] - SETUP['slit_mask_coarse'] // 2, arg_sky[0] + SETUP['slit_mask_coarse'] // 2 + 1,
-        )
-        cols = slice(
-            arg_sky[1] - SETUP['slit_mask_fine'] // 2, arg_sky[1] + SETUP['slit_mask_fine'] // 2 + 1,
-        )
-        SETUP['skymap_mask'][rows, cols] = 0
-        return None
-    
-    def finder(
+        ax, ay = camera.bins_sky.x[a[1]], camera.bins_sky.y[a[0]]
+        # we apply -90deg rotation to camera b source
+        bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]
+        min_slit = min(camera.specs.slit_deltax, camera.specs.slit_deltay)
+        return abs(ax - bx) < min_slit and abs(ay - by) < min_slit
+
+    def match(pending: tuple) -> tuple:
+        """Cross-check the last entry in pending to match against all other pending directions"""
+        pa, pb = pending
+        if not pa or not pb:
+            return tuple()
+
+        # we are going to call this each time we get a new couple of candidate indices.
+        # we avoid evaluating matches for all pairs at all calls, which would result in
+        # repeated evaluations of the same pairs (would result in O(n^3) worst case for
+        # `find_candidates()`
+        *_, latest_a = pa
+        for b in pb:
+            if direction_match(latest_a, b):
+                return latest_a, b
+
+        *_, latest_b = pb
+        for a in pa:
+            if direction_match(a, latest_b):
+                return a, latest_b
+        return tuple()
+
+    def init_get_arg(skies: tuple, snrs: tuple, batchsize: int = 1000) -> Callable:
+        """This hides a reservoirs-batch mechanism for quickly selecting candidates,
+        and initializes the data structures it relies on."""
+        # we sort source directions by significance.
+        # this is kind of costly because the sky arrays may be very large.
+        # sorted directions are moved to a reservoir.
+        reservoirs = [np.argsort(sky, axis=None) for sky in skies]
+
+        # integrating source intensities over aperture for all matrix elements is
+        # computationally unfeasable. To avoid this, we execute this computation over small batches.
+        batches = [np.array([]), np.array([])]
+
+        def slit_intensity():
+            """Integrates source intensity over mask's aperture."""
+            intensities = ([], [])
+            for int_, sky, batch in zip(
+                intensities,
+                skies,
+                batches,
+            ):
+                for arg in batch:
+                    (min_i, max_i, min_j, max_j), _ = cutout(camera, arg)
+                    slit = sky[min_i:max_i, min_j:max_j]
+                    int_.append(np.sum(slit))
+            return intensities
+
+        def fill():
+            """Fill the batches with sorted candidates"""
+            for i, _ in enumerate(sdls):
+                tail, head = reservoirs[i][:-batchsize], reservoirs[i][-batchsize:]
+                batches[i] = np.array([np.unravel_index(id, skies[i].shape) for id in head])
+                reservoirs[i] = tail
+
+            # integrates over mask element aperture and sum between cameras
+            argsort_intensities = np.argsort(np.sum(slit_intensity(), axis=0))
+
+            # sort candidates in present batch by their integrated-combined intensity
+            for i, _ in enumerate(sdls):
+                batches[i] = batches[i][argsort_intensities]
+
+        def empty():
+            """Checks if batches are empty"""
+            return all(not len(b) for b in batches)
+
+        def get() -> tuple | None:
+            """Think of this as a faucet getting you one decent direction combo at a time."""
+            if empty():
+                fill()
+                if empty():
+                    return None
+
+            out = tuple(batch[-1] for batch in batches)
+            for i, _ in enumerate(sdls):
+                batches[i] = batches[i][:-1]
+            return out
+
+        return get if max(tuple(snr[*cand] for cand, snr in zip(get(), snrs))) > snr_threshold else lambda: None
+
+    def find_candidates(skies: tuple, snrs: tuple, max_pending=6666) -> tuple:
+        """Returns candidate, compatible sources for the two cameras.
+        Worst case complexity is O(n^2) but amortized costs are much smaller."""
+        get_arg = init_get_arg(skies, snrs)
+        pending = ([], [])
+
+        while not (matches := match(pending)):
+            args = get_arg()
+            if args is None:
+                break
+            for stack, arg in zip(pending, args):
+                stack.append(arg)
+                if len(stack) > max_pending:
+                    stack.pop(0)
+        return matches if matches else tuple()
+
+    def subtract(
+        arg: tuple[int, int],
         sky: npt.NDArray,
-        snr: npt.NDArray,
-    ) -> tuple[int, int] | bool:
-        """
-        Returns the position of a valid IROS candidate inside the sky image.
-        """
-        reservoir = np.array(
-            [np.unravel_index(id_, sky.shape) for id_ in np.argsort(sky, axis=None)[-batch:]]
-        )
-        for arg_sky in reservoir[::-1]:
-            if (snr[*arg_sky] > snr_threshold) and SETUP['skymap_mask'][*arg_sky]:
-                _update_skymap_mask(arg_sky)
-                return tuple(arg_sky)
-        return False
-    
-    return finder
-
-
-def default_fitter(
-    optimiser: Callable[[npt.NDArray, tuple[int, int]], OptResult],
-) -> Callable[[tuple[int, int], npt.NDArray, npt.NDArray], Source]:
-    """
-    Defines default IROS source candidates parameters fitter.
-    """
-    def fitter(
-        arg_sky: tuple[int, int],
-        sky: npt.NDArray,
-        snr: npt.NDArray,
-    ) -> Source:
-        """Performs the optimisation of the source candidate params."""
+        snr_map: npt.NDArray,
+    ) -> tuple[tuple[float, float, float, float], npt.NDArray]:
+        """Runs optimizer and subtract source."""
         try:
-            params: OptResult = optimiser(
+            shiftx, shifty, fluence = optimize(
+                camera=camera,
                 sky=sky,
-                arg_sky=arg_sky,
+                arg_sky=arg,
+                vignetting=vignetting,
+                psfy=psfy,
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e
-        
-        significance = float(snr[*arg_sky])
-        return Source(*params.params, significance)
-    
-    return fitter
 
-
-def default_subtractor(
-    camera: CodedMaskCamera,
-    vignetting: bool | Callable[[CodedMaskCamera, npt.NDArray, float, float], npt.NDArray],
-    psfy: bool | Callable[[CodedMaskCamera, npt.NDArray], npt.NDArray],
-) -> Callable[[Source, npt.NDArray], npt.NDArray]:
-    """
-    Defines default IROS source shadowgram subtractor.
-    """
-    def subtractor(
-        candidate: Source,
-        detector: npt.NDArray,
-    ) -> npt.NDArray:
-        """Subtracts candidate from detector image."""
-        sg_model: npt.NDArray = model_shadowgram(
+        significance = float(snr_map[*arg])  # candidate significance at extraction pos
+        model = model_sky(
             camera=camera,
-            shift_x=candidate.shift_x,
-            shift_y=candidate.shift_y,
+            shift_x=shiftx,
+            shift_y=shifty,
+            fluence=fluence,
             vignetting=vignetting,
             psfy=psfy,
         )
-        residual = detector - candidate.cts * sg_model
-        return residual
-    
-    return subtractor
+        residual = sky - model
+        return (shiftx, shifty, fluence, significance), residual
 
+    def compute_snratios(
+        skymaps: tuple[npt.NDArray, npt.NDArray],
+        varmaps: tuple[npt.NDArray, npt.NDArray],
+    ) -> tuple[npt.NDArray, npt.NDArray]:
+        """Computes skies SNR."""
+        # variance is clipped to improve numerical stability for off-axis sources,
+        # which may result in very few counts.
+        # TODO: improve on this only sorting matrix elements over a threshold.
+        snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skymaps, varmaps))
+        return snrs
 
-def set_func(
-    fn: Callable | None,
-    default: Callable[[], Callable],
-    *args: Any,
-    **kwargs: Any,
-) -> Callable:
-    """Factory function configuration."""
-    if fn is not None:
-        return fn
-    return default(*args, **kwargs)
-
-
-def iros_singleCAM(
-    detector: npt.NDArray,
-    camera: CodedMaskCamera,
-    max_iterations: int,
-    snr_threshold: float = 5.0,
-    vignetting: bool | Callable[[CodedMaskCamera, npt.NDArray, float, float], npt.NDArray] = True,
-    psfy: bool | Callable[[CodedMaskCamera, npt.NDArray], npt.NDArray] = True,
-    fit_weights: npt.NDArray | Callable[[npt.NDArray], npt.NDArray] | None = None,
-    finder: Callable[[npt.NDArray, npt.NDArray], tuple[int, int] | bool] | None = None,
-    fitter: Callable[[tuple[int, int], npt.NDArray, npt.NDArray], Source] | None = None,
-    subtractor: Callable[[Source, npt.NDArray], npt.NDArray] | None = None,
-    varmap: npt.NDArray | None = None,
-    optimiser: Callable[[npt.NDArray, tuple[int, int]], OptResult] | None = None,
-) -> Iterable[tuple[Source, npt.NDArray]]:
-    """
-    Performs the Iterative Removal of Sources (IROS) algorithm for a single coded-mask
-    camera of the Wide Field Monitor observations.
-    """
-    # intern logic setup
-    find_candidate = set_func(finder, default_finder, camera, snr_threshold)
-    optimise = set_func(
-        optimiser, default_optimiser, camera, vignetting, psfy, fit_weights, verbose=True,
-    )
-    fit_cand_params = set_func(fitter, default_fitter, optimise)
-    subtract_cand_sg = set_func(subtractor, default_subtractor, camera, vignetting, psfy)
-    # arrs setup
-    detector_ = detector.copy()
-    skymap = decode(camera, detector)
-    varmap = (
-        varmap if varmap is not None else variance(camera, detector)
-    )
-    # looping as there's no tomorrow
+    detectors = tuple(count(camera, sdl.data)[0] for sdl in sdls)
+    variances = tuple(variance(camera, d) for d in detectors)
+    skies = tuple(decode(camera, d) for d in detectors)
     for i in range(max_iterations):
-        snrmap = snratio(skymap, varmap)
-        candidate_pos = find_candidate(skymap, snrmap)
-
-        if not candidate_pos:
-            print("\nNo candidates left...")
+        snrs = compute_snratios(skies, variances)
+        candidates = find_candidates(skies, snrs)
+        if not candidates:
             break
         try:
-            source = fit_cand_params(candidate_pos, skymap, snrmap)
+            sources, skies = zip(*(subtract(index, sky, snr) for index, sky, snr in zip(candidates, skies, snrs)))
         except RuntimeError as e:
             warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
             continue
-
-        detector_ = subtract_cand_sg(source, detector_)
-        skymap = decode(camera, detector_)
-        yield (source, skymap)
-
-
-# def iros(
-#     camera: CodedMaskCamera,
-#     sdl_cam1a: SimulationDataLoader,
-#     sdl_cam1b: SimulationDataLoader,
-#     max_iterations: int,
-#     snr_threshold: float = 0.0,
-#     vignetting: bool = True,
-#     psfy: bool = True,
-# ) -> Iterable:
-#     """Performs Iterative Removal of Sources (IROS) for dual-camera WFM observations.
-
-#     This function implements an iterative source detection and removal algorithm for
-#     the WFM coded mask instrument. For each iteration, it:
-#     1. Ranks source candidates by SNR and integrated intensity
-#     2. Matches compatible source positions between orthogonal cameras
-#     3. Fits source parameters
-#     4. Removes fitted sources from the sky image
-#     5. Repeats until no significant sources remain or max iterations reached
-
-#     Args:
-#         camera: CodedMaskCamera instance containing mask/detector geometry and parameters
-#         sdl_cam1a: SimulationDataLoader for the first WFM  camera
-#         sdl_cam1b: SimulationDataLoader for the second WFM camera
-#         max_iterations: Maximum number of source removal iterations to perform
-#         snr_threshold: Optional float. If provided, iteration stops when maximum
-#             residual SNR falls below this value. Defaults to 0. (no threshold).
-#         vignetting: Optional bool. If `True`, the model used for optimization will simulate vignetting.
-#         psfy: Optional bool. If `True`, the model used for optimization will simulate detector
-#         position reconstruction effects.
-
-#     Yields:
-#         For each iteration, yields:
-#             - A tuple of two (x, y, fluence, significance) tuples, one for each camera's
-#               detected source, where x,y are sky-shift coordinates in mm, fluence is source intensity,
-#                significance in standard deviations.
-#             - A tuple of two residual sky images after source removal, one for each camera
-#             Note: Results are ordered to match sdl_cam1a, sdl_cam1b order
-
-#     Raises:
-#         ValueError: If cameras are not oriented orthogonally (90° rotation in azimuth)
-#         RuntimeError: If source parameter optimization fails (with detailed error message)
-
-#     Notes:
-#         Performance Considerations:
-#         - Computation scales with mask resolution. Keep upscaling factors low
-#           (upscale_x * upscale_y ~< 10) for reasonable performance
-
-#         Algorithm Details:
-#         - Requires orthogonal camera views (90° rotation) for source localization
-#         - Ranks candidates by SNR and integrated intensity within aperture
-#         - Optimizes source parameters in local windows around candidates
-#         - When using reconstructed data, accounts for vignetting and PSF effects
-
-#     Example:
-#     >>> for sources, residuals in iros(camera, sdl_cam1a, sdl_cam1b, max_iterations=2):
-#     >>>     source_1a, source_1b = sources
-#     >>>     residual_1a, residual_1b = residuals
-#     >>>     ...
-#     """
-#     from astropy.coordinates import angular_separation
-
-#     # verify cameras are oriented orthogonally (90° rotation in azimuth).
-#     # this is required for the source position matching algorithm.
-#     # then sort the data loaders into a tuple so that the second's data loader
-#     # x axis is at +90° from the first one.
-#     # fmt: off
-#     if not np.isclose(
-#         angular_separation(
-#             *map(np.deg2rad, (*sdl_cam1a.rotations["z"], *sdl_cam1b.rotations["z"]))
-#         ),
-#         0.
-#     ) or not np.isclose(
-#         np.abs(
-#             delta_rot_x := angular_separation(
-#                 *map(np.deg2rad, (*sdl_cam1a.rotations["x"], *sdl_cam1b.rotations["x"])))
-#         ),
-#         np.pi / 2
-#     ):
-#         raise ValueError("Cameras must be rotated by 90° degrees over azimuth.")
-#     else:
-#         if delta_rot_x > 0:
-#             sdls = (sdl_cam1a, sdl_cam1b)
-#         else:
-#             sdls = (sdl_cam1b, sdl_cam1a)
-#     # fmt: on
-
-#     def direction_match(
-#         a: tuple[int, int],
-#         b: tuple[int, int],
-#     ) -> bool:
-#         """Determines if source positions from both cameras correspond to the same sky location.
-#         Compares source positions accounting for the 90° camera rotation. Positions are
-#         considered matching if they are within one slit width from each other after rotation.
-#         TODO: not urgent, but in a future we should make this work for arbitrary camera rotations.
-#         """
-#         ax, ay = camera.bins_sky.x[a[1]], camera.bins_sky.y[a[0]]
-#         # we apply -90deg rotation to camera b source
-#         bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]
-#         min_slit = min(camera.specs.slit_deltax, camera.specs.slit_deltay)
-#         return abs(ax - bx) < min_slit and abs(ay - by) < min_slit
-
-#     def match(pending: tuple) -> tuple:
-#         """Cross-check the last entry in pending to match against all other pending directions"""
-#         pa, pb = pending
-#         if not pa or not pb:
-#             return tuple()
-
-#         # we are going to call this each time we get a new couple of candidate indices.
-#         # we avoid evaluating matches for all pairs at all calls, which would result in
-#         # repeated evaluations of the same pairs (would result in O(n^3) worst case for
-#         # `find_candidates()`
-#         *_, latest_a = pa
-#         for b in pb:
-#             if direction_match(latest_a, b):
-#                 return latest_a, b
-
-#         *_, latest_b = pb
-#         for a in pa:
-#             if direction_match(a, latest_b):
-#                 return a, latest_b
-#         return tuple()
-
-#     def init_get_arg(skies: tuple, snrs: tuple, batchsize: int = 1000) -> Callable:
-#         """This hides a reservoirs-batch mechanism for quickly selecting candidates,
-#         and initializes the data structures it relies on."""
-#         # we sort source directions by significance.
-#         # this is kind of costly because the sky arrays may be very large.
-#         # sorted directions are moved to a reservoir.
-#         reservoirs = [np.argsort(sky, axis=None) for sky in skies]
-
-#         # integrating source intensities over aperture for all matrix elements is
-#         # computationally unfeasable. To avoid this, we execute this computation over small batches.
-#         batches = [np.array([]), np.array([])]
-
-#         def slit_intensity():
-#             """Integrates source intensity over mask's aperture."""
-#             intensities = ([], [])
-#             for int_, sky, batch in zip(
-#                 intensities,
-#                 skies,
-#                 batches,
-#             ):
-#                 for arg in batch:
-#                     (min_i, max_i, min_j, max_j), _ = cutout(camera, arg)
-#                     slit = sky[min_i:max_i, min_j:max_j]
-#                     int_.append(np.sum(slit))
-#             return intensities
-
-#         def fill():
-#             """Fill the batches with sorted candidates"""
-#             for i, _ in enumerate(sdls):
-#                 tail, head = reservoirs[i][:-batchsize], reservoirs[i][-batchsize:]
-#                 batches[i] = np.array([np.unravel_index(id, skies[i].shape) for id in head])
-#                 reservoirs[i] = tail
-
-#             # integrates over mask element aperture and sum between cameras
-#             argsort_intensities = np.argsort(np.sum(slit_intensity(), axis=0))
-
-#             # sort candidates in present batch by their integrated-combined intensity
-#             for i, _ in enumerate(sdls):
-#                 batches[i] = batches[i][argsort_intensities]
-
-#         def empty():
-#             """Checks if batches are empty"""
-#             return all(not len(b) for b in batches)
-
-#         def get() -> tuple | None:
-#             """Think of this as a faucet getting you one decent direction combo at a time."""
-#             if empty():
-#                 fill()
-#                 if empty():
-#                     return None
-
-#             out = tuple(batch[-1] for batch in batches)
-#             for i, _ in enumerate(sdls):
-#                 batches[i] = batches[i][:-1]
-#             return out
-
-#         return get if max(tuple(snr[*cand] for cand, snr in zip(get(), snrs))) > snr_threshold else lambda: None
-
-#     def find_candidates(skies: tuple, snrs: tuple, max_pending=6666) -> tuple:
-#         """Returns candidate, compatible sources for the two cameras.
-#         Worst case complexity is O(n^2) but amortized costs are much smaller."""
-#         get_arg = init_get_arg(skies, snrs)
-#         pending = ([], [])
-
-#         while not (matches := match(pending)):
-#             args = get_arg()
-#             if args is None:
-#                 break
-#             for stack, arg in zip(pending, args):
-#                 stack.append(arg)
-#                 if len(stack) > max_pending:
-#                     stack.pop(0)
-#         return matches if matches else tuple()
-
-#     def subtract(
-#         arg: tuple[int, int],
-#         sky: npt.NDArray,
-#         snr_map: npt.NDArray,
-#     ) -> tuple[tuple[float, float, float, float], npt.NDArray]:
-#         """Runs optimizer and subtract source."""
-#         try:
-#             shiftx, shifty, fluence = optimize(
-#                 camera=camera,
-#                 sky=sky,
-#                 arg_sky=arg,
-#                 vignetting=vignetting,
-#                 psfy=psfy,
-#             )
-#         except Exception as e:
-#             raise RuntimeError(f"Optimization failed: {str(e)}") from e
-
-#         significance = float(snr_map[*arg])  # candidate significance at extraction pos
-#         model = model_sky(
-#             camera=camera,
-#             shift_x=shiftx,
-#             shift_y=shifty,
-#             fluence=fluence,
-#             vignetting=vignetting,
-#             psfy=psfy,
-#         )
-#         residual = sky - model
-#         return (shiftx, shifty, fluence, significance), residual
-
-#     def compute_snratios(
-#         skymaps: tuple[npt.NDArray, npt.NDArray],
-#         varmaps: tuple[npt.NDArray, npt.NDArray],
-#     ) -> tuple[npt.NDArray, npt.NDArray]:
-#         """Computes skies SNR."""
-#         # variance is clipped to improve numerical stability for off-axis sources,
-#         # which may result in very few counts.
-#         # TODO: improve on this only sorting matrix elements over a threshold.
-#         snrs = tuple(snratio(sky, np.clip(var_, a_min=1, a_max=None)) for sky, var_ in zip(skymaps, varmaps))
-#         return snrs
-
-#     detectors = tuple(count(camera, sdl.data)[0] for sdl in sdls)
-#     variances = tuple(variance(camera, d) for d in detectors)
-#     skies = tuple(decode(camera, d) for d in detectors)
-#     for i in range(max_iterations):
-#         snrs = compute_snratios(skies, variances)
-#         candidates = find_candidates(skies, snrs)
-#         if not candidates:
-#             break
-#         try:
-#             sources, skies = zip(*(subtract(index, sky, snr) for index, sky, snr in zip(candidates, skies, snrs)))
-#         except RuntimeError as e:
-#             warnings.warn(f"Optimizer failed at iteration {i}:\n\n{e}")
-#             continue
-#         yield ((sources, skies) if sdls == (sdl_cam1a, sdl_cam1b) else (sources[::-1], skies))
+        yield ((sources, skies) if sdls == (sdl_cam1a, sdl_cam1b) else (sources[::-1], skies))

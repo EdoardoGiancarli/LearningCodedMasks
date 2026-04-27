@@ -15,7 +15,9 @@ from bloodmoon.coords import equatorial2shift
 from bloodmoon.coords import shift2pos
 from bloodmoon.coords import shift2angle
 from bloodmoon.optim import _detector_footprint_cached
-from bloodmoon.optim import _mask_pattern_projection
+from bloodmoon.optim import _shift_mask_pattern
+from bloodmoon.optim import _process_mask_pattern
+from bloodmoon.optim import _extract_detector
 
 from .types import LogEntry
 from .data import DataLoader
@@ -106,13 +108,10 @@ def get_effective_area(
         1e-2 * camera.specs.mask_deltax * camera.specs.mask_deltay / np.prod(camera.upscale_f)
     )
     # mask pattern projection WTO detector sp. res.
-    sg = _mask_pattern_projection(
-        camera, shift_x, shift_y, vignetting, False,
-    )
-    # extract detector
-    i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
-    detector = sg[i_min:i_max, j_min:j_max]
-    detector *= camera.bulk
+    sg = _shift_mask_pattern(camera, shift_x, shift_y)
+    sg = _process_mask_pattern(camera, sg, shift_x, shift_y, vignetting=True, psfy=False)
+    # extract detector WTO normalisation
+    detector = _extract_detector(camera, sg, normalise=False)
     return detector.sum() * pixel_area
 
 

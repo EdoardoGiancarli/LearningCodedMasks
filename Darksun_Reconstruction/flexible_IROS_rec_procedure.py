@@ -59,7 +59,9 @@ def solver(
     if verbose:
         def comp_param_gain(start: float, optm: float) -> float:
             """Computes the optimised parameter value gain wrt start."""
-            return float(np.sign(start) * (optm - start) * 100 / start)
+            if start:
+                return float(np.sign(start) * (optm - start) * 100 / start)
+            return float(optm)
 
         routine_status = [
             'Convergence in chi-square values',
@@ -92,8 +94,8 @@ def default_optimiser(
     vignetting: bool | Callable[[CodedMaskCamera, NDArray, float, float], NDArray],
     psfy: bool | Callable[[CodedMaskCamera, NDArray], NDArray],
     fit_weights: NDArray | Callable[[NDArray], NDArray] | None = None,
-    verbose: bool = False,
     camera_coding_power: float = 0.85,
+    verbose: bool = False,
 ) -> Callable[[NDArray, tuple[int, int]], OptResult]:
     """
     Configures the IROS optimiser for source parameters fitting.
@@ -325,6 +327,16 @@ def default_subtractor(
     return subtractor
 
 
+def set_func(
+    fn: Callable | None,
+    default: Callable[[], Callable],
+    *args: Any,
+    **kwargs: Any,
+) -> Callable:
+    """Factory function configuration."""
+    if fn is not None:
+        return fn
+    return default(*args, **kwargs)
 
 
 def iros_singleCAM(
@@ -342,20 +354,59 @@ def iros_singleCAM(
     optimiser: Callable[[NDArray, tuple[int, int]], OptResult] | None = None,
 ) -> Iterable[tuple[Source, NDArray]]:
     """
-    Performs the Iterative Removal of Sources (IROS) algorithm for a single coded-mask
-    camera of the Wide Field Monitor observations.
-    """
-    def set_func(
-        fn: Callable | None,
-        default: Callable[[], Callable],
-        *args: Any,
-        **kwargs: Any,
-    ) -> Callable:
-        """IROS operations setup."""
-        if fn is not None:
-            return fn
-        return default(*args, **kwargs)
+    Performs the Iterative Removal of Sources (IROS) algorithm on the collected data for
+    a single coded-mask camera of the LEM-X observatory.
 
+    This function implements an iterative source detection and removal procedure.
+    For each iteration, it:
+    1. Ranks source candidates by peak intensity
+    2. Validates candidates by significance
+    3. Fits source parameters
+    4. Removes fitted source from the detector image
+    5. Repeats until no significant sources remain or max iterations reached
+
+    Args:
+        detector (NDArray):
+            Encoded sky-fields detector image.
+        camera (CodedMaskCamera):
+            CodedMaskCamera instance containing mask/detector geometry and parameters.
+        max_iterations (int):
+            Maximum number of source removal iterations to perform (default to 40 for precaution).
+        snr_threshold (float, optional (default=`5.0`):
+            If provided, iteration stops when maximum residual SNR falls below this value.
+        vignetting (bool, Callable, optional (default=`True`):
+            If `True`, the model used for optimization will simulate vignetting.
+        psfy (bool, Callable, optional (default=`True`):
+            If `True`, the model used for optimization will simulate
+            detector position reconstruction effects.
+        varmap (NDArray | None, optional (default=`None`):
+            Variance map of the encoded sky-fields for significance maps computations. If `None`,
+            the sky variance will be computed automathically from the input detector image.
+
+    Yields:
+        output (tuple[Source, NDArray]):
+            - candidate (Source):
+                Source candidate obj with local-frame sky-shift coords, fluence and significance.
+            - residual (NDArray):
+                Coded-camera residual sky after removing the current candidate.
+
+    Raises:
+        RuntimeError: If source parameter optimization fails (with detailed error message)
+
+    ## Notes:
+        Performance Considerations:
+        - Computation scales with mask resolution. Keep upscaling factors low
+          (upscale_x * upscale_y ~< 10) for reasonable performance
+
+        Algorithm Details:
+        - Optimizes source parameters in local windows around candidates
+        - When using reconstructed data, accounts for vignetting and PSF effects
+
+    Examples:
+    >>> for cand, residual in iros(detector, camera, max_iterations=2):
+    >>>     # do your magic here
+    >>>     ...
+    """
     # intern logic setup
     find_candidate = set_func(finder, default_finder, camera, snr_threshold)
     optimise = set_func(

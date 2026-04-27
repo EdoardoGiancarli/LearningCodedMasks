@@ -57,6 +57,7 @@ def _process_mask_pattern(
 def _extract_detector(
     camera: CodedMaskCamera,
     shadowgram: NDArray,
+    normalise: bool = True,
 ) -> NDArray:
     """
     Extracts the detector image from the mask pattern projection on the detector plane.
@@ -64,7 +65,8 @@ def _extract_detector(
     i_min, i_max, j_min, j_max = _detector_footprint_cached(camera)
     detector = shadowgram[i_min:i_max, j_min:j_max]
     detector *= camera.bulk
-    detector /= np.sum(detector)
+    if normalise:
+        detector /= np.sum(detector)
     return detector
 
 
