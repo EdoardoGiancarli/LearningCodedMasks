@@ -7,7 +7,6 @@ from typing import Callable, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
-from tqdm import tqdm
 
 from bloodmoon.io import simulation_files
 from bloodmoon.mask import codedmask
@@ -73,32 +72,31 @@ def main(
     )
     
     # - RUN IROS FOR CAMERA A
-    print(f'\n#### - Analysing CAMERA {ID_CAM_A.upper()}')
-    sdlA = ds.get_data(
-        filepaths[ID_CAM_A][dataset], E_min=emin, E_max=emax, coords=coords,
-    )
-    catA = ds.get_catalogue(
-        filepaths[ID_CAM_A]['sources'], F_min=fmin, F_max=fmax,
-    )
-    detector, _ = count(wfm, sdlA.DLdata)
-    loop = get_loop(detector)
-    outlog_camA, _ = run_IROS(wfm, loop, ID_CAM_A)
+    with ds.timer(f'CAMERA {ID_CAM_A.upper()} ANALYSIS'):
+        sdlA = ds.get_data(
+            filepaths[ID_CAM_A][dataset], E_min=emin, E_max=emax, coords=coords,
+        )
+        catA = ds.get_catalogue(
+            filepaths[ID_CAM_A]['sources'], F_min=fmin, F_max=fmax,
+        )
+        detector, _ = count(wfm, sdlA.DLdata)
+        loop = get_loop(detector)
+        outlog, _ = run_IROS(wfm, loop, ID_CAM_A)
+        log_camA = get_sources_database(wfm, sdlA, catA, outlog, VIGNETTING)
 
     # - RUN IROS FOR CAMERA B
-    print(f'\n#### - Analysing CAMERA {ID_CAM_B.upper()}')
-    sdlB = ds.get_data(
-        filepaths[ID_CAM_B][dataset], E_min=emin, E_max=emax, coords=coords,
-    )
-    catB = ds.get_catalogue(
-        filepaths[ID_CAM_B]['sources'], F_min=fmin, F_max=fmax,
-    )
-    detector, _ = count(wfm, sdlB.DLdata)
-    loop = get_loop(detector)
-    outlog_camB, _ = run_IROS(wfm, loop, ID_CAM_B)
+    with ds.timer(f'CAMERA {ID_CAM_B.upper()} ANALYSIS'):
+        sdlB = ds.get_data(
+            filepaths[ID_CAM_B][dataset], E_min=emin, E_max=emax, coords=coords,
+        )
+        catB = ds.get_catalogue(
+            filepaths[ID_CAM_B]['sources'], F_min=fmin, F_max=fmax,
+        )
+        detector, _ = count(wfm, sdlB.DLdata)
+        loop = get_loop(detector)
+        outlog, _ = run_IROS(wfm, loop, ID_CAM_B)
+        log_camB = get_sources_database(wfm, sdlB, catB, outlog, VIGNETTING)
 
-    # compute sources databases
-    log_camA = get_sources_database(wfm, sdlA, catA, outlog_camA, VIGNETTING)
-    log_camB = get_sources_database(wfm, sdlB, catB, outlog_camB, VIGNETTING)
     # save database and region files
     save_region_file(log_camA, catA, filenames['OUT_REG'][0])
     save_region_file(log_camB, catB, filenames['OUT_REG'][1])
@@ -131,15 +129,15 @@ if __name__ == '__main__':
     UPSY_0: int = 1
 
     #### --- ANALYSIS ID
-    ANALYSIS_ID: str = f"test_routine_isWorking"
+    ANALYSIS_ID: str = f"test_routine_2-6keV"
 
     #### --- IROS SETUP
-    MAX_ITERATIONS: int = 3
+    MAX_ITERATIONS: int = 20
     SNR_THRESHOLD: int | float = 5
 
     #### --- DATA FILTERS SETUP
     # - photons energy filter - [keV]
-    PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (None, None)
+    PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (2.0, 6.0)
     # - RA/Dec filter (sources to filter out) - [deg]
     PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None #CoordEquatorial(244.9797, -15.6401)
     # - sources flux filter for the catalog comparison - [Crab]
