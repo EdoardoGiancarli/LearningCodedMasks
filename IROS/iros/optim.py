@@ -149,7 +149,9 @@ def default_optimiser(
             weights = np.ones_like(sky_ydata)
         # * extract source coords and counts starting values
         sx_start, sy_start = pos2shift(camera, *arg_sky)
-        cts_start = sky_peak / camera_coding_power
+        cts_start = (
+            sky_peak / camera_coding_power if psfy is not False else sky_peak
+        )
         start_params_vals = np.array([sx_start, sy_start, cts_start])
         # * setup fit params boundaries
         #    - the shifts are allowed to fluctuate in a small pixel box since
