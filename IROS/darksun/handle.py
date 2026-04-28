@@ -13,9 +13,11 @@ import pickle
 from bloodmoon.io import validate_fits
 
 from .types import LogEntry
+from .benchmarking import source_catalogue_data
 from .data import Log
 from .data import create_log
 from .data import DataLoader
+from .data import CatalogueLoader
 
 __all__ = [
     "save_database", "save_sky", "save_pickle",
@@ -211,6 +213,78 @@ def save_pickle(data: object, save_to: str | Path) -> None:
     with open(save_to, "wb") as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print("# Saving completed!")
+
+
+def save_region_file(
+    log: Log,
+    catalogue: CatalogueLoader,
+    save_to: str | Path,
+) -> None:
+    """
+    Saves a `.reg` (region) file with info about the reconstructed
+    IROS sources, i.e., their respective RA/Dec coordinates from
+    the catalogue in the `fk5` reference frame.
+
+    Args:
+        log (Log):
+            IROS reconstructed sources database.
+        catalogue (CatalogueLoader):
+            Catalogue data for the LEM-X coded-mask camera.
+        save_to (str | Path):
+            Path for where to save the `.reg` file.
+    """
+    SETUP = {
+        'format': 'DS9 version 4.1',
+        'refsystem': 'fk5',
+        'circles_size': 400.0,
+
+        'options': {
+            'color': 'green',
+            'dashlist': '8 3',
+            'width': 1,
+            'font': '"helvetica 10 normal roman"',
+            'select': 1,
+            'highlite': 1,
+            'dash': 0,
+            'fixed': 0,
+            'edit': 1,
+            'move': 1,
+            'delete': 1,
+            'include': 1,
+            'source': 1,
+        },
+    }
+
+    # populate list with sources location
+    source_list = []
+    for idx, sourceID in enumerate(log.log['ID']):
+        if sourceID in catalogue.DLdata['ID']:
+            source_data = source_catalogue_data(sourceID, catalogue.DLdata)
+            source_list.append(
+                (sourceID, source_data['RA'], source_data['DEC'])
+            )
+        else:
+            source_list.append(
+                (sourceID, log.log['ra'][idx], log.log['dec'][idx])
+            )
+    
+    # write .reg file with custom options
+    global_options = [
+        f'{key}={value} ' for key, value in SETUP['options'].items()
+    ]
+    tags = [
+        f'circle({ra}, {dec}, {SETUP['circles_size']}{'"'}) # text={{{sID}}}\n'
+        for (sID, ra, dec) in source_list
+    ]
+    with open(save_to, "w", encoding="utf-8") as f:
+        f.write(f'# Region file format: {SETUP['format']}\n')
+        f.write('global ')
+        f.writelines(global_options)
+        f.write('\n')
+        f.write(f'{SETUP['refsystem']}\n')
+        f.writelines(tags)
+
+    return
 
 """
                                                            @       @  
