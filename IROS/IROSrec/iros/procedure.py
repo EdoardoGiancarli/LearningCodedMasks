@@ -1,5 +1,5 @@
 """
-IROS pipeline operations.
+IROS procedure operations.
 """
 
 from typing import Callable, Iterable
@@ -19,20 +19,6 @@ from darksun.types import LogEntry
 
 from .optim import iros_singleCAM
 from .types import Source
-
-
-def config_instrument_effects(
-    thin_mask: bool,
-    dataset: str,
-) -> tuple[bool, bool]:
-    """Handles CAI vignetting and psf corrections along y-axis."""
-
-    if dataset not in ["detected", "reconstructed"]:
-        raise ValueError("'dataset' must be either 'detected' or 'reconstructed'.")
-    
-    vignetting = not thin_mask
-    psfy = False if dataset == "detected" else True
-    return vignetting, psfy
 
 
 def get_coord_errors(camera: CodedMaskCamera) -> tuple[float, float]:

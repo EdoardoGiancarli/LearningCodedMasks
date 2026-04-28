@@ -7,7 +7,15 @@ from numpy.typing import NDArray
 
 
 class OptResult(NamedTuple):
-    """Optimisation results."""
+    """
+    Optimisation results.
+
+    Attributes:
+        params (NDArray):
+            Optimised parameters array.
+        covar (NDArray):
+            Optimised parameters covariance matrix.
+    """
     params: NDArray
     covar: NDArray
 
