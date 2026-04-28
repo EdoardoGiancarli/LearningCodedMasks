@@ -132,10 +132,10 @@ def apply_detector_resolution(
 
 def apply_vignetting(
     camera: CodedMaskCamera,
-    shadowgram: npt.DTypeLikeNDArray,
+    shadowgram: npt.NDArray,
     shift_x: float,
     shift_y: float,
-) -> npt.DTypeLikeNDArray:
+) -> npt.NDArray:
     r"""
     Apply vignetting effects to a shadowgram based on source position.
     Vignetting occurs when mask thickness causes partial shadowing at off-axis angles.

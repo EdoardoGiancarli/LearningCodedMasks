@@ -15,7 +15,7 @@ __author__ = "Edoardo Giancarli"
 
 from .types import LogEntry
 from .types import Tag
-from .types import Candidate
+from .types import Source
 
 # from .analyze import run_IROS              (when defined version)
 from .analyze import compute_parameters

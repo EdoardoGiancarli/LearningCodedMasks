@@ -53,7 +53,7 @@ def solver(
             'Convergence in both chi-square and parameter values',
             'Convergence in orthogonality',
         ]
-        print('## Optimisation Results:')
+        print('\n## Optimisation Results:')
         start_vals = (
             kwargs['p0'] if 'p0' in kwargs.keys() else np.ones_like(popt)
         )
@@ -305,7 +305,7 @@ def default_subtractor(
             vignetting=vignetting,
             psfy=psfy,
         )
-        residual = detector - candidate.cts * sg_model
+        residual = detector - candidate.fluence * sg_model
         return residual
     
     return subtractor
