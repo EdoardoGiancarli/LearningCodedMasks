@@ -53,12 +53,12 @@ from IROSrec.run import run_pipeline
 PIPELINE SET-UP.
 """
 #### --- LEM-X CAMERAS MASK PATTERN
-MASK_FITS: str = "mask_NTHT_20260129_CORRECTED.fits"
+MASK_FITS: str = "mask_NTHT_20250725.fits"
 THIN_MASK: bool = False                                                     # removes vignetting effects
 
 #### --- OBSERVATION DATA
-SKYFIELD: str = "Crab"                                                      # skyfield selection
-DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"             # directory with FITS files from WISEMAN
+SKYFIELD: str = "IROSDummy"                                                      # skyfield selection
+DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_1ks"             # directory with FITS files from WISEMAN
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
@@ -72,30 +72,30 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = f"test_crabSens_{DATA_FITS}_{DATASET}_noAnodesMask"
+ANALYSIS_ID: str = f"test_routine_2-6keV_smoothing"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 3
+MAX_ITERATIONS: int = 2
 SNR_THRESHOLD: int | float = 3
 
 MODULE_SKY_COMPOSITION: bool = True   # selects if the LEM-X module cameras are to be joined to get the composed sky
 
 #### --- DETECTOR SMOOTHING SETUP
 # - selects if detector smoothing is to be applied
-SMOOTHING: bool = False
+SMOOTHING: bool = True
 # - significance threshold for brightest sources in sky-field (min = 5.0)
 SMOOTHING_SNR_THRESHOLD: int | float | None = 10
 # - path to non-smoothed IROS reconstruction directory, if present (written as '../baseline/' <-- NOTE: the ending `/`)
 BASELINE_IROSREC: str | Path | None = os.path.join(
     '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7',
     f'Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Outputs/Out{SKYFIELD}',
-    f'{DATA_FITS}/singleCAM_iros_upx2y1_benchmark_2-10keV/',
+    f'{DATA_FITS}/test_routine_2-6keV/',
     #'/mnt/d/PhD_AASS/Coding/Images_fits/singleCAM_iros_benchmark_detected/'
 )
 
 #### --- DATA FILTERS SETUP
 # - photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = None
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (2.0, 6.0)
 # - RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 # - sources flux filter for the catalog comparison - [Crab]

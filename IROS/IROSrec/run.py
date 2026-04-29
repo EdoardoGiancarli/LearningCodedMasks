@@ -19,9 +19,9 @@ from bloodmoon.mask import codedmask
 import darksun as ds
 from darksun.handle import save_region_file
 
-from iros.optim import iros_singleCAM
-from iros.procedure import run_IROS
-from iros.procedure import get_sources_database
+from .iros.optim import iros_singleCAM
+from .iros.procedure import run_IROS
+from .iros.procedure import get_sources_database
 from .dtypes import PipelineParams
 from .handle import config_parameters
 from .handle import check_outfiles_exist
@@ -271,7 +271,8 @@ def run(params: PipelineParams) -> None:
                 ds.save_sky(comp_sky, comp_snr, sdlA, params.filenames.comp_out_sky, comp_WCS)
     
     # save .yaml file with pipeline's parameters
-    save_pipeline_params(params, params.filenames.pipeline_params)
+    if not is_file(params.filenames.pipeline_params):
+        save_pipeline_params(params, params.filenames.pipeline_params)
 
     # final check on pipeline files
     check_outfiles_exist(params.filenames, check_out=False)

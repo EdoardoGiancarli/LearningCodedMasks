@@ -13,7 +13,7 @@ from bloodmoon.types import CoordEquatorial
 from bloodmoon.mask import CodedMaskCamera 
 import darksun as ds
 
-from iros.procedure import run_IROS_loop
+from .iros.procedure import run_IROS_loop
 from .dtypes import AnalysisParams
 from .dtypes import IROSParams
 from .dtypes import OutFileNames
@@ -197,7 +197,7 @@ def save_pipeline_params(
         f'# end'
     )
     dict_: dict[str, Any] = {}
-    dict_.update(**dict(p.__dict__ for p in params))
+    for p in params: dict_.update(p.__dict__.items())
     to_yaml = yaml.dump(dict_, indent=4, sort_keys=False)
 
     with open(save_to, "w", encoding="utf-8") as f:
