@@ -5,6 +5,7 @@ IROS output plotting.
 from typing import Any, Sequence
 import warnings
 from pathlib import Path
+import copy
 
 import numpy as np
 from numpy.typing import NDArray, ArrayLike
@@ -78,6 +79,12 @@ PLOTPARAMS = {
     'scatter_size': 50,
     'scatter_lw': 1.5,
 }
+
+
+def export_pltparams() -> dict[str, Any]:
+    """Exports the dict containing `darksun` plot settings."""
+    dmap = copy.deepcopy(PLOTPARAMS)
+    return dmap
 
 
 class DSPlot:
