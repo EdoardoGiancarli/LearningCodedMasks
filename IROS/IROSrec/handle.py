@@ -348,8 +348,8 @@ def perform_BKG_smoothing(
     else:
         print('No baseline IROS reconstruction for smoothing selected')
         brightest_cands = run_IROS_loop(
-            detector=detector,
             camera=camera,
+            detector=detector,
             snr_threshold=smoothing_thresh,
             vignetting=vignetting,
             psfy=psfy,

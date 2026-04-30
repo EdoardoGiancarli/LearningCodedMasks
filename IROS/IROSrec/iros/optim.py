@@ -326,8 +326,8 @@ def set_func(
 
 
 def iros_singleCAM(
-    detector: NDArray,
     camera: CodedMaskCamera,
+    detector: NDArray,
     max_iterations: int,
     snr_threshold: float = 5.0,
     vignetting: bool | Callable[[CodedMaskCamera, NDArray, float, float], NDArray] = True,
