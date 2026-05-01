@@ -36,12 +36,10 @@ def select_source_photons(
     Returns:
         output (FITS_rec): Output filtered data container.
     """
-    mask = np.ones(len(data), dtype=bool)
+    mask = np.zeros(len(data), dtype=bool)
     coords_ = (coords,) if isinstance(coords, CoordEquatorial) else coords
     for c in coords_:
-        mask &= (
-            (np.isclose(data['RA'], c.ra) & np.isclose(data['DEC'], c.dec))
-        )
+        mask |= ((np.isclose(data['RA'], c.ra) & np.isclose(data['DEC'], c.dec)))
     selected = data[mask]
     if verbose:
         print(f'Selected {len(selected)}/{len(data)} photons.')
