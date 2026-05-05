@@ -72,10 +72,10 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = f"test_galcentre_rec"
+ANALYSIS_ID: str = f"GC_rec_1ks_2-50keV"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 20
+MAX_ITERATIONS: int = 25
 SNR_THRESHOLD: int | float = 5
 
 MODULE_SKY_COMPOSITION: bool = True   # selects if the LEM-X module cameras are to be joined to get the composed sky
@@ -95,7 +95,7 @@ BASELINE_IROSREC: str | Path | None = os.path.join(
 
 #### --- DATA FILTERS SETUP
 # - photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (2.0, 6.0)
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (2.0, 50.0)
 # - RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 # - sources flux filter for the catalog comparison - [Crab]
