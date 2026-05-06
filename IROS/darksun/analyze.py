@@ -109,7 +109,7 @@ def get_effective_area(
     )
     # mask pattern projection WTO detector sp. res.
     sg = _shift_mask_pattern(camera, shift_x, shift_y)
-    sg = _process_mask_pattern(camera, sg, shift_x, shift_y, vignetting=True, psfy=False)
+    sg = _process_mask_pattern(camera, sg, shift_x, shift_y, vignetting=vignetting, psfy=False)
     # extract detector WTO normalisation
     detector = _extract_detector(camera, sg, normalise=False)
     return detector.sum() * pixel_area
