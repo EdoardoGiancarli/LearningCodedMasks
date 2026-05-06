@@ -384,11 +384,10 @@ def load_pickle(filepath: str | Path) -> object:
     Returns:
         output (object): Loaded object.
     """
-    if validate_fits(filepath):
-        print("# Loading data...")
-        with open(filepath, "rb") as handle:
-            data = pickle.load(handle)
-        print("# Loading completed!")
+    print("# Loading data...")
+    with open(filepath, "rb") as handle:
+        data = pickle.load(handle)
+    print("# Loading completed!")
     return data
 
 
