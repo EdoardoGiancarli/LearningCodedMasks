@@ -321,6 +321,7 @@ def map4plot(
     xscale: str = 'linear',
     yscale: str = 'linear',
     tags: Tag | Sequence[Tag] | None = None,
+    plot_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Configures a dictionary with the specified info for plotting.
@@ -371,6 +372,8 @@ def map4plot(
         tags (Tag | Sequence[Tag] | None, optional (default=`None`)):
             Single `Tag` or sequence of `Tag`s objects (e.g., to mark the
             scatter points with the ID of the sources).
+        plot_kwargs (dict[str, Any], optional (default=`None`):
+            Additional arguments passed to plot func (e.g., `plt.plot()`).
     
     Returns:
         output (dict[str, Any]): Map with the info for the plot.
@@ -440,6 +443,7 @@ def map4plot(
         'xscale': xscale,
         'yscale': yscale,
         'tags': tags_,
+        'plot_kwargs': plot_kwargs,
     }
     return dmap
 
@@ -450,7 +454,6 @@ def plot(
     ncols: int = 1,
     nrows: int = 1,
     save_to: str | Path | None = None,
-    **kwargs: Any,
 ) -> None:
     """
     Displays a figure with the specified subplots by taking the info stored in the
@@ -466,8 +469,6 @@ def plot(
             Number of rows to insert in the plot.
         save_to (str | Path | None, optional (default=`None`)):
             Path to save the figure.
-        **kwargs (Any):
-            Additional arguments passed to plot func (e.g., `plt.plot()`).
     
     Raises:
         ValueError: If plot style different from 'plot', 'scatter' or 'stairs'.
@@ -503,13 +504,14 @@ def plot(
         dsp.config_labels(ax, dmap['title'], dmap['xlabel'], dmap['ylabel'])
         dsp.config_ticks(ax)
         dsp.config_axscale(ax, dmap['xscale'], dmap['yscale'])
+        plot_kwargs_ = dmap['plot_kwargs'] or {}
         
         for idx, arr in enumerate(dmap['arrs']):
             match dmap['style'][idx]:
                 case 'plot':
                     ax.plot(
                         dmap['x'][idx], arr, c=dmap['color'][idx], alpha=PLOTPARAMS['alpha'],
-                        label=dmap['labels'][idx], **kwargs,
+                        label=dmap['labels'][idx], **plot_kwargs_,
                     )
                 case 'scatter':
                     c = dmap['color'][idx]
@@ -517,12 +519,12 @@ def plot(
                     ax.scatter(
                         dmap['x'][idx], arr, c=fcolor, edgecolors=ecolor, s=PLOTPARAMS['scatter_size'],
                         alpha=PLOTPARAMS['alpha'], linewidths=PLOTPARAMS['scatter_lw'],
-                        label=dmap['labels'][idx], **kwargs,
+                        label=dmap['labels'][idx], **plot_kwargs_,
                     )
                 case 'stairs':
                     ax.stairs(
                         arr, edges=dmap['x'][idx], edgecolor=dmap['color'][idx],
-                        alpha=PLOTPARAMS['alpha'], label=dmap['labels'][idx], **kwargs,
+                        alpha=PLOTPARAMS['alpha'], label=dmap['labels'][idx], **plot_kwargs_,
                     )
                 case _:
                     raise ValueError(
