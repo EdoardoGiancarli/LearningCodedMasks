@@ -2,7 +2,7 @@
 IROS output plotting.
 """
 
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 import warnings
 from pathlib import Path
 import copy
@@ -58,9 +58,9 @@ PLOTPARAMS = {
     'grid_ls': '-',
     'grid_lw': 0.2,
     'grid_alpha': 0.7,
-    'ticks_w': 2,
-    'ticks_len_major': 7,
-    'ticks_len_minor': 4,
+    'ticks_w': 3,
+    'ticks_len_major': 5,
+    'ticks_len_minor': 2,
     # colorbar
     'cbar_origin': 'lower',
     'cbar_shrink': 0.75,
@@ -118,10 +118,10 @@ class DSPlot:
     
     def config_subplots(
         self,
-        *,
         size: int | float = PLOTPARAMS['size'],
-        dpi: int | float = PLOTPARAMS['dpi'],
         ptype: str = 'plot',
+        wspace: int | float | None = None,
+        hspace: int | float | None = None,
         **kwargs: Any,
     ) -> tuple[Figure, Axes | NDArray]:
         """
@@ -132,12 +132,14 @@ class DSPlot:
             size (int | float, optional (default=PLOTPARAMS['size'])):
                 Figure size for one plot. If multiple rows/cols, the size
                 is automathically adjusted to the number of subplots.
-            dpi (int | float, optional (default=PLOTPARAMS['dpi'])):
-                Figure DPI value.
             ptype (str, optional (default='plot')):
                 Subplots plot type, can be 'plot' for plots or 'image'
                 for images plotting (e.g., see `plot()` and `image_plot()`
                 in the `darksun.show.py` module).
+            wspace (int | float, optional (default=`None`)):
+                Kw arg `wspace` used in `subplots_adjust`.
+            hspace (int | float, optional (default=`None`)):
+                Kw arg `hspace` used in `subplots_adjust`.
             kwargs (Any):
                 Additional keywords passed to `plt.subplot()`.
 
@@ -153,18 +155,18 @@ class DSPlot:
             raise ValueError(
                 f"Invalid 'ptype'={ptype}. Must be 'plot' for plots or 'image' for images."
             )
+        
         height, width = map(
             lambda x: int(size * x + 1) if x > 1 else size,
             (self.nrows, self.ncols),
         )
-        fig, axs = plt.subplots(
-            self.nrows, self.ncols, figsize=(width, height), **kwargs,
-        )
-        fig.dpi = dpi
+        if 'figsize' not in list(kwargs.keys()): kwargs.update(figsize=(width, height))
+        if 'dpi' not in list(kwargs.keys()): kwargs.update(dpi=PLOTPARAMS['dpi'])
+        fig, axs = plt.subplots(self.nrows, self.ncols, **kwargs)
         fig.tight_layout()
         fig.subplots_adjust(
-            wspace=PLOTPARAMS[f'wspacing_{ptype}'] / size,
-            hspace=PLOTPARAMS[f'hspacing_{ptype}'] / size,
+            wspace=wspace or PLOTPARAMS[f'wspacing_{ptype}'] / size,
+            hspace=hspace or PLOTPARAMS[f'hspacing_{ptype}'] / size,
         )
         return fig, axs
 
@@ -199,7 +201,10 @@ class DSPlot:
     def config_ticks(
         ax: Axes,
         xticks: ArrayLike | None = None,
+        xticks_lbl: Iterable[str] | None = None,
         yticks: ArrayLike | None = None,
+        yticks_lbl: Iterable[str] | None = None,
+        grid: bool = False,
     ) -> None:
         """
         Configures grid and tick properties for the specified Axes.
@@ -209,18 +214,19 @@ class DSPlot:
             xticks (ArrayLike | None): Ticks values for the x axis.
             yticks (ArrayLike | None): Ticks values for the y axis.
         """
-        ax.grid(
-            visible=True, color=PLOTPARAMS['grid_color'], linestyle=PLOTPARAMS['grid_ls'],
-            linewidth=PLOTPARAMS['grid_lw'], alpha=PLOTPARAMS['grid_alpha'],
-        )
+        if grid:
+            ax.grid(
+                visible=True, color=PLOTPARAMS['grid_color'], linestyle=PLOTPARAMS['grid_ls'],
+                linewidth=PLOTPARAMS['grid_lw'], alpha=PLOTPARAMS['grid_alpha'],
+            )
         ax.xaxis.set_ticks_position('both')
         ax.yaxis.set_ticks_position('both')
         ax.tick_params(
             which='both', direction='in', width=PLOTPARAMS['ticks_w'],
             length=PLOTPARAMS['ticks_len_major'] if 'major' else PLOTPARAMS['ticks_len_minor'],
         )
-        if xticks is not None: ax.set_xticks(xticks)
-        if yticks is not None: ax.set_yticks(yticks)
+        if xticks is not None: ax.set_xticks(xticks, xticks_lbl)
+        if yticks is not None: ax.set_yticks(yticks, yticks_lbl)
 
     @staticmethod
     def config_axscale(
@@ -454,6 +460,7 @@ def plot(
     ncols: int = 1,
     nrows: int = 1,
     save_to: str | Path | None = None,
+    **subplot_kws: Any,
 ) -> None:
     """
     Displays a figure with the specified subplots by taking the info stored in the
@@ -469,6 +476,8 @@ def plot(
             Number of rows to insert in the plot.
         save_to (str | Path | None, optional (default=`None`)):
             Path to save the figure.
+        subplot_kws (dict[str, Any], optional (default=`None`):
+            Additional arguments passed to `plt.subplots()`.
     
     Raises:
         ValueError: If plot style different from 'plot', 'scatter' or 'stairs'.
@@ -488,7 +497,7 @@ def plot(
         >>> plot(dmaps=(...), ncols=2, nrows=2)   # plots on two cols and rows
     """
     dsp = DSPlot(ncolumns=ncols, nrows=nrows)
-    fig, axs = dsp.config_subplots()
+    fig, axs = dsp.config_subplots(**subplot_kws)
     dmaps_ = (dmaps,) if isinstance(dmaps, dict) else dmaps
     axs_ = (
         (axs,) if isinstance(axs, Axes)
@@ -650,6 +659,7 @@ def image_plot(
     ncols: int = 1,
     nrows: int = 1,
     save_to: str | Path | None = None,
+    **subplot_kws: Any,
 ) -> None:
     """
     Displays a figure with the specified subplots by taking the info stored in the
@@ -664,7 +674,9 @@ def image_plot(
         nrows (int, optional (default=`1`)):
             Number of rows to insert in the plot.
         save_to (str | Path | None, optional (default=`None`)):
-            Path to save the figure.ù
+            Path to save the figure.
+        subplot_kws (dict[str, Any], optional (default=`None`):
+            Additional arguments passed to `plt.subplots()`.
     
     Example:
         >>> # build maps from `map4image()`
@@ -681,7 +693,7 @@ def image_plot(
         >>> image_plot(dmaps=(...), ncols=2, nrows=2)   # imgs on two cols and rows
     """
     dsp = DSPlot(ncols, nrows)
-    fig, axs = dsp.config_subplots(dpi=110, ptype='image')
+    fig, axs = dsp.config_subplots(ptype='image', **subplot_kws)
     dmaps_ = (dmaps,) if isinstance(dmaps, dict) else dmaps
     axs_ = (
         (axs,) if isinstance(axs, Axes)
