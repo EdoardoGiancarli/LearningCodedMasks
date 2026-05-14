@@ -263,6 +263,8 @@ class CodedMaskCamera:
 
             The input `bulk_els_to_hide` is in [mm].
             """
+            if not bulk_els_to_hide:
+                return 1
             print(f'## USING BULK MASK with {bulk_els_to_hide} mm cover ##')
             num_px_to_hide = int(bulk_els_to_hide * self.upscale_f.y / self.specs.mask_deltay)
             active_elements = np.array((bulk > 0), dtype=int)
