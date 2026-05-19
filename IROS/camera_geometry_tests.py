@@ -11,6 +11,7 @@ import pandas as pd
 from astropy.io import fits
 from astropy.wcs import WCS
 
+from bloodmoon.types import CoordEquatorial
 from bloodmoon.mask import CodedMaskCamera, codedmask, count
 from bloodmoon.mask import decode, variance, snratio
 import darksun as ds
@@ -55,7 +56,9 @@ def gather_cam_data(
 
         'thetaX [deg]': np.array(log.log['angle_x']),
         'thetaY [deg]': np.array(log.log['angle_y']),
-        'cts [ph]': log.log['fluence'],
+        'optim cts [ph]': log.log['fluence'],
+
+        'true cts [ph]': true_cts,
 
         'DthetaX [arcmin]': theta_res_x,
         'DthetaY [arcmin]': theta_res_y,
@@ -68,9 +71,9 @@ def gather_cam_data(
 
 def save_sky(
     sky: NDArray,
-    snr: NDArray,
     sdl: DataLoader,
     save_to: str | Path,
+    snr: NDArray | None = None,
     detector: NDArray | None = None,
     wcs: WCS = None,
 ) -> None:
@@ -79,23 +82,23 @@ def save_sky(
     including optional World Coordinate System (WCS) information if provided.
     """
     print("# Saving sky...")
-    # HDU list and Primary Header
+    arrs = {
+        'sky': np.int32(sky),
+        'snr': np.float32(snr) if isinstance(snr, np.ndarray) else None,
+        'detector': np.int32(detector) if isinstance(detector, np.ndarray) else None,
+    }
     hdu_list = fits.HDUList([])
     primary_hdu = fits.PrimaryHDU()
     hdu_list.append(primary_hdu)
-    arrs = [(np.int32(sky), 'sky'), (np.float32(snr), 'snr')]
-    if detector is not None:
-        arrs.append((np.int32(detector), 'detector'))
-
-    # Images for data
-    for img, name in arrs:
-        image_hdu = fits.ImageHDU(
-            data=img,
-            header=sdl.header,
-            name=name.upper(),
-        )
-        if wcs: image_hdu.header.update(wcs.to_header())
-        hdu_list.append(image_hdu)
+    for name, img in arrs.items():
+        if img is not None:
+            image_hdu = fits.ImageHDU(
+                data=img,
+                header=sdl.header,
+                name=name.upper(),
+            )
+            if wcs: image_hdu.header.update(wcs.to_header())
+            hdu_list.append(image_hdu)
     
     hdu_list.writeto(save_to, output_verify="fix+ignore")
     hdu_list.close()
@@ -120,16 +123,33 @@ def main() -> None:
 
     SKYFIELD: str = "CameraGeometry"
     # DATA_FITS: str = "baseline_sources_2-50keV_1ks"
-    DATA_FITS: str = "mask_misaligned_Z1deg_2-50keV_1ks"
+    DATA_FITS: str = "mask_Z2arcmin_2-50keV_1ks"
 
-    RUN_ID: str = 'baseline_misalignIROS_1ks_2-50keV_detected'
+    RUN_ID: str = 's5_rec'
+    E_min: float | None = None
+    E_max: float | None = None
+    exclude_coords: CoordEquatorial | list[CoordEquatorial] | None = [
+        CoordEquatorial(318.950871147977, -51.1920260999562),   # s0
+        CoordEquatorial(296.376333558386, 5.25424886863538),    # s1
+        CoordEquatorial(236.423666441614, 5.25424886863538),    # s2
+        CoordEquatorial(213.849128852023, -51.1920260999562),   # s3
+        CoordEquatorial(286.170341181402, -42.2037736309785),   # s4
+        # CoordEquatorial(281.331753525598, -13.4867719837475),   # s5
+        CoordEquatorial(251.468246474402, -13.4867719837475),   # s6
+        CoordEquatorial(246.629658818598, -42.2037736309785),   # s7
+        CoordEquatorial(266.4, -28.94),                         # s8
+    ]
+    # exclude_coords = None
 
     ID_CAMERA_A: str = "cam1a"
     DATASET: str = "detected"
 
-    VIGNETTING = True
-    PSFY = mgm.config_psfy_flag(DATASET)
+    VIGNETTING: bool = True
+    PSFY: bool = mgm.config_psfy_flag(DATASET)
 
+    max_iters: int = (9 - len(exclude_coords)) if exclude_coords else 10
+
+    # --- ROUTINE BODY ---
     MASK_PATH, SIMUL_DATA_PATH, SAVE_PATH = config_dirpaths(
         mask=MASK_FITS,
         skyfield=SKYFIELD,
@@ -139,16 +159,15 @@ def main() -> None:
     get_datapaths: Callable[[str], str] = lambda dataset: SIMUL_DATA_PATH + f'{ID_CAMERA_A}/{DATA_FITS}_{ID_CAMERA_A}_{dataset}.fits'
 
     wfm: CodedMaskCamera = codedmask(MASK_PATH, UPS_X, UPS_Y)
-    sdlA = ds.get_data(get_datapaths(DATASET), E_min=None, E_max=None)
+    sdlA = ds.get_data(get_datapaths(DATASET), E_min=E_min, E_max=E_max, coords=exclude_coords)
     catA = ds.get_catalogue(get_datapaths('sources'))
 
     detector, _ = count(wfm, sdlA.DLdata)
     skymap = decode(wfm, detector)
     varmap = variance(wfm, detector)
     snrmap = snratio(skymap, varmap)
-    save_sky(skymap, snrmap, sdlA, f'{SAVE_PATH}/SIMUL_sky.fits', detector=detector)
+    save_sky(skymap, sdlA, f'{SAVE_PATH}/SIMUL_sky.fits', snr=snrmap, detector=detector)
 
-    max_iters = 1
     KWS: dict[str, Any] = {
         'vignetting': VIGNETTING,
         'psfy': PSFY,
