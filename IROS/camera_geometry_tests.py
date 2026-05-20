@@ -165,24 +165,24 @@ def main() -> None:
     UPS_X, UPS_Y = 2, 1
 
     SKYFIELD: str = "CameraGeometry"
-    # DATA_FITS: str = "baseline_sources_2-50keV_1ks"
-    DATA_FITS: str = "mask_Z2arcmin_2-50keV_1ks"
+    DATA_FITS: str = "baseline_sources_2-50keV_1ks"
+    # DATA_FITS: str = "mask_Z2arcmin_2-50keV_1ks"
 
-    RUN_ID: str = 's5_rec'
+    RUN_ID: str = 's8_rec'
     E_min: float | None = None
     E_max: float | None = None
-    # exclude_coords: CoordEquatorial | list[CoordEquatorial] | None = [
-    #     CoordEquatorial(318.950871147977, -51.1920260999562),   # s0
-    #     CoordEquatorial(296.376333558386, 5.25424886863538),    # s1
-    #     CoordEquatorial(236.423666441614, 5.25424886863538),    # s2
-    #     CoordEquatorial(213.849128852023, -51.1920260999562),   # s3
-    #     CoordEquatorial(286.170341181402, -42.2037736309785),   # s4
-    #     CoordEquatorial(281.331753525598, -13.4867719837475),   # s5
-    #     CoordEquatorial(251.468246474402, -13.4867719837475),   # s6
-    #     CoordEquatorial(246.629658818598, -42.2037736309785),   # s7
-    #     CoordEquatorial(266.4, -28.94),                         # s8
-    # ]
-    exclude_coords = None
+    exclude_coords: CoordEquatorial | list[CoordEquatorial] | None = [
+        CoordEquatorial(318.950871147977, -51.1920260999562),   # s0
+        CoordEquatorial(296.376333558386, 5.25424886863538),    # s1
+        CoordEquatorial(236.423666441614, 5.25424886863538),    # s2
+        CoordEquatorial(213.849128852023, -51.1920260999562),   # s3
+        CoordEquatorial(286.170341181402, -42.2037736309785),   # s4
+        CoordEquatorial(281.331753525598, -13.4867719837475),   # s5
+        CoordEquatorial(251.468246474402, -13.4867719837475),   # s6
+        CoordEquatorial(246.629658818598, -42.2037736309785),   # s7
+        # CoordEquatorial(266.4, -28.94),                         # s8
+    ]
+    # exclude_coords = None
 
     ID_CAMERA_A: str = "cam1a"
     DATASET: str = "detected"
