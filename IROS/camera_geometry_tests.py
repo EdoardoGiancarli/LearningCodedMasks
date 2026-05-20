@@ -14,8 +14,9 @@ from astropy.wcs import WCS
 from bloodmoon.types import CoordEquatorial
 from bloodmoon.mask import CodedMaskCamera, codedmask, count
 from bloodmoon.mask import decode, variance, snratio
+from bloodmoon.optim import model_sky
 import darksun as ds
-from darksun.data import Log
+from darksun.types import LogEntry
 from darksun.data import Log, DataLoader, CatalogueLoader
 
 from IROSrec.handle import config_dirpaths
@@ -36,6 +37,28 @@ def perform_IROS(
     log, _ = run_IROS(camera, loop, camID)
     return log
 
+def add_skypeaks_to_log(camera: CodedMaskCamera, log: Log, skymap: NDArray, **kws: Any) -> Log:
+    """Adds the sky peak counts at first sky CC reconstruction and after each IROS iteration."""
+    box_sz = 5
+    true = skymap.copy()
+    log.insert(
+        (LogEntry('cc_peak_cts', '', 'ph'), LogEntry('iter_peak_cts', '', 'ph')),
+    )
+
+    for x, y, sx, sy, f in zip(
+        log.log['x'], log.log['y'], log.log['shift_x'], log.log['shift_y'], log.log['fluence'],
+    ):
+        box = (
+            slice(y - 2 * box_sz, y + 2 * box_sz + 1),
+            slice(x - box_sz, x + box_sz + 1),
+        )
+        cc_cts = np.max(skymap[*box])
+        it_cts = np.max(true[*box])
+        log.update([('cc_peak_cts', cc_cts), ('iter_peak_cts', it_cts)])
+        true -= model_sky(camera, sx, sy, f, **kws)
+
+    return log
+
 def gather_cam_data(
     log: Log,
     catalogue: CatalogueLoader,
@@ -50,20 +73,26 @@ def gather_cam_data(
         log, catalogue, sdl, camera,
     )
     cts = np.array(log.log['fluence'])
+    cc_peak_cts = np.array(log.log['cc_peak_cts'])
+    it_peak_cts = np.array(log.log['iter_peak_cts'])
     true_cts = mgm.extract_catalogue_fluences(log, catalogue, sdl, camera)
     dmap = {
         'Source': ids,
 
         'thetaX [deg]': np.array(log.log['angle_x']),
         'thetaY [deg]': np.array(log.log['angle_y']),
-        'optim cts [ph]': log.log['fluence'],
-
-        'true cts [ph]': true_cts,
-
         'DthetaX [arcmin]': theta_res_x,
         'DthetaY [arcmin]': theta_res_y,
+
+        'true cts [ph]': true_cts,
+        'optim cts [ph]': cts.astype(np.int32),
         'Dcts [%]': (cts - true_cts) * 100 / true_cts,
         'Dcts [sigma]': (cts - true_cts) / np.sqrt(true_cts),
+
+        'cc peak cts [ph]': cc_peak_cts.astype(np.int32),
+        'Dcts cc [%]': (cc_peak_cts - true_cts) * 100 / true_cts,
+        'iter peak cts [ph]': it_peak_cts.astype(np.int32),
+        'Dcts iter [%]': (it_peak_cts - true_cts) * 100 / true_cts,
 
         'SNR [sigma]': np.array(log.log['snr']),
     }
@@ -105,10 +134,24 @@ def save_sky(
     print("# Saving completed!")
     return
 
-def save_df_totxt(df: pd.DataFrame, save_to: str) -> None:
-    """Saves input dataframe to `.txt` file."""
-    with open(save_to, "w", encoding="utf-8") as f:
-        f.write(df.to_string(col_space=[10] * len(df.columns), index=False, justify='center'))
+# def df_to_txt(df: pd.DataFrame, save_to: str) -> None:
+#     """Saves input dataframe to `.txt` file."""
+#     kws = {
+#         'col_space': [10] * len(df.columns),
+#         'index': False,
+#         'justify': 'center',
+#         'float_format': '%.2f',
+#     }
+#     df.to_string(save_to, **kws)
+#     return
+
+def df_to_csv(df: pd.DataFrame, save_to: str) -> None:
+    """Saves input dataframe to `.csv` file."""
+    kws = {
+        'index': False,
+        'float_format': '%.2f',
+    }
+    df.to_csv(save_to, **kws)
     return
 
 
@@ -128,18 +171,18 @@ def main() -> None:
     RUN_ID: str = 's5_rec'
     E_min: float | None = None
     E_max: float | None = None
-    exclude_coords: CoordEquatorial | list[CoordEquatorial] | None = [
-        CoordEquatorial(318.950871147977, -51.1920260999562),   # s0
-        CoordEquatorial(296.376333558386, 5.25424886863538),    # s1
-        CoordEquatorial(236.423666441614, 5.25424886863538),    # s2
-        CoordEquatorial(213.849128852023, -51.1920260999562),   # s3
-        CoordEquatorial(286.170341181402, -42.2037736309785),   # s4
-        # CoordEquatorial(281.331753525598, -13.4867719837475),   # s5
-        CoordEquatorial(251.468246474402, -13.4867719837475),   # s6
-        CoordEquatorial(246.629658818598, -42.2037736309785),   # s7
-        CoordEquatorial(266.4, -28.94),                         # s8
-    ]
-    # exclude_coords = None
+    # exclude_coords: CoordEquatorial | list[CoordEquatorial] | None = [
+    #     CoordEquatorial(318.950871147977, -51.1920260999562),   # s0
+    #     CoordEquatorial(296.376333558386, 5.25424886863538),    # s1
+    #     CoordEquatorial(236.423666441614, 5.25424886863538),    # s2
+    #     CoordEquatorial(213.849128852023, -51.1920260999562),   # s3
+    #     CoordEquatorial(286.170341181402, -42.2037736309785),   # s4
+    #     CoordEquatorial(281.331753525598, -13.4867719837475),   # s5
+    #     CoordEquatorial(251.468246474402, -13.4867719837475),   # s6
+    #     CoordEquatorial(246.629658818598, -42.2037736309785),   # s7
+    #     CoordEquatorial(266.4, -28.94),                         # s8
+    # ]
+    exclude_coords = None
 
     ID_CAMERA_A: str = "cam1a"
     DATASET: str = "detected"
@@ -174,8 +217,10 @@ def main() -> None:
     }
     log = perform_IROS(wfm, detector, max_iters, camID=ID_CAMERA_A, **KWS)
     log = get_sources_database(wfm, sdlA, catA, log, vignetting=VIGNETTING)
+    log = add_skypeaks_to_log(wfm, log, skymap, **KWS)
     outdf = gather_cam_data(log, catA, sdlA, wfm)
-    save_df_totxt(outdf, f'{SAVE_PATH}/OUT_{RUN_ID}.txt')
+    # df_to_txt(outdf, f'{SAVE_PATH}/OUT_{RUN_ID}.txt')
+    df_to_csv(outdf, f'{SAVE_PATH}/OUT_{RUN_ID}.csv')
 
     return
 
