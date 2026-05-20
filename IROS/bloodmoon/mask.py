@@ -135,6 +135,8 @@ class CodedMaskCamera:
     specs: CodedMaskSpecs
     upscale_x: int = 1
     upscale_y: int = 1
+    els_mask_x: int | float = 0.0
+    els_mask_y: int | float = 0.0
 
     @cached_property
     def upscale_f(self):
@@ -157,6 +159,29 @@ class CodedMaskCamera:
         n, m = self.shape_detector
         o, p = self.shape_mask
         return n + o - 1, m + p - 1
+    
+    def _mask_detector_artefacts(self, bulk: npt.NDArray) -> npt.NDArray:
+        """
+        Builds a mask for the detector plane edges, accounting for possible
+        artefacts emerging from the reconstruction algorithm used to fit a
+        detected photon position.\\
+        Input `els_mask_x` and `els_mask_y` are expressed in [mm] and represent
+        the physical size of the mask on top of the detector plane surface
+        along the fine and coarse directions, starting from the boundaries.
+        """
+        if not any((self.els_mask_x, self.els_mask_y)):
+            return np.ones_like(bulk)
+        print(f'UserInfo: using bulk mask of [{self.els_mask_x} x {self.els_mask_y}] mm.')
+        active_elements = np.array((bulk > 0), dtype=int)
+        npx_to_hide_x = int(self.els_mask_x * self.upscale_f.x / self.specs.mask_deltax)
+        edges_cover_x = (
+            (_shift(active_elements, 0, -npx_to_hide_x) > 0) & (_shift(active_elements, 0, npx_to_hide_x) > 0)
+        )
+        npx_to_hide_y = int(self.els_mask_y * self.upscale_f.y / self.specs.mask_deltay)
+        edges_cover_y = (
+            (_shift(active_elements, -npx_to_hide_y, 0) > 0) & (_shift(active_elements, npx_to_hide_y , 0) > 0)
+        )
+        return active_elements * edges_cover_x * edges_cover_y
 
     def _bins_mask(
         self,
@@ -253,27 +278,6 @@ class CodedMaskCamera:
         """
         2D array representing the bulk (sensitivity) array of the mask.
         """
-        def _bulk_cover(
-            bulk: npt.NDArray,
-            bulk_els_to_hide: int | float,
-        ) -> npt.NDArray:
-            """
-            Builds a mask for the detector plane, accounting for the 'reconstructed'
-            dataset artefacts from WISEMAN at the DAs edges along the y-axis.
-
-            The input `bulk_els_to_hide` is in [mm].
-            """
-            if not bulk_els_to_hide:
-                return 1
-            print(f'## USING BULK MASK with {bulk_els_to_hide} mm cover ##')
-            num_px_to_hide = int(bulk_els_to_hide * self.upscale_f.y / self.specs.mask_deltay)
-            active_elements = np.array((bulk > 0), dtype=int)
-            edges_cover = (
-                (_shift(active_elements, -num_px_to_hide, 0) > 0) &
-                (_shift(active_elements, num_px_to_hide , 0) > 0)
-            )
-            return active_elements * edges_cover
-        
         bulk = self.get_bulk()
         bulk[~np.isclose(bulk, np.zeros_like(bulk))] = 1
         bins = self._bins_mask(self.upscale_f)
@@ -284,7 +288,8 @@ class CodedMaskCamera:
         # the bin edges number of the subarray is `xmax - xmin + 1`.
         # the number of matrix elements in the subarray is `xmax - xmin + 1 - 1 == xmax - xmin`
         upscaled = _upscale(bulk, *self.upscale_f)[ymin:ymax, xmin:xmax]
-        return upscaled * _bulk_cover(upscaled, 1.5)
+        bulk_cover = self._mask_detector_artefacts(upscaled)
+        return upscaled * bulk_cover
 
     @cached_property
     def balancing(self) -> npt.NDArray:
@@ -296,6 +301,8 @@ def codedmask(
     mask_filepath: str | Path,
     upscale_x: int = 1,
     upscale_y: int = 1,
+    els_mask_x: int | float = 0.0,
+    els_mask_y: int | float = 0.0,
 ) -> CodedMaskCamera:
     """
     Create a CodedMaskCamera from FITS file data.
@@ -338,6 +345,8 @@ def codedmask(
             specs=specs,
             upscale_x=upscale_x,
             upscale_y=upscale_y,
+            els_mask_x=els_mask_x,
+            els_mask_y=els_mask_y,
         )
     raise NotImplementedError("Only reading masks from fits file is supported.")
 
