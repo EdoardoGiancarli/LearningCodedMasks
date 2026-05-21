@@ -149,6 +149,7 @@ def save_database(
     hdu_list.writeto(save_to, output_verify="fix+ignore")
     hdu_list.close()
     print("# Saving completed!")
+    return
 
 
 def save_sky(
@@ -175,6 +176,10 @@ def save_sky(
             World Coordinate System instance, which can be used to
             include coordinate information in the FITS header.
     """
+    data = {
+        'sky': np.int32(sky),
+        'snr': np.float32(snr),
+    }
     print("# Saving sky...")
     # HDU list and Primary Header
     hdu_list = fits.HDUList([])
@@ -182,10 +187,7 @@ def save_sky(
     hdu_list.append(primary_hdu)
 
     # Images for data
-    for img, name in zip(
-        [np.int32(sky), np.float32(snr)],
-        ["sky", "snr"],
-    ):
+    for name, img in list(data.items()):
         image_hdu = fits.ImageHDU(
             data=img,
             header=sdl.header,
@@ -197,6 +199,7 @@ def save_sky(
     hdu_list.writeto(save_to, output_verify="fix+ignore")
     hdu_list.close()
     print("# Saving completed!")
+    return
 
 
 def save_pickle(data: object, save_to: str | Path) -> None:
@@ -213,6 +216,7 @@ def save_pickle(data: object, save_to: str | Path) -> None:
     with open(save_to, "wb") as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print("# Saving completed!")
+    return
 
 
 def save_region_file(
