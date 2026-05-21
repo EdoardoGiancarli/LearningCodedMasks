@@ -23,18 +23,19 @@ def add_cxb(
         f"Photon list in '{data_filepath}' will be updated with data from '{cxb_filepath}'.\n"
         f'Continue? (y/n): '
     )
-    if confirm_update.lower() == 'y':
-        print('Appending CXB photons...')
-        with (
-            fits.open(cxb_filepath, mode="readonly") as hdu_cxb,
-            fits.open(data_filepath, mode="update") as hdu_data,
-        ):
-            print(f'Photons list elements: {len(hdu_data[1].data)}')
-            hdu_data[1].data = np.append(hdu_data[1].data, hdu_cxb[1].data)
-            print(f'Updated photons list elements: {len(hdu_data[1].data)}')
-        print('CXB added succesfully!')
-    else:
+    if confirm_update.lower() == 'n':
         print('Aborted photons list update...')
+        return
+    
+    print('Appending CXB photons...')
+    with (
+        fits.open(cxb_filepath, mode="readonly") as hdu_cxb,
+        fits.open(data_filepath, mode="update") as hdu_data,
+    ):
+        print(f'Photons list elements: {len(hdu_data[1].data)}')
+        hdu_data[1].data = np.append(hdu_data[1].data, hdu_cxb[1].data)
+        print(f'Updated photons list elements: {len(hdu_data[1].data)}')
+    print('CXB added succesfully!')
 
     return
 
