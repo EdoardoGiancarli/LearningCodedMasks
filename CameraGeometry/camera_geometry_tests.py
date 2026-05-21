@@ -134,17 +134,6 @@ def save_sky(
     print("# Saving completed!")
     return
 
-# def df_to_txt(df: pd.DataFrame, save_to: str) -> None:
-#     """Saves input dataframe to `.txt` file."""
-#     kws = {
-#         'col_space': [10] * len(df.columns),
-#         'index': False,
-#         'justify': 'center',
-#         'float_format': '%.2f',
-#     }
-#     df.to_string(save_to, **kws)
-#     return
-
 def df_to_csv(df: pd.DataFrame, save_to: str) -> None:
     """Saves input dataframe to `.csv` file."""
     kws = {
@@ -219,7 +208,6 @@ def main() -> None:
     log = get_sources_database(wfm, sdlA, catA, log, vignetting=VIGNETTING)
     log = add_skypeaks_to_log(wfm, log, skymap, **KWS)
     outdf = gather_cam_data(log, catA, sdlA, wfm)
-    # df_to_txt(outdf, f'{SAVE_PATH}/OUT_{RUN_ID}.txt')
     df_to_csv(outdf, f'{SAVE_PATH}/OUT_{RUN_ID}.csv')
 
     return
