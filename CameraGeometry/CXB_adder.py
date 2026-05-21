@@ -44,10 +44,10 @@ def add_cxb(
 def main() -> None:
 
     SIMUL_PATH = "/mnt/d/PhD_AASS/Coding/Images_fits/CameraGeometry"
-    BASELINE_SIMUL = "baseline_2-50keV_1ks"
-    CXB_SIMUL = "baseline_cxb_2-50keV_1ks"
+    BASELINE_SIMUL = "mask_Z2arcmin_2-50keV_1ks"
+    CXB_SIMUL = "mask_Z2arcmin_cxb_2-50keV_1ks"
 
-    DATASET = 'detected'
+    DATASET = 'reconstructed'
     ID_CAMERA = 'cam1a'
 
     trg_sources_file = f'{SIMUL_PATH}/{BASELINE_SIMUL}/{ID_CAMERA}/{BASELINE_SIMUL}_{ID_CAMERA}_{DATASET}.fits'
