@@ -154,10 +154,10 @@ def main() -> None:
     UPS_X, UPS_Y = 2, 1
 
     SKYFIELD: str = "CameraGeometry"
-    # DATA_FITS: str = "baseline_2-50keV_1ks"
-    DATA_FITS: str = "mask_Z2arcmin_2-50keV_1ks"
+    DATA_FITS: str = "baseline_2-50keV_1ks"
+    # DATA_FITS: str = "mask_Z2arcmin_2-50keV_1ks"
 
-    RUN_ID: str = 'mask_Z2arcmin_wcxb'
+    RUN_ID: str = 'baseline_wcxb'
     E_min: float | None = None
     E_max: float | None = None
     # exclude_coords: CoordEquatorial | list[CoordEquatorial] | None = [
@@ -206,6 +206,7 @@ def main() -> None:
     }
     log = perform_IROS(wfm, detector, max_iters, camID=ID_CAMERA_A, **KWS)
     log = get_sources_database(wfm, sdlA, catA, log, vignetting=VIGNETTING)
+    ds.save_database(log_camA=log, log_camB=log, sdlA=sdlA, sdlB=sdlA, save_to=f'{SAVE_PATH}/OUT_{RUN_ID}_srcDB.fits')
     log = add_skypeaks_to_log(wfm, log, skymap, **KWS)
     outdf = gather_cam_data(log, catA, sdlA, wfm)
     df_to_csv(outdf, f'{SAVE_PATH}/OUT_{RUN_ID}.csv')
