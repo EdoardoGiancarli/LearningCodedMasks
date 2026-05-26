@@ -18,6 +18,7 @@ from typing import Callable
 import numpy as np
 import numpy.typing as npt
 from scipy.signal import correlate
+from scipy.ndimage import rotate
 
 from .coords import pos2shift
 from .images import _interp
@@ -120,6 +121,9 @@ class CodedMaskCamera:
         get_bulk: Callable that returns bulk pattern as 2D array
         specs: CodedMaskSpecs containing geometric parameters and dimensions
         upscale_f: Tuple of upscaling factors for x and y dimensions
+        hide_bulk_els_x: Detector physical elements to hide along fine axis, default=`0.0` [mm].
+        hide_bulk_els_y: Detector physical elements to hide along coarse axis, default=`0.0` [mm].
+        mask_pattern_shift: Shift angle between mask pattern and detector, default=`0.0` [arcmin].
 
     Raises:
         ValueError: If detector plane is larger than mask or if upscale factors are not positive
@@ -135,8 +139,9 @@ class CodedMaskCamera:
     specs: CodedMaskSpecs
     upscale_x: int = 1
     upscale_y: int = 1
-    els_mask_x: int | float = 0.0
-    els_mask_y: int | float = 0.0
+    hide_bulk_els_x: int | float = 0.0
+    hide_bulk_els_y: int | float = 0.0
+    mask_pattern_shift: int | float = 0.0
 
     @cached_property
     def upscale_f(self):
@@ -165,23 +170,41 @@ class CodedMaskCamera:
         Builds a mask for the detector plane edges, accounting for possible
         artefacts emerging from the reconstruction algorithm used to fit a
         detected photon position.\\
-        Input `els_mask_x` and `els_mask_y` are expressed in [mm] and represent
-        the physical size of the mask on top of the detector plane surface
-        along the fine and coarse directions, starting from the boundaries.
+        Input `hide_bulk_els_x` and `hide_bulk_els_y` are expressed in [mm] and
+        represent the physical size of the mask on top of the detector plane
+        surface along the fine and coarse directions, starting from the boundaries.
         """
-        if not any((self.els_mask_x, self.els_mask_y)):
+        if not any((self.hide_bulk_els_x, self.hide_bulk_els_y)):
             return np.ones_like(bulk)
-        print(f'UserInfo: using bulk mask of [{self.els_mask_x} x {self.els_mask_y}] mm.')
+        print(f'UserInfo: using bulk mask of [{self.hide_bulk_els_x} x {self.hide_bulk_els_y}] mm.')
         active_elements = np.array((bulk > 0), dtype=int)
-        npx_to_hide_x = int(self.els_mask_x * self.upscale_f.x / self.specs.mask_deltax)
+        npx_to_hide_x = int(self.hide_bulk_els_x * self.upscale_f.x / self.specs.mask_deltax)
         edges_cover_x = (
             (_shift(active_elements, 0, -npx_to_hide_x) > 0) & (_shift(active_elements, 0, npx_to_hide_x) > 0)
         )
-        npx_to_hide_y = int(self.els_mask_y * self.upscale_f.y / self.specs.mask_deltay)
+        npx_to_hide_y = int(self.hide_bulk_els_y * self.upscale_f.y / self.specs.mask_deltay)
         edges_cover_y = (
             (_shift(active_elements, -npx_to_hide_y, 0) > 0) & (_shift(active_elements, npx_to_hide_y , 0) > 0)
         )
         return active_elements * edges_cover_x * edges_cover_y
+    
+    def _rotate(self, pattern: npt.NDArray) -> npt.NDArray:
+        """
+        Rotates the given pattern with respect to the detector plane,
+        around the camera optical axis. The pattern is rotated by the
+        input `mask_pattern_shift` angle, expressed in [arcmin].
+        """
+        # `mask_pattern_shift` is multiplied by -1 to match angle anti-clockwise
+        # rotation, and is divided by 60 to convert it from [arcmin] to [deg]
+        ROTKWS = {
+            'angle': (-1) * self.mask_pattern_shift / 60.0,
+            'axes': (1, 0),
+            'reshape': False,
+            'order': 4,
+            'mode': 'constant',
+            'cval': 0.0,
+        }
+        return rotate(pattern, **ROTKWS)
 
     def _bins_mask(
         self,
@@ -266,12 +289,18 @@ class CodedMaskCamera:
     @cached_property
     def mask(self) -> npt.NDArray:
         """2D array representing the coded mask pattern."""
-        return _upscale(self.get_mask(), *self.upscale_f)
+        pattern = _upscale(self.get_mask(), *self.upscale_f)
+        if self.mask_pattern_shift:
+            pattern = self._rotate(pattern.astype(float))
+        return pattern
 
     @cached_property
     def decoder(self) -> npt.NDArray:
         """2D array representing the mask pattern used for decoding."""
-        return _upscale(self.get_decoder(), *self.upscale_f)
+        pattern = _upscale(self.get_decoder(), *self.upscale_f)
+        if self.mask_pattern_shift:
+            pattern = self._rotate(pattern)
+        return pattern
 
     @cached_property
     def bulk(self) -> npt.NDArray:
@@ -301,8 +330,7 @@ def codedmask(
     mask_filepath: str | Path,
     upscale_x: int = 1,
     upscale_y: int = 1,
-    els_mask_x: int | float = 0.0,
-    els_mask_y: int | float = 0.0,
+    **kwargs,
 ) -> CodedMaskCamera:
     """
     Create a CodedMaskCamera from FITS file data.
@@ -314,6 +342,7 @@ def codedmask(
         mask_filepath: Path to the mask FITS file
         upscale_x: Upscaling factor for x direction (default: 1)
         upscale_y: Upscaling factor for y direction (default: 1)
+        **kwargs: Argument keywords for the CodedMaskCamera object
 
     Returns:
         CodedMaskCamera object containing mask patterns and specifications
@@ -345,8 +374,7 @@ def codedmask(
             specs=specs,
             upscale_x=upscale_x,
             upscale_y=upscale_y,
-            els_mask_x=els_mask_x,
-            els_mask_y=els_mask_y,
+            **kwargs,
         )
     raise NotImplementedError("Only reading masks from fits file is supported.")
 
