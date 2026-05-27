@@ -123,7 +123,6 @@ class CodedMaskCamera:
         upscale_f: Tuple of upscaling factors for x and y dimensions
         hide_bulk_els_x: Detector physical elements to hide along fine axis, default=`0.0` [mm].
         hide_bulk_els_y: Detector physical elements to hide along coarse axis, default=`0.0` [mm].
-        mask_pattern_shift: Shift angle between mask pattern and detector, default=`0.0` [arcmin].
 
     Raises:
         ValueError: If detector plane is larger than mask or if upscale factors are not positive
@@ -141,7 +140,6 @@ class CodedMaskCamera:
     upscale_y: int = 1
     hide_bulk_els_x: int | float = 0.0
     hide_bulk_els_y: int | float = 0.0
-    mask_pattern_shift: int | float = 0.0
 
     @cached_property
     def upscale_f(self):
@@ -187,24 +185,6 @@ class CodedMaskCamera:
             (_shift(active_elements, -npx_to_hide_y, 0) > 0) & (_shift(active_elements, npx_to_hide_y , 0) > 0)
         )
         return active_elements * edges_cover_x * edges_cover_y
-    
-    def _rotate(self, pattern: npt.NDArray) -> npt.NDArray:
-        """
-        Rotates the given pattern with respect to the detector plane,
-        around the camera optical axis. The pattern is rotated by the
-        input `mask_pattern_shift` angle, expressed in [arcmin].
-        """
-        # `mask_pattern_shift` is multiplied by -1 to match angle anti-clockwise
-        # rotation, and is divided by 60 to convert it from [arcmin] to [deg]
-        ROTKWS = {
-            'angle': (-1) * self.mask_pattern_shift / 60.0,
-            'axes': (1, 0),
-            'reshape': False,
-            'order': 4,
-            'mode': 'constant',
-            'cval': 0.0,
-        }
-        return rotate(pattern, **ROTKWS)
 
     def _bins_mask(
         self,
@@ -283,24 +263,18 @@ class CodedMaskCamera:
 
     @cached_property
     def bins_sky(self) -> BinsRectangular:
-        """Returns bins for the sky-shift domain"""
+        """Returns bins for the sky-shift domain."""
         return self._bins_sky(self.upscale_f)
 
     @cached_property
     def mask(self) -> npt.NDArray:
         """2D array representing the coded mask pattern."""
-        pattern = _upscale(self.get_mask(), *self.upscale_f)
-        if self.mask_pattern_shift:
-            pattern = self._rotate(pattern.astype(float))
-        return pattern
+        return _upscale(self.get_mask(), *self.upscale_f)
 
     @cached_property
     def decoder(self) -> npt.NDArray:
         """2D array representing the mask pattern used for decoding."""
-        pattern = _upscale(self.get_decoder(), *self.upscale_f)
-        if self.mask_pattern_shift:
-            pattern = self._rotate(pattern)
-        return pattern
+        return _upscale(self.get_decoder(), *self.upscale_f)
 
     @cached_property
     def bulk(self) -> npt.NDArray:
@@ -611,9 +585,44 @@ def psf(camera: CodedMaskCamera) -> npt.NDArray:
     return correlate(camera.mask, camera.decoder, mode="same")
 
 
+def _rotate_coords(
+    x: npt.NDArray,
+    y: npt.NDArray,
+    centre: tuple[float, float],
+    angle: float,
+) -> tuple[npt.NDArray, npt.NDArray]:
+    """
+    Rotates the given coordinate arrays wrt (x0, y0) by
+    specified angle value in [deg].
+
+    Args:
+        x: Array of coordinates along the x-axis
+        y: Array of coordinates along the y-axis
+        centre: Pivot rotation point for (x, y) coords
+        angle: Rotation angle expressed in [deg]
+    
+    Returns:
+        Tuple of arrays (x, y) with roto-translated coordinates
+    """
+    angle_rad = np.deg2rad(angle)
+    cos_t, sin_t = np.cos(angle_rad), np.sin(angle_rad)
+    rot_matrix2d = np.array(
+        [
+            [cos_t, -sin_t],
+            [sin_t, cos_t],
+        ]
+    )
+    coords = np.concat((x[None, :], y[None, :]), axis=0)
+    centre_ = np.array(centre).reshape(2, 1)
+    rotated = np.matmul(rot_matrix2d, coords - centre_) + centre_
+    return rotated[0, :], rotated[1, :]
+
+
 def count(
     camera: CodedMaskCamera,
     data: npt.NDArray,
+    rot_angle: int | float = 0.0,
+    centre: tuple[float, float] = (0.0, 0.0),
 ) -> tuple[npt.NDArray, npt.NDArray]:
     """
     Create 2D histogram of detector counts from event data.
@@ -621,12 +630,18 @@ def count(
     Args:
         camera: CodedMaskCamera object containing detector binning
         data: Array of event data with `X` and `Y` coordinates
+        rot_angle: Rotation angle between detector and mask plate, default=`0.0` [deg]
+        centre: Pivot point `(x0, y0)` of the rotation, default=`(0.0, 0.0)`
 
     Returns:
         2D array of binned detector counts
     """
     bins = camera.bins_detector
-    counts, *_ = np.histogram2d(data["Y"], data["X"], bins=[bins.y, bins.x])
+    xcoords, ycoords = (
+        (data["X"], data["Y"]) if not rot_angle
+        else _rotate_coords(data["X"], data["Y"], centre, rot_angle)
+    )
+    counts, *_ = np.histogram2d(ycoords, xcoords, bins=[bins.y, bins.x])
     # - we mask the binned detector counts for the camera bulk to remove
     #   those photons that fall in the dead zone
     # PN: we do NOT multiply for the bulk, since we do not want to modify
