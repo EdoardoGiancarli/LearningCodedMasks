@@ -154,10 +154,10 @@ def main() -> None:
     UPS_X, UPS_Y = 2, 1
 
     SKYFIELD: str = "CameraGeometry"
-    DATA_FITS: str = "baseline_2-50keV_1ks"
-    # DATA_FITS: str = "mask_Z2arcmin_2-50keV_1ks"
+    # DATA_FITS: str = "baseline_thinmask_infdet_1ks_2-50keV"
+    DATA_FITS: str = "mask_Z2arcmin_thinmask_infdet_1ks_2-50keV"
 
-    RUN_ID: str = 'baseline_wcxb'
+    RUN_ID: str = 'mask_Z2arcmin_wcxb'
     E_min: float | None = None
     E_max: float | None = None
     # exclude_coords: CoordEquatorial | list[CoordEquatorial] | None = [
@@ -176,7 +176,7 @@ def main() -> None:
     ID_CAMERA_A: str = "cam1a"
     DATASET: str = "detected"
 
-    VIGNETTING: bool = True
+    VIGNETTING: bool = False
     PSFY: bool = mgm.config_psfy_flag(DATASET)
 
     max_iters: int = (9 - len(exclude_coords)) if exclude_coords else 10
