@@ -139,7 +139,7 @@ def pos2equatorial(
 
 def equatorial2pos(
     sdl: SimulationDataLoader,
-    camera: CodedMaskCamera,
+    camera: "CodedMaskCamera",
     ra: float,
     dec: float,
 ) -> tuple[int, int]:
