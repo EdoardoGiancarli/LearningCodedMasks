@@ -254,7 +254,7 @@ def _process_mask_pattern(
 def _extract_detector(
     camera: CodedMaskCamera,
     shadowgram: npt.NDArray,
-    normalise: bool = True,
+    normalise: bool = False,
 ) -> npt.NDArray:
     """
     Extracts the detector image from the mask pattern projection on the detector plane.
@@ -300,12 +300,19 @@ def model_shadowgram(
             raise ValueError(f"'{key}' must be bool or Callable, got {type(val)} instead.")
     # shift camera mask pattern wrt source local-frame coords
     mask_shifted = _shift_mask_pattern(camera, shift_x, shift_y)
+    norm_factor = _extract_detector(camera, mask_shifted).sum()
     # apply instrumental effects
     mask_projected = _process_mask_pattern(
         camera, mask_shifted, shift_x, shift_y, vignetting, psfy,
     )
-    # extract normalised source detector image
+    # extract source detector image
+    #   - the shadowgram must be normalised wrt the shifted pattern
+    #     without instr. effects applied on it
+    #   - after applying the instr. effects a fraction of the photons
+    #     is lost and/or dispersed, and the total sum is reduced, thus
+    #     increasing the array px intensities
     detector = _extract_detector(camera, mask_projected)
+    detector /= norm_factor
     return detector
 
 
