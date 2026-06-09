@@ -59,12 +59,12 @@ MASK_FITS: str = "mask_NTHT_20250725.fits"
 THIN_MASK: bool = False                                                     # removes vignetting effects
 
 #### --- OBSERVATION DATA
-SKYFIELD: str = "GalacticCentre"                                            # skyfield selection
-DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"             # directory with FITS files from WISEMAN
+SKYFIELD: str = "IROSDummy"                                            # skyfield selection
+DATA_FITS: str = "iros_benchmark_2-50keV_mask_050_1040x17_1ks"             # directory with FITS files from WISEMAN
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "reconstructed"
+DATASET: str = "detected"
 
 #### --- IMAGES UPSCALING
 UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
@@ -74,13 +74,13 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = f"GC_rec_1ks_2-6keV"
+ANALYSIS_ID: str = f"Crab_benchmark_2-6keV_detected"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 25
+MAX_ITERATIONS: int = 5
 SNR_THRESHOLD: int | float = 5
 
-MODULE_SKY_COMPOSITION: bool = True   # selects if the LEM-X module cameras are to be joined to get the composed sky
+MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
 
 #### --- DETECTOR SMOOTHING SETUP
 # - selects if detector smoothing is to be applied
