@@ -52,6 +52,8 @@ from IROSrec.run import run_pipeline
 """
 PIPELINE SET-UP.
 """
+# NOTE: a bulk mask of [0.0, 1.5] mm is inserted in the pipeline to account for reconstructed phs artefacts
+
 #### --- LEM-X CAMERAS MASK PATTERN
 MASK_FITS: str = "mask_NTHT_20250725.fits"
 THIN_MASK: bool = False                                                     # removes vignetting effects
@@ -72,7 +74,7 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = f"GC_rec_1ks_2-50keV"
+ANALYSIS_ID: str = f"GC_rec_1ks_2-6keV"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 25
@@ -95,7 +97,7 @@ BASELINE_IROSREC: str | Path | None = os.path.join(
 
 #### --- DATA FILTERS SETUP
 # - photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (2.0, 50.0)
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (2.0, 6.0)
 # - RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 # - sources flux filter for the catalog comparison - [Crab]

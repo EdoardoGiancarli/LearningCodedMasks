@@ -63,6 +63,7 @@ def run(params: PipelineParams) -> None:
                 mask_filepath=params.analysis_params.mask_file,
                 upscale_x=UPSX_0,
                 upscale_y=UPSY_0,
+                hide_bulk_els_y=1.5,
             )
             filepaths = simulation_files(params.analysis_params.simul_data)
             sdlA = ds.get_data(
@@ -89,6 +90,7 @@ def run(params: PipelineParams) -> None:
                     mask_filepath=params.analysis_params.mask_file,
                     upscale_x=UPSX_FINAL,
                     upscale_y=UPSY_FINAL,
+                    hide_bulk_els_y=1.5,
                 )
                 wcs_fit = tuple(ds.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
         
