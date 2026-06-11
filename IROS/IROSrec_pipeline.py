@@ -63,7 +63,7 @@ DATA_FITS: str = "baseline_2-50keV_1ks"             # directory with FITS files 
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "detected"
+DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
 UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
@@ -73,10 +73,10 @@ UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisatio
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = f"Crab_benchmark_1ks_2-6keV_detected"
+ANALYSIS_ID: str = f"Crab_benchmark_1ks_2-50keV_oldvign"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 5
+MAX_ITERATIONS: int = 2
 SNR_THRESHOLD: int | float = 5
 
 MODULE_SKY_COMPOSITION: bool = False   # selects if the LEM-X module cameras are to be joined to get the composed sky
@@ -96,7 +96,7 @@ BASELINE_IROSREC: str | Path | None = os.path.join(
 
 #### --- DATA FILTERS SETUP
 # - photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (2.0, 6.0)
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] = (2.0, 50.0)
 # - RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 # - sources flux filter for the catalog comparison - [Crab]
