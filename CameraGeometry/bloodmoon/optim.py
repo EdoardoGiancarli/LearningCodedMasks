@@ -254,7 +254,7 @@ def _process_mask_pattern(
 def _extract_detector(
     camera: CodedMaskCamera,
     shadowgram: npt.NDArray,
-    normalise: bool = False,
+    normalise: bool = True,
 ) -> npt.NDArray:
     """
     Extracts the detector image from the mask pattern projection on the detector plane.
