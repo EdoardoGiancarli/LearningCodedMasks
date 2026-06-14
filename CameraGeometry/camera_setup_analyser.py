@@ -5,29 +5,27 @@ such as mask and/or SDDs (or even whole detector plane) rotations and/or shifts 
 """
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
-from astropy.io import fits
-from astropy.wcs import WCS
 from tqdm import tqdm
 
 from bloodmoon.types import CoordEquatorial
 from bloodmoon.mask import CodedMaskCamera, codedmask, count
-from bloodmoon.mask import decode, variance, snratio
+from bloodmoon.mask import decode
 from bloodmoon.optim import model_sky
 import darksun as ds
 from darksun.types import LogEntry
 from darksun.data import Log, DataLoader, CatalogueLoader
 
-from IROSrec.handle import config_dirpaths
 from IROSrec.iros.optim import iros_singleCAM
 from IROSrec.iros.procedure import run_IROS, get_sources_database
 import imgmaker as mgm
 
-DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations'
+
+DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data'
 
 def check_and_pick(parent: Path, pattern: str) -> Path:
     matches = tuple(parent.glob(pattern))
@@ -53,25 +51,22 @@ def perform_IROS(
     log, _ = run_IROS(camera, loop, camID)
     return log
 
-def add_skypeaks_to_log(camera: CodedMaskCamera, log: Log, skymap: NDArray, **kws: Any) -> Log:
+def add_skypeaks_to_log(camera: CodedMaskCamera, log: Log, skymap: NDArray, boxsize: int = 5, **src_kws: Any) -> Log:
     """Adds the sky peak counts at first sky CC reconstruction and after each IROS iteration."""
-    box_sz = 5
-    true = skymap.copy()
+    it_skymap = skymap.copy()
     log.insert(
         (LogEntry('cc_peak_cts', '', 'ph'), LogEntry('iter_peak_cts', '', 'ph')),
     )
-
     for x, y, sx, sy, f in zip(
         log.log['x'], log.log['y'], log.log['shift_x'], log.log['shift_y'], log.log['fluence'],
     ):
         box = (
-            slice(y - 2 * box_sz, y + 2 * box_sz + 1),
-            slice(x - box_sz, x + box_sz + 1),
+            slice(y - 2 * boxsize, y + 2 * boxsize + 1),
+            slice(x - boxsize, x + boxsize + 1),
         )
-        cc_cts = np.max(skymap[*box])
-        it_cts = np.max(true[*box])
+        cc_cts, it_cts = map(np.max, (skymap[*box], it_skymap[*box]))
         log.update([('cc_peak_cts', cc_cts), ('iter_peak_cts', it_cts)])
-        true -= model_sky(camera, sx, sy, f, **kws)
+        it_skymap -= model_sky(camera, sx, sy, f, **src_kws)
 
     return log
 
@@ -114,11 +109,58 @@ def gather_cam_data(
     }
     return pd.DataFrame(dmap)
 
+def analyse_sim(
+    simpath: Path,
+    camera: CodedMaskCamera,
+    dataset: str,
+    energy_range: tuple[float | None, float | None],
+    camID: str = 'cam1a',
+    vignetting: bool = True,
+    psfy: bool = True,
+    # save_to: str | Path | None = None,
+    **iros_kws: Any,
+) -> pd.DataFrame:
+    """Runs the analysis for specified camera layout."""
+    E_min, E_max = energy_range
+    out_dfs: list[pd.DataFrame] = []
+
+    sdl = ds.get_data(
+        check_and_pick(simpath, f'{camID}/*{dataset}*.fits'), E_min=E_min, E_max=E_max, coords=None,
+    )
+    cat = ds.get_catalogue(check_and_pick(simpath, f'{camID}/*sources*.fits'))
+    
+    # select up to second-to-last row to exclude CXB
+    src_list = cat.DLdata[:-1]
+    src_loop = tqdm(src_list['NAME'], desc='Source Analysis')
+
+    for srcID in src_loop:
+        src_loop.set_postfix({'ID': srcID})
+
+        mask = (src_list['NAME'] != srcID)
+        exclude_srcs: list[CoordEquatorial] = [
+            CoordEquatorial(ra, dec) for ra, dec in zip(src_list[mask]['RA'], src_list[mask]['DEC'])
+        ]
+        phs = ds.filter_data(sdl.DLdata, E_min=None, E_max=None, coords=exclude_srcs)
+
+        detector, _ = count(camera, phs)
+        skymap = decode(camera, detector)
+
+        log = perform_IROS(camera, detector, max_iterations=1, camID=camID, vignetting=vignetting, psfy=psfy, **iros_kws)
+        log = get_sources_database(camera, sdl, cat, log, vignetting=vignetting)
+        log = add_skypeaks_to_log(camera, log, skymap, vignetting=vignetting, psfy=psfy)
+        out_dfs.append(gather_cam_data(log, cat, sdl, camera))
+    
+    # merge single src data and save csv
+    out_src_data = pd.concat(out_dfs, ignore_index=True)
+    # if save_to is not None: df_to_csv(out_src_data, save_to)
+
+    return out_src_data
+
 def df_to_csv(df: pd.DataFrame, save_to: str) -> None:
     """Saves input dataframe to `.csv` file."""
     kws = {
         'index': False,
-        'float_format': '%.4f',
+        'float_format': '%.6f',
     }
     df.to_csv(save_to, **kws)
     return
@@ -126,139 +168,101 @@ def df_to_csv(df: pd.DataFrame, save_to: str) -> None:
 
 
 
-
-
-def main(sims: list[str]) -> None:
+def main(sims: list[tuple[str, str]]) -> None:
     """
     Runs LEM-X single coded-mask camera performance analysis.
 
     Args:
-        ...
+        sims (list[tuple[str, str]]):
+            List of tuples with data directory path and respective directory path to save output CSV database.
     """
-    sims_ = tuple(map(Path, sims))
-    # - CAMERA SETUP
-    MASK_FITS: str = f"{DIRPATH}/mask_NTHT_20260129_CORRECTED.fits"
+    MASK_FITS: str = f"{DIRPATH}/Simulations/mask_NTHT_20260129_CORRECTED.fits"
     UPS_X, UPS_Y = 2, 1
 
-    ID_CAMERA_A: str = "cam1a"
+    DATASET: str = 'reconstructed'
     E_min: float | None = None
     E_max: float | None = None
-    DATASET: str = 'reconstructed'
+
     VIGNETTING: bool = True
     PSFY: bool = mgm.config_psfy_flag(DATASET)
 
-    # - ANALYSIS SETUP
-    # SRC_IDs: str | list[str] = 'all'    # NOTE: 'all' takes all srcs, list[src_ids] takes specified srcs only
-    # SRC_SELECTOR: str = 'single'        # NOTE: 'single' filters each src individually, 'group' includes all srcs together
-    # INCLUDE_CXB: bool = True            # NOTE: keep or filters out CXB from data
-
-
-
-    # - BEGIN ANALYSIS
-    wfm = codedmask(MASK_FITS, UPS_X, UPS_Y)
-
 
     # NOTE NOTE NOTE testing
-    sims_ = sims_[:3]
+    temp_sims = sims[:2]
     # NOTE NOTE NOTE testing
 
 
-    loop = tqdm(sims_, desc='Camera Analysis')
-    for simpath in loop:
+    wfm: CodedMaskCamera = codedmask(MASK_FITS, UPS_X, UPS_Y)
+    loop = tqdm(temp_sims, desc='Camera Analysis')
+    for filepaths in loop:
+        simpath, outpath = map(Path, filepaths)
         loop.set_postfix({'Sim': simpath.name})
-        out_dfs: list[pd.DataFrame] = []
-
-        print(simpath)
-
-
-
-        # sdl = ds.get_data(
-        #     check_and_pick(simpath, f'{ID_CAMERA_A}/*{DATASET}*.fits'), E_min=E_min, E_max=E_max, coords=None,
-        # )
-        # cat = ds.get_catalogue(check_and_pick(simpath, f'{ID_CAMERA_A}/*sources*.fits'))
-        # src_list = cat.DLdata[:-1]   # NOTE: exclude CXB
-
-        # src_loop = tqdm(src_list['NAME'], desc='Source Analysis')
-        # for srcID in src_loop:
-        #     src_loop.set_postfix({'ID': srcID})
-
-        #     mask = (src_list['NAME'] != srcID)
-        #     exclude_srcs: list[CoordEquatorial] = [
-        #         CoordEquatorial(ra, dec) for ra, dec in zip(src_list[mask]['RA'], src_list[mask]['DEC'])
-        #     ]
-        #     phs = ds.filter_data(sdl.DLdata, E_min=None, E_max=None, coords=exclude_srcs)
-
-        #     detector, _ = count(wfm, phs)
-        #     skymap = decode(wfm, detector)
-
-        #     KWS: dict[str, Any] = {
-        #         'vignetting': VIGNETTING,
-        #         'psfy': PSFY,
-        #     }
-        #     log = perform_IROS(wfm, detector, max_iterations=1, camID=ID_CAMERA_A, **KWS)
-        #     log = get_sources_database(wfm, sdl, cat, log, vignetting=VIGNETTING)
-        #     log = add_skypeaks_to_log(wfm, log, skymap, **KWS)
-        #     out_dfs.append(gather_cam_data(log, cat, sdl, wfm))
-        
-        # # merge single src data and save csv
-        # out_src_data = pd.concat(out_dfs, ignore_index=True)
-        # outpath: Path = ...
-        # print(out_src_data, outpath)
-        # # df_to_csv(out_src_data, outpath)
+        out_src_data = analyse_sim(
+            simpath=simpath,
+            camera=wfm,
+            dataset=DATASET,
+            energy_range=(E_min, E_max),
+            vignetting=VIGNETTING,
+            psfy=PSFY,
+        )
+        print(out_src_data, outpath / f'{simpath.name}.csv')
+        # df_to_csv(out_src_data, outpath)
 
     return
 
 
 if __name__ == '__main__':
 
-    simspath: str = f'{DIRPATH}/CameraGeometry'
+    simspath: str = f'{DIRPATH}/Simulations/CameraGeometry'
+    outspath: str = f'{DIRPATH}/Outputs/OutCameraGeometry'
     CASE_STUDY: list[str] = [
         # Baseline
-        f'{simspath}/baseline/baseline',
+        (f'{simspath}/baseline/baseline', f'{outspath}/baseline',)
 
         # Mask rotations
         # - X axis
-        f'{simspath}/mask_rots/mask_Xrot/Xrot_0.5arcmin',
-        f'{simspath}/mask_rots/mask_Xrot/Xrot_1arcmin',
-        f'{simspath}/mask_rots/mask_Xrot/Xrot_2arcmin',
+        (f'{simspath}/mask_rots/mask_Xrot/Xrot_0.5arcmin', f'{outspath}/mask_rots/mask_Xrot'),
+        (f'{simspath}/mask_rots/mask_Xrot/Xrot_1arcmin', f'{outspath}/mask_rots/mask_Xrot'),
+        (f'{simspath}/mask_rots/mask_Xrot/Xrot_2arcmin', f'{outspath}/mask_rots/mask_Xrot'),
         # - Y axis
-        f'{simspath}/mask_rots/mask_Yrot/Yrot_0.5arcmin',
-        f'{simspath}/mask_rots/mask_Yrot/Yrot_1arcmin',
-        f'{simspath}/mask_rots/mask_Yrot/Yrot_2arcmin',
+        (f'{simspath}/mask_rots/mask_Yrot/Yrot_0.5arcmin', f'{outspath}/mask_rots/mask_Yrot'),
+        (f'{simspath}/mask_rots/mask_Yrot/Yrot_1arcmin', f'{outspath}/mask_rots/mask_Yrot'),
+        (f'{simspath}/mask_rots/mask_Yrot/Yrot_2arcmin', f'{outspath}/mask_rots/mask_Yrot'),
         # - Z axis
-        f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin',
-        f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin',
-        f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin',
-        f'{simspath}/mask_rots/mask_Zrot/Zrot_m2arcmin',
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_m2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
 
         # SDD_00 rotations
         # - X axis
-        f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_0.5arcmin',
-        f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_1arcmin',
-        f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_2arcmin',
+        (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
+        (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
+        (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
         # - Y axis
-        f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_0.5arcmin',
-        f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_1arcmin',
-        f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_2arcmin',
+        (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
+        (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
+        (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
         # - Z axis
-        f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_0.5arcmin',
-        f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_1arcmin',
-        f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_2arcmin',
+        (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
+        (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
+        (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
 
         # SDD_00 shifts
         # - X axis
-        f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_10um',
-        f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_30um',
-        f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_50um',
+        (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_10um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
+        (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_30um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
+        (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_50um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
         # - Y axis
-        f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_10um',
-        f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_30um',
-        f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_50um',
+        (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_10um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
+        (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_30um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
+        (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_50um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
         # - Z axis
-        f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_10um',
-        f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_30um',
-        f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_50um',
+        (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_10um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
+        (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_30um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
+        (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_50um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
     ]
+
     main(CASE_STUDY)
 
 
