@@ -4,6 +4,8 @@ This module is intended for benchmarking the performance of a LEM-X camera accou
 such as mask and/or SDDs (or even whole detector plane) rotations and/or shifts with respect to the nominal design.
 """
 
+from functools import partial
+import multiprocessing
 from pathlib import Path
 from typing import Any
 
@@ -109,50 +111,7 @@ def gather_cam_data(
     }
     return pd.DataFrame(dmap)
 
-def analyse_sim(
-    simpath: Path,
-    camera: CodedMaskCamera,
-    dataset: str,
-    energy_range: tuple[float | None, float | None],
-    camID: str = 'cam1a',
-    vignetting: bool = True,
-    psfy: bool = True,
-    **iros_kws: Any,
-) -> pd.DataFrame:
-    """Runs the analysis for specified camera layout."""
-    E_min, E_max = energy_range
-    out_dfs: list[pd.DataFrame] = []
-
-    sdl = ds.get_data(
-        check_and_pick(simpath, f'{camID}/*{dataset}*.fits'), E_min=E_min, E_max=E_max, coords=None,
-    )
-    cat = ds.get_catalogue(check_and_pick(simpath, f'{camID}/*sources*.fits'))
-    
-    # select up to second-to-last row to exclude CXB
-    src_list = cat.DLdata[:-1]
-    src_loop = tqdm(src_list['NAME'], desc='Source Analysis')
-
-    for srcID in src_loop:
-        src_loop.set_postfix({'ID': srcID})
-
-        mask = (src_list['NAME'] != srcID)
-        exclude_srcs: list[CoordEquatorial] = [
-            CoordEquatorial(ra, dec) for ra, dec in zip(src_list[mask]['RA'], src_list[mask]['DEC'])
-        ]
-        phs = ds.filter_data(sdl.DLdata, E_min=None, E_max=None, coords=exclude_srcs)
-
-        detector, _ = count(camera, phs)
-        skymap = decode(camera, detector)
-
-        log = perform_IROS(camera, detector, max_iterations=1, camID=camID, vignetting=vignetting, psfy=psfy, **iros_kws)
-        log = get_sources_database(camera, sdl, cat, log, vignetting=vignetting)
-        log = add_skypeaks_to_log(camera, log, skymap, vignetting=vignetting, psfy=psfy)
-        out_dfs.append(gather_cam_data(log, cat, sdl, camera))
-    
-    out_src_data = pd.concat(out_dfs, ignore_index=True)
-    return out_src_data
-
-def df_to_csv(df: pd.DataFrame, save_to: str) -> None:
+def df_to_csv(df: pd.DataFrame, save_to: str | Path) -> None:
     """Saves input dataframe to `.csv` file."""
     kws = {
         'index': False,
@@ -161,10 +120,59 @@ def df_to_csv(df: pd.DataFrame, save_to: str) -> None:
     df.to_csv(save_to, **kws)
     return
 
+def analyse_sim(
+    filepaths: tuple[str, str],
+    camera_path: str,
+    upscaling: tuple[int, int],
+    dataset: str,
+    energy_range: tuple[float | None, float | None],
+    camID: str = 'cam1a',
+    vignetting: bool = True,
+    psfy: bool = True,
+    save_data: bool = True,
+    **iros_kws: Any,
+) -> None:
+    """Runs the analysis for specified camera layout."""
+    simpath, outpath = map(Path, filepaths)
+    E_min, E_max = energy_range
+    wfm: CodedMaskCamera = codedmask(camera_path, *upscaling)
+    out_dfs: list[pd.DataFrame] = []
+
+    sdl = ds.get_data(
+        check_and_pick(simpath, f'{camID}/*{dataset}*.fits'), E_min=E_min, E_max=E_max, coords=None,
+    )
+    cat = ds.get_catalogue(check_and_pick(simpath, f'{camID}/*sources*.fits'))
+    # select up to second-to-last row to exclude CXB
+    src_list = cat.DLdata[:-1]
+
+    for srcID in src_list['NAME']:
+        mask = (src_list['NAME'] != srcID)
+        exclude_srcs: list[CoordEquatorial] = [
+            CoordEquatorial(ra, dec) for ra, dec in zip(src_list[mask]['RA'], src_list[mask]['DEC'])
+        ]
+        phs = ds.filter_data(sdl.DLdata, E_min=None, E_max=None, coords=exclude_srcs)
+
+        detector, _ = count(wfm, phs)
+        skymap = decode(wfm, detector)
+
+        log = perform_IROS(wfm, detector, max_iterations=1, camID=camID, vignetting=vignetting, psfy=psfy, **iros_kws)
+        log = get_sources_database(wfm, sdl, cat, log, vignetting=vignetting)
+        log = add_skypeaks_to_log(wfm, log, skymap, vignetting=vignetting, psfy=psfy)
+        out_dfs.append(gather_cam_data(log, cat, sdl, wfm))
+    
+    # merge single src data and save csv
+    out_src_data = pd.concat(out_dfs, ignore_index=True)
+    if save_data:
+        print(f'Saving {simpath.name}')
+        outpath.mkdir(parents=True, exist_ok=True)
+        df_to_csv(out_src_data, outpath / f'{simpath.name}_{dataset}_{E_min or 2.0}-{E_max or 50.0}keV.csv')
+
+    return
 
 
 
-def main(sims: list[tuple[str, str]]) -> None:
+
+def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
     """
     Runs LEM-X single coded-mask camera performance analysis.
 
@@ -175,29 +183,35 @@ def main(sims: list[tuple[str, str]]) -> None:
     MASK_FITS: str = f"{DIRPATH}/Simulations/mask_NTHT_20260129_CORRECTED.fits"
     UPS_X, UPS_Y = 2, 1
 
-    DATASET: str = 'reconstructed'
-    E_min: float | None = None
-    E_max: float | None = None
+    DATASET: str = 'detected'
+    E_min: float | None = 2.0
+    E_max: float | None = 6.0
 
     VIGNETTING: bool = True
     PSFY: bool = mgm.config_psfy_flag(DATASET)
     IROS_KWS: dict[str, Any] = {}
 
-    wfm: CodedMaskCamera = codedmask(MASK_FITS, UPS_X, UPS_Y)
-    loop = tqdm(sims, desc='Camera Analysis')
-    for filepaths in loop:
-        simpath, outpath = map(Path, filepaths)
-        loop.set_postfix({'Sim': simpath.name})
-        out_src_data = analyse_sim(
-            simpath=simpath,
-            camera=wfm,
-            dataset=DATASET,
-            energy_range=(E_min, E_max),
-            vignetting=VIGNETTING,
-            psfy=PSFY,
-            **IROS_KWS,
+    worker_fn = partial(
+        analyse_sim,
+        camera_path=MASK_FITS,
+        upscaling=(UPS_X, UPS_Y),
+        dataset=DATASET,
+        energy_range=(E_min, E_max),
+        vignetting=VIGNETTING,
+        psfy=PSFY,
+        **IROS_KWS,
+    )
+    n_workers_ = max(1, min(n_workers, multiprocessing.cpu_count() - 1))
+    print(f'Starting analysis on {n_workers_} cores...')
+    with multiprocessing.Pool(processes=n_workers_) as pool:
+        list(
+            tqdm(
+                pool.imap_unordered(worker_fn, sims),
+                total=len(sims),
+                desc='Camera Analysis',
+            )
         )
-        df_to_csv(out_src_data, outpath / f'{simpath.name}.csv')
+    print('Analysis complete!')
 
     return
 
