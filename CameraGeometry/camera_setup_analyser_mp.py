@@ -184,8 +184,8 @@ def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
     UPS_X, UPS_Y = 2, 1
 
     DATASET: str = 'detected'
-    E_min: float | None = 2.0
-    E_max: float | None = 6.0
+    E_min: float | None = None
+    E_max: float | None = None
 
     VIGNETTING: bool = True
     PSFY: bool = mgm.config_psfy_flag(DATASET)
@@ -225,47 +225,44 @@ if __name__ == '__main__':
         (f'{simspath}/baseline/baseline', f'{outspath}/baseline'),
 
         # Mask rotations
-        # - X axis
-        (f'{simspath}/mask_rots/mask_Xrot/Xrot_0.5arcmin', f'{outspath}/mask_rots/mask_Xrot'),
-        (f'{simspath}/mask_rots/mask_Xrot/Xrot_1arcmin', f'{outspath}/mask_rots/mask_Xrot'),
-        (f'{simspath}/mask_rots/mask_Xrot/Xrot_2arcmin', f'{outspath}/mask_rots/mask_Xrot'),
+        # # - X axis
+        # (f'{simspath}/mask_rots/mask_Xrot/Xrot_0.5arcmin', f'{outspath}/mask_rots/mask_Xrot'),
+        # (f'{simspath}/mask_rots/mask_Xrot/Xrot_1arcmin', f'{outspath}/mask_rots/mask_Xrot'),
+        # (f'{simspath}/mask_rots/mask_Xrot/Xrot_2arcmin', f'{outspath}/mask_rots/mask_Xrot'),
         # - Y axis
-        (f'{simspath}/mask_rots/mask_Yrot/Yrot_0.5arcmin', f'{outspath}/mask_rots/mask_Yrot'),
-        (f'{simspath}/mask_rots/mask_Yrot/Yrot_1arcmin', f'{outspath}/mask_rots/mask_Yrot'),
-        (f'{simspath}/mask_rots/mask_Yrot/Yrot_2arcmin', f'{outspath}/mask_rots/mask_Yrot'),
+        (f'{simspath}/mask_rots/mask_Yrot/Yrot_4arcmin', f'{outspath}/mask_rots/mask_Yrot'),
+        (f'{simspath}/mask_rots/mask_Yrot/Yrot_6arcmin', f'{outspath}/mask_rots/mask_Yrot'),
         # - Z axis
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_m2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
 
-        # SDD_00 rotations
-        # - X axis
-        (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
-        (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
-        (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
-        # - Y axis
-        (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
-        (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
-        (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
-        # - Z axis
-        (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
-        (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
-        (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
+        # # SDD_00 rotations
+        # # - X axis
+        # (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
+        # (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
+        # (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
+        # # - Y axis
+        # (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
+        # (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
+        # (f'{simspath}/sdd00_rots/sdd00_Yrot/Yrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Yrot'),
+        # # - Z axis
+        # (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
+        # (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_1arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
+        # (f'{simspath}/sdd00_rots/sdd00_Zrot/Zrot_2arcmin', f'{outspath}/sdd00_rots/sdd00_Zrot'),
 
-        # SDD_00 shifts
-        # - X axis
-        (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_10um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
-        (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_30um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
-        (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_50um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
-        # - Y axis
-        (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_10um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
-        (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_30um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
-        (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_50um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
-        # - Z axis
-        (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_10um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
-        (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_30um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
-        (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_50um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
+        # # SDD_00 shifts
+        # # - X axis
+        # (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_10um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
+        # (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_30um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
+        # (f'{simspath}/sdd00_shifts/sdd00_Xshift/Xshift_50um', f'{outspath}/sdd00_shifts/sdd00_Xshift'),
+        # # - Y axis
+        # (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_10um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
+        # (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_30um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
+        # (f'{simspath}/sdd00_shifts/sdd00_Yshift/Yshift_50um', f'{outspath}/sdd00_shifts/sdd00_Yshift'),
+        # # - Z axis
+        # (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_10um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
+        # (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_30um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
+        # (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_50um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
     ]
 
     main(CASE_STUDY)
