@@ -165,7 +165,8 @@ def analyse_sim(
     if save_data:
         print(f'Saving {simpath.name}')
         outpath.mkdir(parents=True, exist_ok=True)
-        df_to_csv(out_src_data, outpath / f'{simpath.name}_{dataset}_{E_min or 2.0}-{E_max or 50.0}keV.csv')
+        upx, upy = wfm.upscale_f
+        df_to_csv(out_src_data, outpath / f'{simpath.name}_{dataset}_{E_min or 2.0}-{E_max or 50.0}keV_upx{upx}upy{upy}.csv')
 
     return
 
@@ -181,7 +182,7 @@ def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
             List of tuples with data directory path and respective directory path to save output CSV database.
     """
     MASK_FITS: str = f"{DIRPATH}/Simulations/mask_NTHT_20260129_CORRECTED.fits"
-    UPS_X, UPS_Y = 2, 1
+    UPS_X, UPS_Y = 5, 2
 
     DATASET: str = 'detected'
     E_min: float | None = None
@@ -229,10 +230,13 @@ if __name__ == '__main__':
         # (f'{simspath}/mask_rots/mask_Xrot/Xrot_0.5arcmin', f'{outspath}/mask_rots/mask_Xrot'),
         # (f'{simspath}/mask_rots/mask_Xrot/Xrot_1arcmin', f'{outspath}/mask_rots/mask_Xrot'),
         # (f'{simspath}/mask_rots/mask_Xrot/Xrot_2arcmin', f'{outspath}/mask_rots/mask_Xrot'),
-        # - Y axis
-        (f'{simspath}/mask_rots/mask_Yrot/Yrot_4arcmin', f'{outspath}/mask_rots/mask_Yrot'),
-        (f'{simspath}/mask_rots/mask_Yrot/Yrot_6arcmin', f'{outspath}/mask_rots/mask_Yrot'),
+        # # - Y axis
+        # (f'{simspath}/mask_rots/mask_Yrot/Yrot_4arcmin', f'{outspath}/mask_rots/mask_Yrot'),
+        # (f'{simspath}/mask_rots/mask_Yrot/Yrot_6arcmin', f'{outspath}/mask_rots/mask_Yrot'),
         # - Z axis
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
         (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
         (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
 
