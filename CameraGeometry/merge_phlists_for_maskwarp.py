@@ -1,3 +1,10 @@
+"""
+Mask warp effects support module. This script join the photon lists of two symmetric simulations with non-zero
+mask pitch around the Y-axis to simulate at first order warping stress of the coded-mask plate.
+"""
+
+from functools import partial
+import multiprocessing
 from pathlib import Path
 from typing import Callable
 
@@ -5,28 +12,49 @@ import numpy as np
 from numpy.typing import NDArray
 from astropy.io import fits
 from astropy.table import Table, vstack
+from tqdm import tqdm
 
-from bloodmoon.mask import CodedMaskCamera, codedmask
 import darksun as ds
 from darksun.data import DataLoader
 
+DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/'
 
-def grep_phIDs(sdl: DataLoader, cond: Callable[[NDArray], NDArray]) -> NDArray:
+def _grep_phIDs(sdl: DataLoader, cond: Callable[[NDArray], NDArray]) -> NDArray:
     """Extracts photon IDs from given list based on mask output X coord condition."""
     mask = cond(sdl.DLdata['X'])
     return sdl.DLdata['ID'][mask]
 
-
-def intersect_IDs(all_ids: NDArray, collected_ids: NDArray, uniqueIDs: bool = True) -> NDArray:
+def _intersect_IDs(all_ids: NDArray, collected_ids: NDArray, uniqueIDs: bool = True) -> NDArray:
     """Extracts valid photon ID indexes within collected photons list."""
     _, _, idx_b = np.intersect1d(all_ids, collected_ids, assume_unique=uniqueIDs, return_indices=True)
     return idx_b
+
+
+def check_and_pick(parent: Path, pattern: str) -> Path:
+    matches = tuple(parent.glob(pattern))
+    if not matches:
+        raise ValueError(f"A file matching the pattern {str(parent / pattern)} is expected but missing.")
+    f, *extra_matches = matches
+    if extra_matches:
+        raise ValueError(
+            f"Found unexpected extra matches for glob pattern {str(parent / pattern)}."
+            f"File with pattern {pattern} should be unique"
+        )
+    return f
+
+
+def extract_phs(sdl_mask: DataLoader, sdl: DataLoader, cond: Callable[[NDArray], NDArray]) -> fits.FITS_rec:
+    """Extracts valid photons from ID intersection between collected photons and selected output from mask."""
+    phIDs = _grep_phIDs(sdl_mask, cond)
+    IDidxs = _intersect_IDs(phIDs, sdl.DLdata['ID'])
+    return sdl.DLdata[IDidxs]
 
 
 def merge_photons(
     phs_left: fits.FITS_rec,
     phs_right: fits.FITS_rec,
     save_to: str | Path | None = None,
+    overwrite: bool = False,
     tab_name: str | None = None,
     header: fits.Header | None = None,
 ) -> fits.FITS_rec:
@@ -45,25 +73,77 @@ def merge_photons(
             except Exception as e:
                 print(f'Encountered error {e}, skipping header update...')
         hdu_list = fits.HDUList([fits.PrimaryHDU(), merged_hdu])
-        hdu_list.writeto(save_to, output_verify="fix+ignore")
+        hdu_list.writeto(save_to, output_verify="fix+ignore", overwrite=overwrite)
         hdu_list.close()
         print("# Saving completed!")
     
     return merged_hdu.data
 
 
+def run(
+    filepaths: tuple[tuple[str, str], str],
+    dataset: str,
+    camID: str,
+    overwrite: bool = False,
+) -> None:
+    """
+    """
+    # filepaths to FITS, refer to which half-mask to retain
+    path_left, path_right, save_to = map(Path, (*filepaths[0], filepaths[-1]))
+    # sdls with data, for both sims (photons from mask output and collected by SDDs)
+    sdl_mask_left, sdl_mask_right = map(lambda path: ds.get_data(check_and_pick(path, f'{camID}/*mask*.fits')), (path_left, path_right))
+    sdl_left, sdl_right = map(lambda path: ds.get_data(check_and_pick(path, f'{camID}/*{dataset}*.fits')), (path_left, path_right))
+    # define cond and select photons
+    valid_phs_left = extract_phs(sdl_mask_left, sdl_left, lambda x: x < 0.0)
+    valid_phs_right = extract_phs(sdl_mask_right, sdl_right, lambda x: x >= 0.0)
+    # merge photon lists and save
+    kws = dict(overwrite=overwrite, tab_name=dataset.upper(), header=sdl_left.header)
+    _ = merge_photons(valid_phs_left, valid_phs_right, save_to=save_to, **kws)
+    return
 
 
 
 
-
-def main() -> None:
-    """"""
-    ...
+def main(
+    sims: list[tuple[tuple[str, str], str]],
+    dataset: str = 'detected',
+    camID: str = 'cam1a',
+    n_workers: int = 4,
+    overwrite_outfits: bool = False,
+) -> None:
+    """Executes script."""
+    # NOTE: removed merged FITS_Rec output from `run()` as with list comprehension and
+    #       multiprocessing may lead to processing lag and/or out-of-memory crashes
+    worker_fn = partial(
+        run,
+        dataset=dataset,
+        camID=camID,
+        overwrite=overwrite_outfits,
+    )
+    n_workers_ = max(1, min(n_workers, multiprocessing.cpu_count() - 1))
+    print(f'Starting analysis on {n_workers_} cores...')
+    with multiprocessing.Pool(processes=n_workers_) as pool:
+        list(
+            tqdm(
+                pool.imap_unordered(worker_fn, sims),
+                total=len(sims),
+                desc='Camera Analysis',
+            )
+        )
+    print('Analysis complete!')
+    return
 
 
 if __name__ == '__main__':
-    main()
+
+    CASE_STUDY: list[tuple[tuple[str, str], str]] = [
+        (
+            (..., ...),
+            ...,
+        ),
+    ]
+
+    main(CASE_STUDY)
 
 
 # end
