@@ -182,7 +182,7 @@ def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
             List of tuples with data directory path and respective directory path to save output CSV database.
     """
     MASK_FITS: str = f"{DIRPATH}/Simulations/mask_NTHT_20260129_CORRECTED.fits"
-    UPS_X, UPS_Y = 5, 2
+    UPS_X, UPS_Y = 5, 1
 
     DATASET: str = 'detected'
     E_min: float | None = None
@@ -223,7 +223,7 @@ if __name__ == '__main__':
     outspath: str = f'{DIRPATH}/Outputs/OutCameraGeometry'
     CASE_STUDY: list[str] = [
         # Baseline
-        (f'{simspath}/baseline/baseline', f'{outspath}/baseline'),
+        # (f'{simspath}/baseline/baseline', f'{outspath}/baseline'),
 
         # Mask rotations
         # # - X axis
@@ -234,11 +234,11 @@ if __name__ == '__main__':
         # (f'{simspath}/mask_rots/mask_Yrot/Yrot_4arcmin', f'{outspath}/mask_rots/mask_Yrot'),
         # (f'{simspath}/mask_rots/mask_Yrot/Yrot_6arcmin', f'{outspath}/mask_rots/mask_Yrot'),
         # - Z axis
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
 
         # # SDD_00 rotations
         # # - X axis
@@ -267,6 +267,12 @@ if __name__ == '__main__':
         # (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_10um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
         # (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_30um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
         # (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_50um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
+
+        # SDD plane positive warping
+        # - Y axis
+        (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_2arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
+        (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_4arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
+        (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_6arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
     ]
 
     main(CASE_STUDY)
