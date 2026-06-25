@@ -17,8 +17,6 @@ from tqdm import tqdm
 import darksun as ds
 from darksun.data import DataLoader
 
-DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/'
-
 def _grep_phIDs(sdl: DataLoader, cond: Callable[[NDArray], NDArray]) -> NDArray:
     """Extracts photon IDs from given list based on mask output X coord condition."""
     mask = cond(sdl.DLdata['X'])
@@ -66,13 +64,14 @@ def merge_photons(
 
     if save_to is not None:
         print("# Saving merged photon list...")
+        primary_hdu = fits.PrimaryHDU()
         if header is not None:
             try:
-                merged_hdu.header.extend(header, strip=True, update=True)
+                primary_hdu.header.extend(header, strip=True, update=True)
                 print('Updated BinTable header!')
             except Exception as e:
                 print(f'Encountered error {e}, skipping header update...')
-        hdu_list = fits.HDUList([fits.PrimaryHDU(), merged_hdu])
+        hdu_list = fits.HDUList([primary_hdu, merged_hdu])
         hdu_list.writeto(save_to, output_verify="fix+ignore", overwrite=overwrite)
         hdu_list.close()
         print("# Saving completed!")
@@ -94,9 +93,12 @@ def run(
     sdl_mask_left, sdl_mask_right = map(lambda path: ds.get_data(check_and_pick(path, f'{camID}/*mask*.fits')), (path_left, path_right))
     sdl_left, sdl_right = map(lambda path: ds.get_data(check_and_pick(path, f'{camID}/*{dataset}*.fits')), (path_left, path_right))
     # define cond and select photons
+    print('Extracting photons...')
     valid_phs_left = extract_phs(sdl_mask_left, sdl_left, lambda x: x < 0.0)
     valid_phs_right = extract_phs(sdl_mask_right, sdl_right, lambda x: x >= 0.0)
+    print('Photons successfully extracted!')
     # merge photon lists and save
+    save_to.parent.mkdir(parents=True, exist_ok=True)
     kws = dict(overwrite=overwrite, tab_name=dataset.upper(), header=sdl_left.header)
     _ = merge_photons(valid_phs_left, valid_phs_right, save_to=save_to, **kws)
     return
@@ -106,7 +108,7 @@ def run(
 
 def main(
     sims: list[tuple[tuple[str, str], str]],
-    dataset: str = 'detected',
+    dataset: str,
     camID: str = 'cam1a',
     n_workers: int = 4,
     overwrite_outfits: bool = False,
@@ -135,15 +137,44 @@ def main(
 
 
 if __name__ == '__main__':
+    DATASET: str = 'detected'
+    ID_CAM: str = 'cam1a'
+    DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/CameraGeometry/mask_warps'
+    PYWARP_PATH: str = 'mask_Ywarp/plusYwarp'
+    NYWARP_PATH: str = 'mask_Ywarp/negYwarp'
 
     CASE_STUDY: list[tuple[tuple[str, str], str]] = [
+        # - POSITIVE Y MASK WARPING
+        # NOTE: positive on the left (X < 0), negative on the right (X >= 0)
         (
-            (..., ...),
-            ...,
+            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_2arcmin/p2arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_2arcmin/m2arcmin'),
+            f'{DIRPATH}/{PYWARP_PATH}/pYwarp_2arcmin/{ID_CAM}/pYwarp_2arcmin_2-50keV_1ks_{DATASET}.fits',
+        ),
+        (
+            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_4arcmin/p4arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_4arcmin/m4arcmin'),
+            f'{DIRPATH}/{PYWARP_PATH}/pYwarp_4arcmin/{ID_CAM}/pYwarp_4arcmin_2-50keV_1ks_{DATASET}.fits',
+        ),
+        (
+            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_6arcmin/p6arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_6arcmin/m6arcmin'),
+            f'{DIRPATH}/{PYWARP_PATH}/pYwarp_6arcmin/{ID_CAM}/pYwarp_6arcmin_2-50keV_1ks_{DATASET}.fits',
+        ),
+        # - NEGATIVE Y MASK WARPING
+        # NOTE: negative on the left (X < 0), positive on the right (X >= 0)
+        (
+            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_2arcmin/m2arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_2arcmin/p2arcmin'),
+            f'{DIRPATH}/{NYWARP_PATH}/nYwarp_2arcmin/{ID_CAM}/nYwarp_2arcmin_2-50keV_1ks_{DATASET}.fits',
+        ),
+        (
+            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_4arcmin/m4arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_4arcmin/p4arcmin'),
+            f'{DIRPATH}/{NYWARP_PATH}/nYwarp_4arcmin/{ID_CAM}/nYwarp_4arcmin_2-50keV_1ks_{DATASET}.fits',
+        ),
+        (
+            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_6arcmin/m6arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_6arcmin/p6arcmin'),
+            f'{DIRPATH}/{NYWARP_PATH}/nYwarp_6arcmin/{ID_CAM}/nYwarp_6arcmin_2-50keV_1ks_{DATASET}.fits',
         ),
     ]
 
-    main(CASE_STUDY)
+    main(CASE_STUDY, dataset=DATASET, camID=ID_CAM, n_workers=3)
 
 
 # end

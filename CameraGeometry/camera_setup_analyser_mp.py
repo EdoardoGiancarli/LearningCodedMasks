@@ -240,6 +240,17 @@ if __name__ == '__main__':
         # (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
         # (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
 
+        # Mask warping
+        # - Y axis
+        #   * positive warp
+        (f'{simspath}/mask_warps/mask_Ywarp/plusYwarp/pYwarp_2arcmin', f'{outspath}/mask_warps/mask_Ywarp/plusYwarp/'),
+        (f'{simspath}/mask_warps/mask_Ywarp/plusYwarp/pYwarp_4arcmin', f'{outspath}/mask_warps/mask_Ywarp/plusYwarp/'),
+        (f'{simspath}/mask_warps/mask_Ywarp/plusYwarp/pYwarp_6arcmin', f'{outspath}/mask_warps/mask_Ywarp/plusYwarp/'),
+        #   * negative warp
+        (f'{simspath}/mask_warps/mask_Ywarp/negYwarp/nYwarp_2arcmin', f'{outspath}/mask_warps/mask_Ywarp/negYwarp/'),
+        (f'{simspath}/mask_warps/mask_Ywarp/negYwarp/nYwarp_4arcmin', f'{outspath}/mask_warps/mask_Ywarp/negYwarp/'),
+        (f'{simspath}/mask_warps/mask_Ywarp/negYwarp/nYwarp_6arcmin', f'{outspath}/mask_warps/mask_Ywarp/negYwarp/'),
+
         # # SDD_00 rotations
         # # - X axis
         # (f'{simspath}/sdd00_rots/sdd00_Xrot/Xrot_0.5arcmin', f'{outspath}/sdd00_rots/sdd00_Xrot'),
@@ -270,12 +281,12 @@ if __name__ == '__main__':
 
         # SDD plane positive warping
         # - Y axis
-        (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_2arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
-        (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_4arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
-        (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_6arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
+        # (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_2arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
+        # (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_4arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
+        # (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_6arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
     ]
 
-    main(CASE_STUDY)
+    main(CASE_STUDY, n_workers=2)
 
 
 # end
