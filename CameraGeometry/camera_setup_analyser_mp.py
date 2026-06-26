@@ -27,7 +27,8 @@ from IROSrec.iros.procedure import run_IROS, get_sources_database
 import imgmaker as mgm
 
 
-DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data'
+# DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data'
+DIRPATH: str = '/mnt/d/PhD_AASS/Coding/Images_fits'
 
 def check_and_pick(parent: Path, pattern: str) -> Path:
     matches = tuple(parent.glob(pattern))
@@ -130,11 +131,13 @@ def analyse_sim(
     vignetting: bool = True,
     psfy: bool = True,
     save_data: bool = True,
+    rot_coords: bool = False,
     **iros_kws: Any,
 ) -> None:
     """Runs the analysis for specified camera layout."""
     simpath, outpath = map(Path, filepaths)
     E_min, E_max = energy_range
+    rot_angle_corr = -1 * float(str(simpath.name)[5 : -6]) / 60 if rot_coords else 0   # [deg]
     wfm: CodedMaskCamera = codedmask(camera_path, *upscaling)
     out_dfs: list[pd.DataFrame] = []
 
@@ -152,7 +155,7 @@ def analyse_sim(
         ]
         phs = ds.filter_data(sdl.DLdata, E_min=None, E_max=None, coords=exclude_srcs)
 
-        detector, _ = count(wfm, phs)
+        detector, _ = count(wfm, phs, rot_angle=rot_angle_corr)
         skymap = decode(wfm, detector)
 
         log = perform_IROS(wfm, detector, max_iterations=1, camID=camID, vignetting=vignetting, psfy=psfy, **iros_kws)
@@ -181,12 +184,15 @@ def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
         sims (list[tuple[str, str]]):
             List of tuples with data directory path and respective directory path to save output CSV database.
     """
-    MASK_FITS: str = f"{DIRPATH}/Simulations/mask_NTHT_20260129_CORRECTED.fits"
-    UPS_X, UPS_Y = 5, 1
+    # MASK_FITS: str = f"{DIRPATH}/Simulations/mask_NTHT_20260129_CORRECTED.fits"
+    MASK_FITS: str = f"{DIRPATH}/mask_NTHT_20260129_CORRECTED.fits"
+    UPS_X, UPS_Y = 5, 2
 
     DATASET: str = 'detected'
     E_min: float | None = None
     E_max: float | None = None
+
+    ROT_COORDS: bool = False
 
     VIGNETTING: bool = True
     PSFY: bool = mgm.config_psfy_flag(DATASET)
@@ -200,6 +206,7 @@ def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
         energy_range=(E_min, E_max),
         vignetting=VIGNETTING,
         psfy=PSFY,
+        rot_coords=ROT_COORDS,
         **IROS_KWS,
     )
     n_workers_ = max(1, min(n_workers, multiprocessing.cpu_count() - 1))
@@ -219,8 +226,11 @@ def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
 
 if __name__ == '__main__':
 
-    simspath: str = f'{DIRPATH}/Simulations/CameraGeometry'
-    outspath: str = f'{DIRPATH}/Outputs/OutCameraGeometry'
+    # simspath: str = f'{DIRPATH}/Simulations/CameraGeometry'
+    # outspath: str = f'{DIRPATH}/Outputs/OutCameraGeometry'
+    simspath: str = f'{DIRPATH}/CameraGeometry'
+    outspath: str = f'{DIRPATH}/OutCameraGeometry'
+
     CASE_STUDY: list[str] = [
         # Baseline
         # (f'{simspath}/baseline/baseline', f'{outspath}/baseline'),
@@ -234,22 +244,11 @@ if __name__ == '__main__':
         # (f'{simspath}/mask_rots/mask_Yrot/Yrot_4arcmin', f'{outspath}/mask_rots/mask_Yrot'),
         # (f'{simspath}/mask_rots/mask_Yrot/Yrot_6arcmin', f'{outspath}/mask_rots/mask_Yrot'),
         # - Z axis
-        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-
-        # # Mask warping
-        # # - Y axis
-        # #   * positive warp
-        # (f'{simspath}/mask_warps/mask_Ywarp/plusYwarp/pYwarp_2arcmin', f'{outspath}/mask_warps/mask_Ywarp/plusYwarp/'),
-        # (f'{simspath}/mask_warps/mask_Ywarp/plusYwarp/pYwarp_4arcmin', f'{outspath}/mask_warps/mask_Ywarp/plusYwarp/'),
-        # (f'{simspath}/mask_warps/mask_Ywarp/plusYwarp/pYwarp_6arcmin', f'{outspath}/mask_warps/mask_Ywarp/plusYwarp/'),
-        # #   * negative warp
-        # (f'{simspath}/mask_warps/mask_Ywarp/negYwarp/nYwarp_2arcmin', f'{outspath}/mask_warps/mask_Ywarp/negYwarp/'),
-        # (f'{simspath}/mask_warps/mask_Ywarp/negYwarp/nYwarp_4arcmin', f'{outspath}/mask_warps/mask_Ywarp/negYwarp/'),
-        # (f'{simspath}/mask_warps/mask_Ywarp/negYwarp/nYwarp_6arcmin', f'{outspath}/mask_warps/mask_Ywarp/negYwarp/'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
 
         # # SDD_00 rotations
         # # - X axis
@@ -279,20 +278,20 @@ if __name__ == '__main__':
         # (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_30um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
         # (f'{simspath}/sdd00_shifts/sdd00_Zshift/Zshift_50um', f'{outspath}/sdd00_shifts/sdd00_Zshift'),
 
-        # SDD plane positive warping
-        # - Y axis
+        # # SDD plane positive warping
+        # # - Y axis
         # (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_2arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
         # (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_4arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
         # (f'{simspath}/sdd_plane_warps/sdd_plane_Ywarp/pYwarp_6arcmin', f'{outspath}/sdd_plane_warps/sdd_plane_Ywarp'),
 
-        # SDD plane contraption
-        # - radial contrapt
-        (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_20um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
-        (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_50um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
-        (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_100um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
+        # # SDD plane contraption
+        # # - radial contrapt
+        # (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_20um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
+        # (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_50um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
+        # (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_100um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
     ]
 
-    main(CASE_STUDY, n_workers=2)
+    main(CASE_STUDY)
 
 
 # end
