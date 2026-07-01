@@ -178,7 +178,7 @@ def default_optimiser(
             (
                 min(sx_start + camera.upscale_f.x * px_dim_x, camera.bins_sky.x[-1]),
                 min(sy_start + camera.upscale_f.y * px_dim_y, camera.bins_sky.y[-1]),
-                1.25 * sky_peak,
+                1.4 * sky_peak,
             ),
         ]
         # perform optimisation
