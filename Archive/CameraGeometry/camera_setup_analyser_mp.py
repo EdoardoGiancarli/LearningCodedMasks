@@ -27,8 +27,8 @@ from IROSrec.iros.procedure import run_IROS, get_sources_database
 import imgmaker as mgm
 
 
-# DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data'
-DIRPATH: str = '/mnt/d/PhD_AASS/Coding/Images_fits'
+DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data'
+# DIRPATH: str = '/mnt/d/PhD_AASS/Coding/Images_fits'
 
 def check_and_pick(parent: Path, pattern: str) -> Path:
     matches = tuple(parent.glob(pattern))
@@ -129,7 +129,6 @@ def analyse_sim(
     energy_range: tuple[float | None, float | None],
     camID: str = 'cam1a',
     vignetting: bool = True,
-    psfy: bool = True,
     save_data: bool = True,
     rot_coords: bool = False,
     **iros_kws: Any,
@@ -137,6 +136,7 @@ def analyse_sim(
     """Runs the analysis for specified camera layout."""
     simpath, outpath = map(Path, filepaths)
     E_min, E_max = energy_range
+    psfy: bool = mgm.config_psfy_flag(dataset)
     rot_angle_corr = -1 * float(str(simpath.name)[5 : -6]) / 60 if rot_coords else 0   # [deg]
     wfm: CodedMaskCamera = codedmask(camera_path, *upscaling)
     out_dfs: list[pd.DataFrame] = []
@@ -176,7 +176,15 @@ def analyse_sim(
 
 
 
-def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
+def main(
+    sims: list[tuple[str, str]],
+    upscaling: tuple[int, int] = (5, 2),
+    dataset: str = 'detected',
+    E_min: float | None = None,
+    E_max: float | None = None,
+    rot_coords: bool = False,
+    n_workers: int = 4,
+) -> None:
     """
     Runs LEM-X single coded-mask camera performance analysis.
 
@@ -184,29 +192,20 @@ def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
         sims (list[tuple[str, str]]):
             List of tuples with data directory path and respective directory path to save output CSV database.
     """
-    # MASK_FITS: str = f"{DIRPATH}/Simulations/mask_NTHT_20260129_CORRECTED.fits"
-    MASK_FITS: str = f"{DIRPATH}/mask_NTHT_20260129_CORRECTED.fits"
-    UPS_X, UPS_Y = 5, 2
-
-    DATASET: str = 'detected'
-    E_min: float | None = None
-    E_max: float | None = None
-
-    ROT_COORDS: bool = False
+    MASK_FITS: str = f"{DIRPATH}/Simulations/mask_NTHT_20260129_CORRECTED.fits"
+    # MASK_FITS: str = f"{DIRPATH}/mask_NTHT_20260129_CORRECTED.fits"
 
     VIGNETTING: bool = True
-    PSFY: bool = mgm.config_psfy_flag(DATASET)
     IROS_KWS: dict[str, Any] = {}
 
     worker_fn = partial(
         analyse_sim,
         camera_path=MASK_FITS,
-        upscaling=(UPS_X, UPS_Y),
-        dataset=DATASET,
+        upscaling=upscaling,
+        dataset=dataset,
         energy_range=(E_min, E_max),
         vignetting=VIGNETTING,
-        psfy=PSFY,
-        rot_coords=ROT_COORDS,
+        rot_coords=rot_coords,
         **IROS_KWS,
     )
     n_workers_ = max(1, min(n_workers, multiprocessing.cpu_count() - 1))
@@ -226,10 +225,10 @@ def main(sims: list[tuple[str, str]], n_workers: int = 4) -> None:
 
 if __name__ == '__main__':
 
-    # simspath: str = f'{DIRPATH}/Simulations/CameraGeometry'
-    # outspath: str = f'{DIRPATH}/Outputs/OutCameraGeometry'
-    simspath: str = f'{DIRPATH}/CameraGeometry'
-    outspath: str = f'{DIRPATH}/OutCameraGeometry'
+    simspath: str = f'{DIRPATH}/Simulations/CameraGeometry'
+    outspath: str = f'{DIRPATH}/Outputs/OutCameraGeometry'
+    # simspath: str = f'{DIRPATH}/CameraGeometry'
+    # outspath: str = f'{DIRPATH}/OutCameraGeometry'
 
     CASE_STUDY: list[str] = [
         # Baseline
@@ -243,12 +242,12 @@ if __name__ == '__main__':
         # # - Y axis
         # (f'{simspath}/mask_rots/mask_Yrot/Yrot_4arcmin', f'{outspath}/mask_rots/mask_Yrot'),
         # (f'{simspath}/mask_rots/mask_Yrot/Yrot_6arcmin', f'{outspath}/mask_rots/mask_Yrot'),
-        # - Z axis
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
-        (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # # - Z axis
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_0.5arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_1arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_2arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_4arcmin', f'{outspath}/mask_rots/mask_Zrot'),
+        # (f'{simspath}/mask_rots/mask_Zrot/Zrot_6arcmin', f'{outspath}/mask_rots/mask_Zrot'),
 
         # # SDD_00 rotations
         # # - X axis
@@ -289,9 +288,20 @@ if __name__ == '__main__':
         # (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_20um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
         # (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_50um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
         # (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_100um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
+
+        # SRC Phase
+        (f'{simspath}/src_phase', f'{outspath}/src_phase'),
     ]
 
-    main(CASE_STUDY)
+    main(
+        sims=CASE_STUDY,
+        upscaling=(5, 1),
+        dataset='reconstructed',
+        E_min=None,
+        E_max=None,
+        rot_coords=False,
+        n_workers=1,
+    )
 
 
 # end
