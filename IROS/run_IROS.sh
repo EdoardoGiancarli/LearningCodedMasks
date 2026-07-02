@@ -4,17 +4,22 @@ echo ""
 python IROSrec_pipeline__argparsed.py --help
 
 python IROSrec_pipeline__argparsed.py \
-    --run GC_rec_detected \
-    --skyfield GalacticCentre \
+    --run IROSbenchmrk \
+    --skyfield IROSDummy \
+    --datadir baseline_2-50keV_1ks \
+
+python IROSrec_pipeline__argparsed.py \
+    --run IROSbenchmrk_detected \
+    --skyfield IROSDummy \
     --datadir baseline_2-50keV_1ks \
     --dataset detected \
 
 python IROSrec_pipeline__argparsed.py \
-    --run GC_rec_detected_2-6keV \
-    --skyfield GalacticCentre \
+    --run IROSbenchmrk_detected_2-5keV \
+    --skyfield IROSDummy \
     --datadir baseline_2-50keV_1ks \
     --dataset detected \
-    --energy_range 2.0 6.0 \
+    --energy_range 2.0 5.0 \
 
 echo ""
 echo "Finished IROS sky-field reconstruction(s)!"
