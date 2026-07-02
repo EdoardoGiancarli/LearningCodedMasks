@@ -65,7 +65,7 @@ def main() -> None:
     parser.add_argument(
         "--datadir",
         type=str,
-        help="Directory with FITS output files from WISEMAN.",
+        help="Directory name with FITS output files from WISEMAN.",
     )
     parser.add_argument(
         "--dataset_type",
@@ -109,7 +109,7 @@ def main() -> None:
         help="Photons energy filter range, in [keV] (e.g., --energy_range 2.0 50.0, default: %(default)s).",
     )
     parser.add_argument(
-        "--photon_coords",
+        "--photons_coords",
         nargs='*',
         type=float,
         default=None,
@@ -202,11 +202,11 @@ def main() -> None:
         start_ups=(args.up_fine, args.up_coarse),
         final_ups=(args.up_fine, args.up_coarse),
         analysisID=args.run,
-        iros_max_iterations=args.max_iterations,
-        iros_snr_threshold=args.snr_threshold,
-        sky_compositions=args.module_sky_composition,
+        iros_max_iterations=args.max_iters,
+        iros_snr_threshold=args.snr_thresh,
+        sky_compositions=args.compose_unit,
         smoothing=args.smoothing,
-        smoothing_thresh=args.smoothing_snr_threshold,
+        smoothing_thresh=args.smoothing_snr_thresh,
         smoothing_baseline_recnstr=args.baseline_irosrec,
         energy_range=energy_range,
         coords=parsed_coords,
