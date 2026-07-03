@@ -577,7 +577,7 @@ class TestMaskVignetting(TestCase):
     def setUp(self):
         BASEPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations'
         #BASEPATH: str = '/mnt/d/PhD_AASS/Coding/Images_fits'
-        MASK_FITS: str = "wfm_mask_NTHT_20260129_CORRECTED.fits"
+        MASK_FITS: str = "mask_NTHT_20260129_CORRECTED.fits"
 
         UPS_X: int = 5
         UPS_Y: int = 1
