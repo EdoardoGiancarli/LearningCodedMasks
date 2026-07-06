@@ -4,25 +4,14 @@ echo ""
 python IROSrec_pipeline__argparsed.py --help
 
 python IROSrec_pipeline__argparsed.py \
-    --run IROSbenchmrk___oldVignetting \
-    --skyfield IROSDummy \
-    --datadir baseline_2-50keV_1ks \
-    --max_iters 15 \
-
-python IROSrec_pipeline__argparsed.py \
-    --run IROSbenchmrk_detected___oldVignetting \
-    --skyfield IROSDummy \
-    --datadir baseline_2-50keV_1ks \
-    --dataset detected \
-    --max_iters 15 \
-
-python IROSrec_pipeline__argparsed.py \
-    --run IROSbenchmrk_detected_2-5keV___oldVignetting \
+    --run IROSbenchmrk_detected_smoothed \
     --skyfield IROSDummy \
     --datadir baseline_2-50keV_1ks \
     --dataset detected \
     --energy_range 2.0 5.0 \
-    --max_iters 15 \
+    --smoothing \
+    --smoothing_snr_thresh 40 \
+    --baseline_irosrec '/mnt/d/PhD_AASS/Coding/Images_fits/IROSbenchmrk_detected/' \
 
 echo ""
 echo "Finished IROS sky-field reconstruction(s)!"
