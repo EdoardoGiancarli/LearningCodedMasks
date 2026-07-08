@@ -4,51 +4,22 @@ echo ""
 python IROSrec_pipeline__argparsed.py --help
 
 python IROSrec_pipeline__argparsed.py \
-   --run GC_upx5upy1_detected_2-6keV_noVignetting \
+   --run GC_upx5upy1_detected_2-6keV_noSCOX1 \
    --skyfield GalacticCentre \
    --datadir baseline_2-50keV_1ks \
    --dataset detected \
    --up_fine 5 \
    --energy_range 2.0 6.0 \
-   --thin_mask \
+   --photons_coords 244.979705810547 -15.6400995254517 \
 
 python IROSrec_pipeline__argparsed.py \
-   --run GC_upx5upy1_detected_2-6keV \
-   --skyfield GalacticCentre \
+   --run IROSbenchmrk_upx5upy1_detected_2-5keV_noS17 \
+   --skyfield IROSDummy \
    --datadir baseline_2-50keV_1ks \
    --dataset detected \
    --up_fine 5 \
-   --energy_range 2.0 6.0 \
-
-python IROSrec_pipeline__argparsed.py \
-   --run GC_upx5upy1_detected \
-   --skyfield GalacticCentre \
-   --datadir baseline_2-50keV_1ks \
-   --dataset detected \
-   --up_fine 5 \
-
-python IROSrec_pipeline__argparsed.py \
-   --run GC_upx5upy1_2-6keV \
-   --skyfield GalacticCentre \
-   --datadir baseline_2-50keV_1ks \
-   --up_fine 5 \
-   --energy_range 2.0 6.0 \
-
-python IROSrec_pipeline__argparsed.py \
-   --run GC_upx5upy1 \
-   --skyfield GalacticCentre \
-   --datadir baseline_2-50keV_1ks \
-   --up_fine 5 \
-
-#python IROSrec_pipeline__argparsed.py \
-#    --run IROSbenchmrk_detected_smoothed \
-#    --skyfield IROSDummy \
-#    --datadir baseline_2-50keV_1ks \
-#    --dataset detected \
-#    --energy_range 2.0 5.0 \
-#    --smoothing \
-#    --smoothing_snr_thresh 40 \
-#    --baseline_irosrec '/mnt/d/PhD_AASS/Coding/Images_fits/IROSbenchmrk_detected/' \
+   --energy_range 2.0 5.0 \
+   --photons_coords 239.824508666992 -54.0559692382813 \
 
 echo ""
 echo "Finished IROS sky-field reconstruction(s)!"
