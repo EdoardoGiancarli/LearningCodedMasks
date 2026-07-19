@@ -53,17 +53,17 @@ DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks_mask25"      # di
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "reconstructed"
+DATASET: str = "detected"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
 UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisation
 UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "GC_IROS_doubleCam_rec_mask25"
+ANALYSIS_ID: str = "GC_IROS_doubleCam_rec_detected_2-6keV_UPX5_mask25"
 
 #### --- IROS SETUP
 MAX_ITERATIONS: int = 25
@@ -73,7 +73,7 @@ WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joine
 
 #### --- DATA FILTERS SETUP
 # photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = (2.0, 50.0)
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = (2.0, 6.0)
 # RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 
