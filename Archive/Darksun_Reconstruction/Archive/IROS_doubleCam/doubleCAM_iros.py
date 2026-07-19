@@ -139,7 +139,7 @@ def iros(
         ax, ay = camera.bins_sky.x[a[1]], camera.bins_sky.y[a[0]]
         # we apply -90deg rotation to camera b source
         bx, by = -camera.bins_sky.y[b[0]], camera.bins_sky.x[b[1]]
-        min_slit = min(camera.mdl["slit_deltax"], camera.mdl["slit_deltay"])
+        min_slit = min(camera.specs.slit_deltax, camera.specs.slit_deltay)
         return abs(ax - bx) < min_slit and abs(ay - by) < min_slit
 
     def match(pending: tuple) -> tuple:
@@ -250,6 +250,7 @@ def iros(
                 arg_sky=arg,
                 vignetting=vignetting,
                 psfy=psfy,
+                verbose=True,
             )
         except Exception as e:
             raise RuntimeError(f"Optimization failed: {str(e)}") from e

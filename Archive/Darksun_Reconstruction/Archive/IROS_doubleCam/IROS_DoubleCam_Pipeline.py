@@ -35,7 +35,7 @@ TODO:
     - WARNING: new-sources association must be updated to consider repeating same new-source
 """
 
-from IROS._pipeline_config import run_pipeline
+from IROS_doubleCam._pipeline_config import run_pipeline
 from typing import Sequence
 from bloodmoon.types import CoordEquatorial
 
@@ -44,47 +44,43 @@ from bloodmoon.types import CoordEquatorial
 PIPELINE SET-UP.
 """
 #### --- WIDE FIELD MONITOR MASK
-#MASK_FITS: str = "wfm_mask_summer2021.fits"
-MASK_FITS: str = "wfm_mask_NTHT_20250725.fits"
+MASK_FITS: str = "mask_NTHT_20250725.fits"
 THIN_MASK: bool = False                           # selects if infinitely opaque and thin mask (removes vignetting effects)
 
 #### --- OBSERVATION DATA
-SKYFIELD: str = "GalacticCenter"                                            # skyfield selection
-DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks"      # directory with FITS files from WFM
-
-#SKYFIELD: str = "IROSDummy"
-#DATA_FITS: str = "catalog_withCXB_1Crab_infdet_2-50keV_1ks"
+SKYFIELD: str = "GalacticCentre"                                            # skyfield selection
+DATA_FITS: str = "galctr_rxte-sax_mask_050_1040x17_2-50keV_1ks_mask25"      # directory with FITS files from WFM
 
 ID_CAMERA_A: str = "cam1a"
 ID_CAMERA_B: str = "cam1b"
-DATASET: str = "detected"
+DATASET: str = "reconstructed"
 
 #### --- IMAGES UPSCALING
-UPSX_0: int = 5                     # initial upscaling (with which IROS is performed)
+UPSX_0: int = 2                     # initial upscaling (with which IROS is performed)
 UPSY_0: int = 1
 
-UPSX_FINAL: int = 5                 # final upscaling for skies and visualisation
-UPSY_FINAL: int = 1
+UPSX_FINAL: int = UPSX_0            # final upscaling for skies and visualisation
+UPSY_FINAL: int = UPSY_0
 
 #### --- ANALYSIS ID
-ANALYSIS_ID: str = "testing"
+ANALYSIS_ID: str = "GC_IROS_doubleCam_rec_mask25"
 
 #### --- IROS SETUP
-MAX_ITERATIONS: int = 20
+MAX_ITERATIONS: int = 25
 SNR_THRESHOLD: int | float = 5
 
-WFM_SKY_COMPOSITION: bool = True   # selects if the WFM cameras are to be joined to get the composed sky
+WFM_SKY_COMPOSITION: bool = False   # selects if the WFM cameras are to be joined to get the composed sky
 
 #### --- DATA FILTERS SETUP
 # photons energy filter - [keV]
-PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = None
+PHOTONS_ENERGY_RANGE: tuple[int | float | None, int | float | None] | None = (2.0, 50.0)
 # RA/Dec filter (sources to filter out) - [deg]
 PHOTONS_COORDS: CoordEquatorial | Sequence[CoordEquatorial] | None = None
 
 # number of sources in the catalog for comparison
 CATALOGUE_NUM_BRIGHT_SOURCES: int | tuple[int, int] | None = None
 # sources flux filter for the catalog comparison - [ph/cm2/s]
-CATALOGUE_FLUX_RANGE: tuple[int | float | None, int | float | None] | None = (1e-2, None)
+CATALOGUE_FLUX_RANGE: tuple[int | float | None, int | float | None] | None = (None, None)
 
 
 

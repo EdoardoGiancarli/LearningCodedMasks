@@ -177,14 +177,12 @@ def run(params: PipelineParams) -> None:
                 camera=wfm,
                 sdl=sdlA,
                 vignetting=params.vignetting,
-                psfy=params.psfy,
             )
             log_camB = ds.compute_parameters(
                 log=log_camB,
                 camera=wfm,
                 sdl=sdlB,
                 vignetting=params.vignetting,
-                psfy=params.psfy,
             )
             ds.save_database(
                 log_camA=log_camA,
