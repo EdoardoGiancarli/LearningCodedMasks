@@ -273,6 +273,7 @@ def model_shadowgram(
     shift_y: float,
     vignetting: bool | Callable[[CodedMaskCamera, npt.NDArray, float, float], npt.NDArray] = True,
     psfy: bool | Callable[[CodedMaskCamera, npt.NDArray], npt.NDArray] = True,
+    normalise: bool = True,
 ) -> npt.NDArray:
     """
     Generates a normalized shadowgram for a point source.
@@ -286,14 +287,15 @@ def model_shadowgram(
         camera: CodedMaskCamera instance containing all geometric parameters
         shift_x: Source position x-coordinate in sky-shift space (mm)
         shift_y: Source position y-coordinate in sky-shift space (mm)
-        vignetting: simulates vignetting effects
-        psfy: simulates detector reconstruction effects
+        vignetting: Simulates vignetting effects
+        psfy: Simulates detector reconstruction effects
+        normalise: Normalises modelled shadowgram profile
 
     Returns:
         2D array representing the modeled detector image from the source
 
     Notes:
-        * Results are normalized, i.e. sums up to one.
+        * Results are normalised by default, i.e. sums up to one.
     """
     for key, val in {'vignetting': vignetting, 'psfy': psfy}.items():
         if not (isinstance(val, bool) or callable(val)):
@@ -305,7 +307,7 @@ def model_shadowgram(
         camera, mask_shifted, shift_x, shift_y, vignetting, psfy,
     )
     # extract normalised source detector image
-    detector = _extract_detector(camera, mask_projected)
+    detector = _extract_detector(camera, mask_projected, normalise=normalise)
     return detector
 
 
@@ -331,8 +333,8 @@ def model_sky(
         shift_x: Source position x-coordinate in sky-shift space (mm)
         shift_y: Source position y-coordinate in sky-shift space (mm)
         fluence: Source intensity/fluence value
-        vignetting: simulates vignetting effects
-        psfy: simulates detector reconstruction effects
+        vignetting: Simulates vignetting effects
+        psfy: Simulates detector reconstruction effects
 
     Returns:
         2D array representing the modeled sky reconstruction after all effects
