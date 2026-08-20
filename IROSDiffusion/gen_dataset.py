@@ -226,7 +226,7 @@ def generate_in_step(
         # generate data
         data: Dataset = generate_data(camera, coords, rates, vignetting, psfy, psf_crp, rng)
         # gather data to make dataset and save
-        save_to: str = f"{save_to_dirpath}/test_dataset_ID{start_from_ID + step}_nels{batch}.pt"
+        save_to: str = f"{save_to_dirpath}/test_dataset_ID{start_from_ID + step}_nels{batch}.pickle"
         dataset: dict[str, Any] = gather_dataset(camera, data)
         save_dataset(dataset, save_to)
 
@@ -235,7 +235,24 @@ def generate_in_step(
 
 
 
-if __name__ == '__main__':
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--batches",
+        nargs='*',
+        type=int,
+        help="Number of arrays to generate at each batch. Pass as sequence of integers, e.g.: 100 2000 500 ...",
+    )
+    parser.add_argument(
+        "--start_from_ID",
+        type=int,
+        default=1,
+        help="Determines start ID number for output dataset file (default: %(default)s).",
+    )
+    args = parser.parse_args()
+
 
     BASE_PATH: str = "/mnt/d/PhD_AASS/Coding/Images_fits"
 
@@ -256,8 +273,8 @@ if __name__ == '__main__':
     rnd_gen: Generator = np.random.default_rng()
 
     # config dataset generation
-    start_from_ID: int = 1
-    batches: int | tuple[int, int] = 1000
+    batches: int | tuple[int, int] = tuple(args.batches)
+    start_from_ID: int = args.start_from_ID
 
     # generate data
     generate_in_step(
@@ -269,6 +286,11 @@ if __name__ == '__main__':
         psfy=PSFY,
         rng=rnd_gen,
     )
+    return
+
+
+if __name__ == '__main__':
+    main()
 
 
 # end
