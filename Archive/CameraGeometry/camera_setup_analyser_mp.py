@@ -225,8 +225,8 @@ def main(
 
 if __name__ == '__main__':
 
-    simspath: str = f'{DIRPATH}/Simulations/CameraGeometry'
-    outspath: str = f'{DIRPATH}/Outputs/OutCameraGeometry'
+    simspath: str = f'{DIRPATH}/Simulations/GECO'
+    outspath: str = f'{DIRPATH}/Outputs/OutGECO'
     # simspath: str = f'{DIRPATH}/CameraGeometry'
     # outspath: str = f'{DIRPATH}/OutCameraGeometry'
 
@@ -289,18 +289,21 @@ if __name__ == '__main__':
         # (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_50um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
         # (f'{simspath}/sdd_plane_contrapts/sdd_plane_radial_contr/radial_contr_100um', f'{outspath}/sdd_plane_contrapts/sdd_plane_radial_contr'),
 
-        # SRC Phase
-        (f'{simspath}/src_phase', f'{outspath}/src_phase'),
+        # # SRC Phase
+        # (f'{simspath}/src_phase', f'{outspath}/src_phase'),
+
+        # GECO Sensitivity Map
+        (f'{simspath}/crab_semigrid_2-50keV_1ks', f'{outspath}/crab_semigrid_2-50keV_1ks'),
     ]
 
     main(
         sims=CASE_STUDY,
-        upscaling=(5, 1),
+        upscaling=(10, 4),
         dataset='reconstructed',
-        E_min=None,
-        E_max=None,
+        E_min=2.0,
+        E_max=10.0,
         rot_coords=False,
-        n_workers=1,
+        n_workers=2,
     )
 
 
