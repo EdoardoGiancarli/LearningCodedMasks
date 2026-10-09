@@ -3,13 +3,22 @@ echo ""
 
 uv run IROSrec_pipeline__argparsed.py --help
 
-uv run IROSrec_pipeline__argparsed.py \
-   --run IROSbncmrk_detected_1ks_upx2_infdense_NewSGNorm_mask25 \
-   --skyfield IROSDummy \
-   --datadir iros_benchmark_2-50keV_mask_050_1040x17_infdet_1ks_mask25 \
-   --dataset detected \
-   --mask_pattern mask_NTHT_20250725.fits \
-   # --up_fine 5 \
+# uv run IROSrec_pipeline__argparsed.py \
+#    --run Crab_rec_1ks_2-50keV \
+#    --skyfield IROSDummy \
+#    --datadir baseline_2-50keV_1ks \
+#    --energy_range 2.0 50.0 \
+#    --hide_bulk_els_y 1.5 \
+#    --max_iters 3 \
+
+# uv run IROSrec_pipeline__argparsed.py \
+#    --run Crab_rec_1ks_2-6keV \
+#    --skyfield IROSDummy \
+#    --datadir baseline_2-50keV_1ks \
+#    --energy_range 2.0 6.0 \
+#    --hide_bulk_els_y 1.5 \
+#    --max_iters 3 \
+   
 
 # uv run IROSrec_pipeline__argparsed.py \
 #    --run GC_smoothed_rec_1ks_upx5_mask25 \
