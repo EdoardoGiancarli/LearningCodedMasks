@@ -86,6 +86,18 @@ def main() -> None:
         default=1,
         help="Upsampling factor along the coarse camera axis (default: %(default)s).",
     )
+    parser.add_argument(
+        "--hide_bulk_els_x",
+        type=float,
+        default=0.0,
+        help="Bulk elements to mask in [mm] along the fine camera axis, accounting for artefacts (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--hide_bulk_els_y",
+        type=float,
+        default=0.0,
+        help="Bulk elements to mask in [mm] along the coarse camera axis, accounting for artefacts (default: %(default)s).",
+    )
     # - IROS setup args
     parser.add_argument(
         "--max_iters",
@@ -201,6 +213,7 @@ def main() -> None:
         dataset=args.dataset_type,
         start_ups=(args.up_fine, args.up_coarse),
         final_ups=(args.up_fine, args.up_coarse),
+        hide_bulk_els=(args.hide_bulk_els_x, args.hide_bulk_els_y),
         analysisID=args.run,
         iros_max_iterations=args.max_iters,
         iros_snr_threshold=args.snr_thresh,

@@ -63,7 +63,8 @@ def run(params: PipelineParams) -> None:
                 mask_filepath=params.analysis_params.mask_file,
                 upscale_x=UPSX_0,
                 upscale_y=UPSY_0,
-                # hide_bulk_els_y=1.5,
+                hide_bulk_els_x=params.analysis_params.hide_bulk_els[0],
+                hide_bulk_els_y=params.analysis_params.hide_bulk_els[1],
             )
             filepaths = simulation_files(params.analysis_params.simul_data)
             sdlA = ds.get_data(
@@ -90,7 +91,8 @@ def run(params: PipelineParams) -> None:
                     mask_filepath=params.analysis_params.mask_file,
                     upscale_x=UPSX_FINAL,
                     upscale_y=UPSY_FINAL,
-                    # hide_bulk_els_y=1.5,
+                    hide_bulk_els_x=params.analysis_params.hide_bulk_els[0],
+                    hide_bulk_els_y=params.analysis_params.hide_bulk_els[1],    
                 )
                 wcs_fit = tuple(ds.fit_WCS(wfm_WCS, sdl) for sdl in sdls)
         
@@ -292,6 +294,7 @@ def run_pipeline(
     dataset: str,
     start_ups: tuple[int, int],
     final_ups: tuple[int, int],
+    hide_bulk_els: tuple[float, float],
     analysisID: str | None,
     iros_max_iterations: int = 20,
     iros_snr_threshold: int | float = 5,
@@ -317,6 +320,7 @@ def run_pipeline(
         dataset=dataset,
         start_ups=start_ups,
         final_ups=final_ups,
+        hide_bulk_els=hide_bulk_els,
         analysisID=analysisID,
         iros_max_iterations=iros_max_iterations,
         iros_snr_threshold=iros_snr_threshold,

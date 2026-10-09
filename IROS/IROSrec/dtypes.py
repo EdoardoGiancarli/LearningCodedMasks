@@ -23,6 +23,7 @@ class AnalysisParams:
     dataset: str
     start_ups: tuple[int, int]
     final_ups: tuple[int, int]
+    hide_bulk_els: tuple[float, float]
     sky_compositions: bool
 
 
