@@ -35,12 +35,12 @@ def model_shadowgram(
     psfy: bool | Callable[[CodedMaskCamera, npt.NDArray], npt.NDArray] = True,
 ) -> npt.NDArray:
     """
-    Generates a normalized shadowgram for a point source.
+    Generates shadowgram for a point-like source.
 
     The model may feature:
     - Mask pattern projection
-    - Vignetting effects
-    - PSF convolution over y axis
+    - Coded-mask *vignetting* effect
+    - Detector spatial resolution effects along camera coarse axis
 
     Args:
         camera: CodedMaskCamera instance containing all geometric parameters
@@ -51,9 +51,6 @@ def model_shadowgram(
 
     Returns:
         2D array representing the modeled detector image from the source
-
-    Notes:
-        * Results are normalized, i.e. sums up to one.
     """
     for key, val in {'vignetting': vignetting, 'psfy': psfy}.items():
         if not (isinstance(val, bool) or callable(val)):
