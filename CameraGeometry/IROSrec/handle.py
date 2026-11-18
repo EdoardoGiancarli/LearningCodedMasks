@@ -180,6 +180,7 @@ def save_pipeline_params(
         f'#     - `module_cameras` contains the ID for the two coded-mask cameras of the LEM-X module;\n'
         f'#     - `dataset` is the photons reconstruction logic-type of the data;\n'
         f'#     - `start_ups` and `final_ups` are the starting and final images upsampling factors in the (fine, coarse) directions;\n'
+        f'#     - `hide_bulk_els` [mm] are the masked bulk elements along (fine, coarse) directions to account for artefacts;\n'
         f'#     - `iros_max_iterations` is the max number of IROS iterations;\n'
         f'#     - `iros_snr_threshold` is the significance threshold for the candidates validation;\n'
         f'#     - `sky_compositions` is a flag for the cameras sky images composition;\n'
@@ -218,6 +219,7 @@ def config_parameters(
     dataset: str,
     start_ups: tuple[int, int],
     final_ups: tuple[int, int],
+    hide_bulk_els: tuple[float, float],
     analysisID: str | None,
     iros_max_iterations: int,
     iros_snr_threshold: int | float,
@@ -272,6 +274,7 @@ def config_parameters(
         dataset=dataset,
         start_ups=start_ups,
         final_ups=final_ups,
+        hide_bulk_els=hide_bulk_els,
         sky_compositions=sky_compositions,
     )
     # - IROS params
@@ -306,6 +309,7 @@ def config_parameters(
             f"  - Psfy: {psfy}\n"
             f"  - Starting upscaling (x, y): {start_ups}\n"
             f"  - Final upscaling (x, y): {final_ups}\n"
+            f"  - Bulk artefact mask (x, y) [mm]: {hide_bulk_els}\n"
             f"  - Max IROS iteration: {iros_max_iterations}\n"
             f"  - Sky compositions: {sky_compositions}\n"
             f"  - Detector BKG smoothing: {smoothing}\n"

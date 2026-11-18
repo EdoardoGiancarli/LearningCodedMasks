@@ -170,29 +170,25 @@ def crop(
         - Negative indexes for `pos` are allowed.
     """
     n, m = image.shape
-    y, x = pos
     cy, cx = crp
-    boundary_x = (
-        ((0 <= x - cx) and (x + cx < m - 1)) or ((cx - x <= m - 1) and (x + cx < 0))
-    )
-    boundary_y = (
-        ((0 <= y - cy) and (y + cy < n - 1)) or ((cy - y <= n - 1) and (y + cy < 0))
-    )
 
-    if (cy <= 0) or (cx <= 0):
+    if (cy < 0) or (cx < 0):
         raise ValueError("Cropping must be a tuple of positive integers.")
-    if not (boundary_x and boundary_y):
+
+    y = pos[0] + n if pos[0] < 0 else pos[0]
+    x = pos[1] + m if pos[1] < 0 else pos[1]
+
+    boundary_y = ((0 <= y - cy) and (y + cy < n))
+    boundary_x = ((0 <= x - cx) and (x + cx < m))
+    if not (boundary_y and boundary_x):
+        msg = f'Cropping {crp} at pos {pos} exceeds tensor edges'
         if not strict:
-            # the crop extends up to the 2nd row/col from top/bottom/left/right
-            if not boundary_x:
-                cx = min(x - 2, m - x - 3) if x > 0 else min(x + m + 2, -x - 2)
-            if not boundary_y:
-                cy = min(y - 2, n - y - 3) if y > 0 else min(y + n + 2, -y - 2)
-            print(f"Cropping {crp} at pos {pos} exceeds array edges, new cropping: {cy, cx}.")
+            cy, cx = min(y, n - y - 1), min(x, m - x - 1)
+            print(f'UserInfo: {msg}, new cropping: {cy, cx}.')
         else:
-            raise IndexError(f"Cropping {crp} at pos {pos} exceeds array edges.")
-    
-    return image[y - cy : y + cy + 1, x - cx : x + cx + 1]
+            raise IndexError(msg + '.')
+
+    return image[..., y - cy : y + cy + 1, x - cx : x + cx + 1]
 
 
 def unframe(
