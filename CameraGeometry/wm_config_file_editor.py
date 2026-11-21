@@ -34,6 +34,12 @@ SDD_PLANE_WARP_DMAP: dict[str, dict[str, int]] = {
     'z': {'00': 1, '10': -1, '01': -1, '11': 1},
 }
 
+def arcmin2deg(val: float, unit: str) -> float:
+    return val if unit == 'deg' else val / 60
+
+def micron2mm(val: float, unit: str) -> float:
+    return val if unit == 'mm' else 1e-3 * val
+
 @dataclass(frozen=True)
 class SimType:
     """Camera geometry simulation type to be performed by WISEMAN."""
@@ -48,13 +54,7 @@ class SimType:
         if self.value[-1] not in avail_units:
             raise ValueError(f"Invalid effect unit '{self.value[-1]}', must be in {avail_units}")
 
-def arcmin2deg(val: float, unit: str) -> float:
-    return val if unit == 'deg' else val / 60
-
-def micron2mm(val: float, unit: str) -> float:
-    return val if unit == 'mm' else 1e-3 * val
-
-# -----------   I/O helpers   -----------
+# -----------   I/O operators   -----------
 
 def load_json(filepath: str | Path) -> dict[str, Any]:
     with open(filepath, 'r') as f:
