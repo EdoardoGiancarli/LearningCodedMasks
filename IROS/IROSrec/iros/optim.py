@@ -70,7 +70,7 @@ def solver(
             f'  - procedure msg: {msg}\n'
             f'  - success status {iflag}: {routine_status[iflag - 1]}\n'
         )
-    return OptResult(popt, errs)
+    return OptResult(popt, pcov)
 
 
 def default_optimiser(
