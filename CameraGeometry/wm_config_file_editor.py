@@ -373,49 +373,44 @@ def config_wmsim(
 
 if __name__ == '__main__':
 
-    mask_fpath: str = (
-        '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/mask_NTHT_20260129_CORRECTED.fits'
-    )
-    # tree_path: str = "/mnt/d/PhD_AASS/Coding/Images_fits/cam_geom_wmsims"
-    tree_path: str = "/home/edoardo/Desktop/cam_geom_wmsims"
+    # basepath: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding'
+    basepath: str = '/mnt/d/PhD_AASS/Coding/Images_fits'
+    
+    sims_parent: str = f'{basepath}/cam_geom_wmsims'
+    mask_fpath: str = f'{basepath}/mask_NTHT_20260129_CORRECTED.fits'
 
     simtypes: list[SimType] = []
 
     # ---------   MASK   ---------
     # --- ROTATIONS
+    vals: list[float] = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0]  # [arcmin]
+    simtypes += [
+        SimType('mask', 'rots', 'y', (val, 'arcmin')) for val in vals
+    ]
+    simtypes += [
+        SimType('mask', 'rots', 'z', (val, 'arcmin')) for val in vals
+    ]
+    # --- PLATE WARPING
+    vals += [-v for v in vals]
+    simtypes += [
+        SimType('mask', 'warps', 'y', (val, 'arcmin'), mask_fpath=mask_fpath) for val in vals
+    ]
+    # ---------   DETECTOR PLANE   ---------
+    # --- DEFORMATIONS
+    vals = [25.0, 50.0, 75.0, 100.0]  # [micron]
+    simtypes += [
+        *[SimType('sdd', 'plane_deforms', 'x', (val, 'micron'), sddplane_deform='external') for val in vals],
+        *[SimType('sdd', 'plane_deforms', 'x', (val, 'micron'), sddplane_deform='internal') for val in vals],
+        *[SimType('sdd', 'plane_deforms', 'x', (val, 'micron'), sddplane_deform='slide') for val in vals],
+        *[SimType('sdd', 'plane_deforms', 'x', (val, 'micron'), sddplane_deform='trapez') for val in vals],
+    ]
+    # --- IN-PLANE SDD ROTATIONS
+    vals = [1.0, 2.0, 3.0, 4.0]  # [arcmin]
+    simtypes += [
+        SimType('sdd', 'plane_inrots', 'z', (val, 'arcmin')) for val in vals
+    ]
 
-    simtypes = (
-        SimType('sdd', 'plane_deforms', 'x', (-1, 'mm')),
-        SimType('sdd', 'plane_deforms', 'y', (1, 'mm')),
-        SimType('sdd', 'plane_deforms', 'y', (1, 'mm'), sddplane_deform='trapez'),
-        
-        SimType('sdd', 'plane_inrots', 'z', (1, 'deg')),
-        SimType('sdd', 'plane_inrots', 'x', (-1, 'deg')),
-
-        SimType('mask', 'warps', 'x', (6, 'arcmin'), mask_fpath=mask_fpath),
-
-        # SimType('mask', 'rots', 'x', (-1, 'deg')),
-        # SimType('mask', 'rots', 'y', (6, 'arcmin')),
-        # SimType('mask', 'rots', 'z', (-2, 'arcmin')),
-
-        # SimType('mask', 'warps', 'y', (2, 'arcmin')),
-        # SimType('mask', 'warps', 'y', (-2, 'arcmin')),
-        # SimType('mask', 'warps', 'y', (-0.1, 'deg')),
-
-        # SimType('mask', 'shifts', 'z', (1, 'mm')),
-        # SimType('mask', 'expans', 'z', (1, 'mm')),
-
-        # SimType('sdd', 'shifts', 'x', (100, 'micron')),
-        # SimType('sdd', 'shifts', 'y', (1, 'mm')),
-        # SimType('sdd', 'plane_expans', 'radial', (10, 'mm')),
-        # SimType('sdd', 'plane_expans', 'radial', (-10, 'mm')),
-        # SimType('sdd', 'rots', 'x', (6 / 60, 'arcmin')),
-        # SimType('sdd', 'rots', 'y', (6 / 60, 'arcmin')),
-        # SimType('sdd', 'plane_warps', 'x', (6 / 60, 'arcmin')),
-        # SimType('sdd', 'plane_warps', 'y', (6 / 60, 'arcmin')),
-        # SimType('sdd', 'plane_warps', 'y', (-6 / 60, 'arcmin')),
-    )
-    config_wmsim(tree_path, simtypes)
+    config_wmsim(sims_parent, simtypes)
 
 
 # end
