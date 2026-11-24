@@ -5,6 +5,7 @@ Script for WISEMAN configuration files editing/generation.
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
+from itertools import product
 import json
 import math
 from pathlib import Path
@@ -26,22 +27,77 @@ HALFMASK_PROJ_WARP_DMAP = {
     'x': 'Y',
     'y': 'X',
 }
-# map for single-SDD rotation directions along given plane axis for detector plane
-# warping; +1 is relative to an anti-clockwise rotation, -1 to a clockwise one
+# map for single-SDD rotation directions along given plane axis for detector
+# plane warping; -1/+1 refers to clockwise/anti-clockwise rotation
 SDD_PLANE_WARP_DMAP: dict[str, dict[str, int]] = {
     'x': {'00': -1, '10': -1, '01': 1, '11': 1},
     'y': {'00': 1, '10': -1, '01': 1, '11': -1},
     'z': {'00': 1, '10': -1, '01': -1, '11': 1},
 }
+# map for detector plane deformation cases, with per-axis weights
+# [x axis, y axis], and with -1/+1 referring to neg/pos shifts
+SDD_PLANE_DEFORMS_DMAP: dict[str, list[dict[str, int]]] = {
+    'external': [
+        {'00': -1, '10': 1, '01': -1, '11': 1},
+        {'00': -1, '10': -1, '01': 1, '11': 1},
+    ],
+    'internal': [
+        {'00': 1, '10': -1, '01': 1, '11': -1},
+        {'00': 1, '10': 1, '01': -1, '11': -1},
+    ],
+    'slide': [
+        {'00': -1, '10': -1, '01': 1, '11': 1},
+        {'00': 1, '10': -1, '01': 1, '11': -1},
+    ],
+    'trapez': [
+        {'00': -1, '10': 1, '01': 1, '11': -1},
+        {'00': 1, '10': -1, '01': -1, '11': 1},
+    ],
+}
 
 @dataclass(frozen=True)
 class SimType:
-    """Camera geometry simulation type to be performed by WISEMAN."""
+    """
+    Camera geometry simulation type to be performed by WISEMAN.
+
+    Attributes:
+        level (str):
+            Target subsystem (`'mask'` or `'sdd'`).
+        stype (str):
+            Geometry perturbation type (e.g., `'rots'`, `'shifts'`, `'warps'`,
+            `'plane_expans'`, `'plane_deforms'`, `'plane_inrots'`, `'plane_warps'`).
+        axis (str):
+            Reference axis or mode (`'x'`, `'y'`, `'z'`, or `'radial'`).
+        value (tuple[float, str]):
+            Perturbation magnitude and unit as `(amount, unit)`. Supported units
+            are `'deg'`, `'arcmin'`, `'mm'`, and `'micron'`.
+        sddID (str, optional=`'00'`):
+            Target SDD identifier (`'00'`, `'10'`, `'01'`, `'11'`) for single-SDD
+            operations (`'rots'`, `'shifts'`).
+        sddplane_deform (str, optional=`'external'`):
+            Detector plane deformation pattern (`'external'`, `'internal'`,
+            `'slide'`, or `'trapez'`) used when `stype='plane_deforms'`.
+        rm_sdd_inrots (tuple[str, ...], optional=`()`):
+            Sign combinations to exclude when `stype='plane_inrots'`, formatted
+            as comma-separated strings (e.g., `('1,1,1,1', '-1,-1,-1,-1')`)
+            mapping `-1`/`+1` to clockwise/anti-clockwise rotations across
+            `('00', '10', '01', '11')`.
+        mask_fpath (str | Path, optional=`""`):
+            Optional override path to the coded-mask pattern FITS file used
+            when `level='mask'` and `stype='warps'`. If empty, falls back to
+            `mask.maskPatternFile` in the baseline JSON.
+
+    Raises:
+        ValueError: If `value[1]` is not one of the supported physical units.
+    """
     level: str
     stype: str
     axis: str
     value: tuple[float, str]
     sddID: str = '00'
+    sddplane_deform: str = 'external'
+    rm_sdd_inrots: tuple[str, ...] = ()
+    mask_fpath: str | Path = ""
 
     def __post_init__(self) -> None:
         avail_units = ('deg', 'arcmin', 'mm', 'micron')
@@ -115,7 +171,11 @@ def edit_config_for_mask_rots(data: dict[str, Any], st: SimType) -> Iterator[tup
     update_maskRot(data, AXIS_DMAP[st.axis], val)
     yield "", data
 
-def edit_config_for_mask_warps(data: dict[str, Any], st: SimType, ext: int = 2) -> Iterator[tuple[str, dict]]:
+def edit_config_for_mask_warps(
+    data: dict[str, Any],
+    st: SimType,
+    ext: int = 2,
+) -> Iterator[tuple[str, dict]]:
     """
     Edits baseline camera parameters data to account for coded-mask plate warping.
 
@@ -126,17 +186,18 @@ def edit_config_for_mask_warps(data: dict[str, Any], st: SimType, ext: int = 2) 
     if st.axis not in ('x', 'y'):
         raise ValueError(f"Invalid axis '{st.axis}' for coded-mask plate warping (only planar).")
 
-    val = arcmin2deg(*st.value)
+    fpath = st.mask_fpath or data['mask']['maskPatternFile']
+    header = dict(fits.getheader(fpath, ext=ext))
 
+    val = arcmin2deg(*st.value)
     mask_ax2proj = HALFMASK_PROJ_WARP_DMAP[st.axis].upper()
-    header = dict(fits.getheader(data['mask']['maskPatternFile'], ext=ext))
     half_mask = (header[f'MAX{mask_ax2proj}'] - header[f'MIN{mask_ax2proj}']) / 2
     zOff = half_mask * math.sin(math.radians(val))
 
     neg_rot = deepcopy(data)
     update_maskRot(neg_rot, AXIS_DMAP[st.axis], -abs(val))
     update_maskOff(neg_rot, AXIS_DMAP['z'], zOff)
-    yield f"neg_{abs(st.value[0])}{st.value[1]}", neg_rot    # NOTE: this refers to the dir name
+    yield f"neg_{abs(st.value[0])}{st.value[1]}", neg_rot
 
     pos_rot = deepcopy(data)
     update_maskRot(pos_rot, AXIS_DMAP[st.axis], abs(val))
@@ -178,7 +239,21 @@ def edit_config_for_sdd_plane_expans(data: dict[str, Any], st: SimType) -> Itera
         
     yield "", data
 
-def edit_config_for_sdd_warps(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
+def edit_config_for_sdd_plane_deforms(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
+    """Edits baseline camera parameters data to account for detector plane deformation."""
+    if st.axis not in ('x', 'y'):
+        raise ValueError(f"Invalid axis '{st.axis}' for detector plane deformation (only planar).")
+    if st.sddplane_deform not in SDD_PLANE_DEFORMS_DMAP:
+        raise ValueError(f"Invalid detector plane deformation type '{st.sddplane_deform}'.")
+
+    idx = AXIS_DMAP[st.axis]
+    val = micron2mm(*st.value)
+    for sddID, w in SDD_PLANE_DEFORMS_DMAP[st.sddplane_deform][idx].items():
+        update_detPos(data, idx, w * val, sddID)
+        
+    yield f"{st.sddplane_deform}_{st.value[0]}{st.value[1]}", data
+
+def edit_config_for_sdd_plane_warps(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
     """Edits baseline camera parameters data to account for detector plane warping, symmetric wrt plane centre."""
     if st.axis not in AXIS_DMAP:
         raise ValueError(f"Invalid axis '{st.axis}' for detector plane warps.")
@@ -189,6 +264,35 @@ def edit_config_for_sdd_warps(data: dict[str, Any], st: SimType) -> Iterator[tup
         update_detRot(data, idx, w * val, sddID)
 
     yield "", data
+
+def edit_config_for_sdd_plane_inrots(
+    data: dict[str, Any],
+    st: SimType,
+) -> Iterator[tuple[str, dict]]:
+    """
+    Edits baseline camera parameters data to account for all-SDD rotations
+    wrt selected axis (e.g., for SDD in-plane rotations select 'z' axis).
+
+    ## Notes:
+        * `rm_sdd_inrots` refers to SDD rot combinations, e.g. express as
+          `['1,1,1,1', '1,1,1,-1', ...]`, with -1/+1 referring to a
+          clockwise/anti-clockwise rotation
+    """
+    if st.axis not in AXIS_DMAP:
+        raise ValueError(f"Invalid axis '{st.axis}' for all-SDD in-plane-rotations.")
+
+    idx = AXIS_DMAP[st.axis]
+    val = arcmin2deg(*st.value)
+    rm_sdd_inrots_ = [tuple(map(int, e.split(','))) for e in st.rm_sdd_inrots]
+
+    sddIDs = ('00', '10', '01', '11')
+    states = set(product([-1, 1], repeat=len(sddIDs)))
+    for state in states.difference(rm_sdd_inrots_):
+        data_ = deepcopy(data)
+        for sddID, w in zip(sddIDs, state):
+            update_detRot(data_, idx, w * val, sddID)
+
+        yield f"state_{'.'.join(map(str, state))}_{st.value[0]}{st.value[1]}", data_
 
 # -----------   Interface for WM sim editing   -----------
 
@@ -206,7 +310,9 @@ WMSIM_REGISTRY: dict[str, dict[str, ConfigEditor]] = {
         'rots': edit_config_for_sdd_rots,
         'shifts': edit_config_for_sdd_shifts,
         'plane_expans': edit_config_for_sdd_plane_expans,
-        'plane_warps': edit_config_for_sdd_warps,
+        'plane_deforms': edit_config_for_sdd_plane_deforms,
+        'plane_inrots': edit_config_for_sdd_plane_inrots,
+        'plane_warps': edit_config_for_sdd_plane_warps,
     },
 }
 
@@ -267,14 +373,26 @@ def config_wmsim(
 
 if __name__ == '__main__':
 
-    simtype = (
+    mask_fpath: str = (
+        '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/mask_NTHT_20260129_CORRECTED.fits'
+    )
+
+    simtypes = (
+        SimType('sdd', 'plane_deforms', 'x', (-1, 'mm')),
+        SimType('sdd', 'plane_deforms', 'y', (1, 'mm')),
+        SimType('sdd', 'plane_deforms', 'y', (1, 'mm'), sddplane_deform='trapez'),
+        
+        SimType('sdd', 'plane_inrots', 'z', (1, 'deg')),
+        SimType('sdd', 'plane_inrots', 'x', (-1, 'deg')),
+
+        SimType('mask', 'warps', 'x', (6, 'arcmin'), mask_fpath=mask_fpath),
+
         # SimType('mask', 'rots', 'x', (-1, 'deg')),
         # SimType('mask', 'rots', 'y', (6, 'arcmin')),
         # SimType('mask', 'rots', 'z', (-2, 'arcmin')),
 
-        # SimType('mask', 'warps', 'x', (6, 'arcmin')),
-        SimType('mask', 'warps', 'y', (2, 'arcmin')),
-        SimType('mask', 'warps', 'y', (-2, 'arcmin')),
+        # SimType('mask', 'warps', 'y', (2, 'arcmin')),
+        # SimType('mask', 'warps', 'y', (-2, 'arcmin')),
         # SimType('mask', 'warps', 'y', (-0.1, 'deg')),
 
         # SimType('mask', 'shifts', 'z', (1, 'mm')),
@@ -290,7 +408,8 @@ if __name__ == '__main__':
         # SimType('sdd', 'plane_warps', 'y', (6 / 60, 'arcmin')),
         # SimType('sdd', 'plane_warps', 'y', (-6 / 60, 'arcmin')),
     )
-    config_wmsim("/mnt/d/PhD_AASS/Coding/Images_fits/cam_geom_wmsims", simtype)
+    # config_wmsim("/mnt/d/PhD_AASS/Coding/Images_fits/cam_geom_wmsims", simtypes)
+    config_wmsim("/home/edoardo/Desktop/cam_geom_wmsims", simtypes)
 
 
 # end
