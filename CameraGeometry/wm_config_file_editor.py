@@ -34,12 +34,6 @@ SDD_PLANE_WARP_DMAP: dict[str, dict[str, int]] = {
     'z': {'00': 1, '10': -1, '01': -1, '11': 1},
 }
 
-def arcmin2deg(val: float, unit: str) -> float:
-    return val if unit == 'deg' else val / 60
-
-def micron2mm(val: float, unit: str) -> float:
-    return val if unit == 'mm' else 1e-3 * val
-
 @dataclass(frozen=True)
 class SimType:
     """Camera geometry simulation type to be performed by WISEMAN."""
@@ -66,6 +60,40 @@ def save_json(data: Any, filepath: str | Path, mode: str = 'w') -> None:
         json.dump(data, f, indent=4)
     return
 
+# -----------   data operators   -----------
+
+def arcmin2deg(val: float, unit: str) -> float:
+    avail = ('deg', 'arcmin')
+    if unit not in avail:
+        raise ValueError(f"Invalid unit '{unit}', must be in {avail}")
+    return val if unit == 'deg' else val / 60
+
+def micron2mm(val: float, unit: str) -> float:
+    avail = ('mm', 'micron')
+    if unit not in avail:
+        raise ValueError(f"Invalid unit '{unit}', must be in {avail}")
+    return val if unit == 'mm' else 1e-3 * val
+
+def update_maskOff(data: dict[str, Any], idx: int, val: float) -> None:
+    """Adds given value offset to mask pos along specified axis."""
+    data['mask']['maskOff'][idx] += val
+    return
+
+def update_maskRot(data: dict[str, Any], idx: int, val: float) -> None:
+    """Overwrites given value to mask rot angle along specified axis."""
+    data['mask']['maskRot'][idx] = val
+    return
+
+def update_detPos(data: dict[str, Any], idx: int, val: float, sddID: str) -> None:
+    """Adds given value offset to SDD pos along specified axis."""
+    data['focalplane']['detPos'][sddID][idx] += val
+    return
+
+def update_detRot(data: dict[str, Any], idx: int, val: float, sddID: str) -> None:
+    """Overwrites given value to SDD rot angle along specified axis."""
+    data['focalplane']['detRot'][sddID][idx] = val
+    return
+
 # -----------   WM sim files configuration editors   -----------
 
 ConfigEditor = Callable[[dict, SimType], Iterator[tuple[str, dict]]]
@@ -83,10 +111,8 @@ def edit_config_for_mask_rots(data: dict[str, Any], st: SimType) -> Iterator[tup
     """Edits baseline camera parameters data to account for coded-mask rotations."""
     if st.axis not in AXIS_DMAP:
         raise ValueError(f"Invalid axis '{st.axis}' for mask rotations.")
-
     val = arcmin2deg(*st.value)
-    data['mask']['maskRot'][AXIS_DMAP[st.axis]] = val
-
+    update_maskRot(data, AXIS_DMAP[st.axis], val)
     yield "", data
 
 def edit_config_for_mask_warps(data: dict[str, Any], st: SimType, ext: int = 2) -> Iterator[tuple[str, dict]]:
@@ -108,33 +134,29 @@ def edit_config_for_mask_warps(data: dict[str, Any], st: SimType, ext: int = 2) 
     zOff = half_mask * math.sin(math.radians(val))
 
     neg_rot = deepcopy(data)
-    neg_rot['mask']['maskRot'][AXIS_DMAP[st.axis]] = -abs(val)
-    neg_rot['mask']['maskOff'][AXIS_DMAP['z']] += zOff
-    yield f"neg_{st.value[0]}{st.value[1]}", neg_rot    # NOTE: this refers to the dir name
+    update_maskRot(neg_rot, AXIS_DMAP[st.axis], -abs(val))
+    update_maskOff(neg_rot, AXIS_DMAP['z'], zOff)
+    yield f"neg_{abs(st.value[0])}{st.value[1]}", neg_rot    # NOTE: this refers to the dir name
 
     pos_rot = deepcopy(data)
-    pos_rot['mask']['maskRot'][AXIS_DMAP[st.axis]] = abs(val)
-    pos_rot['mask']['maskOff'][AXIS_DMAP['z']] += zOff
-    yield f"pos_{st.value[0]}{st.value[1]}", pos_rot
+    update_maskRot(pos_rot, AXIS_DMAP[st.axis], abs(val))
+    update_maskOff(pos_rot, AXIS_DMAP['z'], zOff)
+    yield f"pos_{abs(st.value[0])}{st.value[1]}", pos_rot
 
 def edit_config_for_sdd_rots(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
     """Edits baseline camera parameters data to account for SDD rotations."""
     if st.axis not in AXIS_DMAP:
         raise ValueError(f"Invalid axis '{st.axis}' for SDD rotations.")
-    
     val = arcmin2deg(*st.value)
-    data['focalplane']['detRot'][st.sddID][AXIS_DMAP[st.axis]] = val
-
+    update_detRot(data, AXIS_DMAP[st.axis], val, st.sddID)
     yield "", data
 
 def edit_config_for_sdd_shifts(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
     """Edits baseline camera parameters data to account for SDD shifts."""
     if st.axis not in AXIS_DMAP:
         raise ValueError(f"Invalid axis '{st.axis}' for SDD shifts on detector plane.")
-
     val = micron2mm(*st.value)
-    data['focalplane']['detPos'][st.sddID][AXIS_DMAP[st.axis]] += val
-
+    update_detPos(data, AXIS_DMAP[st.axis], val, st.sddID)
     yield "", data
 
 def edit_config_for_sdd_plane_expans(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
@@ -164,7 +186,7 @@ def edit_config_for_sdd_warps(data: dict[str, Any], st: SimType) -> Iterator[tup
     idx = AXIS_DMAP[st.axis]
     val = arcmin2deg(*st.value)
     for sddID, w in SDD_PLANE_WARP_DMAP[st.axis].items():
-        data['focalplane']['detRot'][sddID][idx] = w * val
+        update_detRot(data, idx, w * val, sddID)
 
     yield "", data
 
