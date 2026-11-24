@@ -376,6 +376,13 @@ if __name__ == '__main__':
     mask_fpath: str = (
         '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/mask_NTHT_20260129_CORRECTED.fits'
     )
+    # tree_path: str = "/mnt/d/PhD_AASS/Coding/Images_fits/cam_geom_wmsims"
+    tree_path: str = "/home/edoardo/Desktop/cam_geom_wmsims"
+
+    simtypes: list[SimType] = []
+
+    # ---------   MASK   ---------
+    # --- ROTATIONS
 
     simtypes = (
         SimType('sdd', 'plane_deforms', 'x', (-1, 'mm')),
@@ -408,8 +415,7 @@ if __name__ == '__main__':
         # SimType('sdd', 'plane_warps', 'y', (6 / 60, 'arcmin')),
         # SimType('sdd', 'plane_warps', 'y', (-6 / 60, 'arcmin')),
     )
-    # config_wmsim("/mnt/d/PhD_AASS/Coding/Images_fits/cam_geom_wmsims", simtypes)
-    config_wmsim("/home/edoardo/Desktop/cam_geom_wmsims", simtypes)
+    config_wmsim(tree_path, simtypes)
 
 
 # end
