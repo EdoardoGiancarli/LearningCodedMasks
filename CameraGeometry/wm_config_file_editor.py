@@ -416,7 +416,7 @@ if __name__ == '__main__':
         SimType('mask', 'warps', 'y', (val, 'arcmin'), mask_fpath=mask_fpath) for val in vals
     ]
     # - PLATE DEFORMATIONS
-    get_mname = lambda val: f"mask_050_1040x17_20260129_ELXDIM_250um_for_wiseman_disp{'m' if val < 0 else 'p'}0{int(abs(val))}.fits"
+    get_mname = lambda val: f"mask_050_1040x17_20260129_ELXDIM_250um_for_wiseman_disp{'m' if val < 0 else 'p'}{f'0{str(int(abs(val)))}'[-3:]}.fits"
     vals = [-25.0, -50.0, -75.0, -100.0, 25.0, 50.0, 75.0, 100.0]
     simtypes += [
         SimType('mask', 'expans', 'x', (val, 'micron'), mask_fpath=get_mname(val)) for val in vals
