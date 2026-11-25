@@ -204,6 +204,24 @@ def edit_config_for_mask_warps(
     update_maskOff(pos_rot, AXIS_DMAP['z'], zOff)
     yield f"pos_{abs(st.value[0])}{st.value[1]}", pos_rot
 
+def edit_config_for_mask_expans(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
+    """
+    Edits baseline camera parameters data to account for coded-mask plate expansion.
+
+    ## Notes
+        * In this case the mask pattern file within `data` is updated.
+    """
+    if st.axis not in ('x', 'y'):
+        raise ValueError(f"Invalid axis '{st.axis}' for coded-mask plate expansion (only planar).")
+    if not st.mask_fpath:
+        raise ValueError(f"Missing deformed coded-mask pattern in SimType obj.")
+
+    in_path, mask_path = map(Path, (data['mask']['maskPatternFile'], st.mask_fpath))
+    out_path = mask_path if mask_path.is_absolute() else in_path.parent / mask_path
+    data['mask']['maskPatternFile'] = str(out_path)
+
+    yield "", data
+
 def edit_config_for_sdd_rots(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
     """Edits baseline camera parameters data to account for SDD rotations."""
     if st.axis not in AXIS_DMAP:
@@ -304,7 +322,7 @@ WMSIM_REGISTRY: dict[str, dict[str, ConfigEditor]] = {
         'rots': edit_config_for_mask_rots,
         'shifts': partial(NotAvailable, msg='Mask shifts TBD...'),
         'warps': edit_config_for_mask_warps,
-        'expans': partial(NotAvailable, msg='Mask plate expansions TBD...'),
+        'expans': edit_config_for_mask_expans,
     },
     'sdd': {
         'rots': edit_config_for_sdd_rots,
@@ -373,16 +391,18 @@ def config_wmsim(
 
 if __name__ == '__main__':
 
-    # basepath: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding'
-    basepath: str = '/mnt/d/PhD_AASS/Coding/Images_fits'
+    basepath: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding'
+    mask_fpath: str = f'{basepath}/IROS_Data/Simulations/mask_NTHT_20260129_CORRECTED.fits'
+
+    # basepath: str = '/mnt/d/PhD_AASS/Coding/Images_fits'
+    # mask_fpath: str = f'{basepath}/mask_NTHT_20260129_CORRECTED.fits'
     
     sims_parent: str = f'{basepath}/cam_geom_wmsims'
-    mask_fpath: str = f'{basepath}/mask_NTHT_20260129_CORRECTED.fits'
 
     simtypes: list[SimType] = []
 
     # ---------   MASK   ---------
-    # --- ROTATIONS
+    # - ROTATIONS
     vals: list[float] = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0]  # [arcmin]
     simtypes += [
         SimType('mask', 'rots', 'y', (val, 'arcmin')) for val in vals
@@ -390,13 +410,19 @@ if __name__ == '__main__':
     simtypes += [
         SimType('mask', 'rots', 'z', (val, 'arcmin')) for val in vals
     ]
-    # --- PLATE WARPING
+    # - PLATE WARPING
     vals += [-v for v in vals]
     simtypes += [
         SimType('mask', 'warps', 'y', (val, 'arcmin'), mask_fpath=mask_fpath) for val in vals
     ]
+    # - PLATE DEFORMATIONS
+    get_mname = lambda val: f"mask_050_1040x17_20260129_ELXDIM_250um_for_wiseman_disp{'m' if val < 0 else 'p'}0{int(abs(val))}.fits"
+    vals = [-25.0, -50.0, -75.0, -100.0, 25.0, 50.0, 75.0, 100.0]
+    simtypes += [
+        SimType('mask', 'expans', 'x', (val, 'micron'), mask_fpath=get_mname(val)) for val in vals
+    ]
     # ---------   DETECTOR PLANE   ---------
-    # --- DEFORMATIONS
+    # - DEFORMATIONS
     vals = [25.0, 50.0, 75.0, 100.0]  # [micron]
     simtypes += [
         *[SimType('sdd', 'plane_deforms', 'x', (val, 'micron'), sddplane_deform='external') for val in vals],
@@ -404,7 +430,7 @@ if __name__ == '__main__':
         *[SimType('sdd', 'plane_deforms', 'x', (val, 'micron'), sddplane_deform='slide') for val in vals],
         *[SimType('sdd', 'plane_deforms', 'x', (val, 'micron'), sddplane_deform='trapez') for val in vals],
     ]
-    # --- IN-PLANE SDD ROTATIONS
+    # - IN-PLANE SDD ROTATIONS
     vals = [1.0, 2.0, 3.0, 4.0]  # [arcmin]
     simtypes += [
         SimType('sdd', 'plane_inrots', 'z', (val, 'arcmin')) for val in vals
