@@ -4,7 +4,23 @@ Module for `camgeom` custom types.
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
+from numpy.typing import NDArray
+
+
+class OptResult(NamedTuple):
+    """
+    Optimisation results.
+
+    Attributes:
+        params (NDArray):
+            Optimised parameters array.
+        covar (NDArray):
+            Optimised parameters covariance matrix.
+    """
+    params: NDArray
+    covar: NDArray
 
 @dataclass(frozen=True)
 class SimType:
