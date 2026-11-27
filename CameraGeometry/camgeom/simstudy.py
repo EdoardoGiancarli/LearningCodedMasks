@@ -427,7 +427,11 @@ def analyse_camgeom(
         **phs_corr,
     )
     src_df = srcdmap_to_df(src_dmap)
-    save_to_csv(src_df, outpath)
+
+    upx, upy = camera.upscale_f
+    out_fname = f'{simpath.name}_{dataset}_{E_min or 2.0}-{E_max or 50.0}keV_upx{upx}upy{upy}.csv'
+    outpath.mkdir(parents=True, exist_ok=True)
+    save_to_csv(src_df, outpath / out_fname)
 
     return
 

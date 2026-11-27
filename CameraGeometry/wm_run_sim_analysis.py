@@ -8,9 +8,11 @@ import os
 for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ.setdefault(var, "1")
 
+from pathlib import Path
 from functools import lru_cache
 import multiprocessing
 from typing import Any, Callable, Optional
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
@@ -40,6 +42,29 @@ def _init_worker_objs(
     _WORKER_STATE_DMAP['log_progress'] = log_progress
     _WORKER_STATE_DMAP['kwargs'] = kwargs
     return
+
+def select_sims(
+    parent: str | Path,
+    pattern: str = '*',
+    exclude: tuple[str | Path, ...] = (),
+) -> tuple[Path, ...]:
+    """
+    Globs WM sims with given pattern in parent dir.
+    """
+    def check_fpath(p: str | Path, matches: set[Path]) -> Path:
+        p = Path(p)
+        p = parent / p if not p.is_absolute() else p
+        if p not in matches:
+            warnings.warn(f"Chosen file (to select/exclude) '{p.name}' not in directory.")
+        return p
+
+    parent = Path(parent)
+    matches = set(parent.glob(pattern))
+    if not exclude:
+        return tuple(matches)
+
+    exclude = tuple(check_fpath(p, matches) for p in exclude)
+    return tuple(matches.difference(exclude))
 
 
 # ------   analysis   ------
@@ -96,31 +121,25 @@ def analyse_geomsims(
 
 # ------   SDD spatial resolution kernel   ------
 
-def psfy_for_crab() -> Callable[[CodedMaskCamera, NDArray], NDArray]:
-    """
-    Models SDD spatial resolution correction, calibrated for point-like Crab in [2, 50] keV.
-    """
-    @lru_cache(maxsize=1)
-    def _psfy_kernel_cached(camera: CodedMaskCamera) -> NDArray:
-        """Cached SDD resolution kernel."""
-        gauss_kws = {"mode": 'constant', "cval": 0.0}
-        alpha, beta, sigma = 0.15, 0.51, 0.1
+@lru_cache(maxsize=1)
+def _psfy_kernel_cached(camera: CodedMaskCamera) -> NDArray:
+    """Cached SDD resolution kernel."""
+    gauss_kws = {"mode": 'constant', "cval": 0.0}
+    alpha, beta, sigma = 0.15, 0.51, 0.1
 
-        px_ydim = camera.specs.mask_deltay / camera.upscale_f.y
-        slit_dim = camera.specs.slit_deltay
-        bins = np.linspace(-slit_dim, slit_dim, int(2 * slit_dim / px_ydim) + 1)
+    px_ydim = camera.specs.mask_deltay / camera.upscale_f.y
+    slit_dim = camera.specs.slit_deltay
+    bins = np.linspace(-slit_dim, slit_dim, int(2 * slit_dim / px_ydim) + 1)
 
-        modsec = 1.0 / np.cosh(np.abs(bins / alpha) ** beta)
-        psfy = gaussian_filter(modsec, sigma, **gauss_kws)
+    modsec = 1.0 / np.cosh(np.abs(bins / alpha) ** beta)
+    psfy = gaussian_filter(modsec, sigma, **gauss_kws)
 
-        return psfy / np.sum(psfy)
+    return psfy / np.sum(psfy)
 
-    def apply_detector_resolution(camera: CodedMaskCamera, shadowgram: NDArray) -> NDArray:
-        """Applies finite detector spatial resolution effects to a shadowgram."""
-        kernel = _psfy_kernel_cached(camera)
-        return convolve(shadowgram, kernel, mode="same")
-
-    return apply_detector_resolution
+def psfy_for_crab(camera: CodedMaskCamera, shadowgram: NDArray) -> NDArray:
+    """Models SDD spatial resolution correction, calibrated for point-like Crab in [2, 50] keV."""
+    kernel = _psfy_kernel_cached(camera)
+    return convolve(shadowgram, kernel, mode="same")
     
 
 
@@ -128,13 +147,14 @@ def psfy_for_crab() -> Callable[[CodedMaskCamera, NDArray], NDArray]:
 
 if __name__ == '__main__':
 
-    basepath: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding'
-    mask_fpath: str = f'{basepath}/IROS_Data/Simulations/mask_NTHT_20260129_CORRECTED.fits'
+    basepath: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data'
+    mask_fpath: str = f'{basepath}/Simulations/mask_NTHT_20260129_CORRECTED.fits'
 
     # basepath: str = '/mnt/d/PhD_AASS/Coding/Images_fits'
     # mask_fpath: str = f'{basepath}/mask_NTHT_20260129_CORRECTED.fits'
 
-    sims_parent: str = f'{basepath}/cam_geom_wmsims'
+    sims_parent: str = f'{basepath}/Simulations/CameraGeometry'
+    sims_out: str = f'{basepath}/Outputs/OutCameraGeometry'
 
     # - pars ----------------------------------------------------------------------------------------
     energy_band = (2.0, 50.0)   # [keV]
@@ -143,33 +163,67 @@ if __name__ == '__main__':
     # - sim/output filepaths ------------------------------------------------------------------------
     sims: list[tuple[str, str]] = []
 
+    # ---------   BASELINE   ---------
+    field = 'baseline'
+    simpaths = select_sims(f"{sims_parent}/{field}")
+    sims += [
+        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+    ]
+
     # ---------   MASK   ---------
     # - ROTATIONS
-    vals: list[float] = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0]  # [arcmin]
+    field = 'mask_rots/mask_y_rots'
+    simpaths = select_sims(f"{sims_parent}/{field}")
+    sims += [
+        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+    ]
+    field = 'mask_rots/mask_z_rots'
+    simpaths = select_sims(f"{sims_parent}/{field}")
+    sims += [
+        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+    ]
+
+    print(len(sims))
+    exit()
 
     # - PLATE WARPING
-    vals += [-v for v in vals]  # [arcmin]
+    field = '/'
+    simpaths = select_sims(f"{sims_parent}/{field}")
+    sims += [
+        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+    ]
 
     # - PLATE DEFORMATIONS
-    vals = [-25.0, -50.0, -75.0, -100.0, 25.0, 50.0, 75.0, 100.0]  # [micron]
+    field = '/'
+    simpaths = select_sims(f"{sims_parent}/{field}")
+    sims += [
+        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+    ]
 
     # ---------   DETECTOR PLANE   ---------
     # - DEFORMATIONS
-    vals = [25.0, 50.0, 75.0, 100.0]  # [micron]
+    field = '/'
+    simpaths = select_sims(f"{sims_parent}/{field}")
+    sims += [
+        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+    ]
 
     # - IN-PLANE SDD ROTATIONS
-    vals = [1.0, 2.0, 3.0, 4.0]  # [arcmin]
+    field = '/'
+    simpaths = select_sims(f"{sims_parent}/{field}")
+    sims += [
+        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+    ]
 
 
     # - analyse camera geometry sims ----------------------------------------------------------------
-    psfy = psfy_for_crab()
     analyse_geomsims(
         camera=wfm,
         sims=sims,
         energy_band=energy_band,
         n_workers=4,
         #
-        psfy=psfy,
+        psfy=psfy_for_crab,
         psf_crp_xyoff=(2 + wfm.upscale_f.x, 5 * wfm.upscale_f.y),
         src_optim_kws=None,
         phs_corr=None,
