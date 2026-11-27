@@ -74,11 +74,7 @@ def edit_config_for_mask_rots(data: dict[str, Any], st: SimType) -> Iterator[tup
     update_maskRot(data, AXIS_DMAP[st.axis], val)
     yield "", data
 
-def edit_config_for_mask_warps(
-    data: dict[str, Any],
-    st: SimType,
-    ext: int = 2,
-) -> Iterator[tuple[str, dict]]:
+def edit_config_for_mask_warps(data: dict[str, Any], st: SimType, ext: int = 2) -> Iterator[tuple[str, dict]]:
     """
     Edits baseline camera parameters data to account for coded-mask plate warping.
 
@@ -186,10 +182,7 @@ def edit_config_for_sdd_plane_warps(data: dict[str, Any], st: SimType) -> Iterat
 
     yield "", data
 
-def edit_config_for_sdd_plane_inrots(
-    data: dict[str, Any],
-    st: SimType,
-) -> Iterator[tuple[str, dict]]:
+def edit_config_for_sdd_plane_inrots(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
     """
     Edits baseline camera parameters data to account for all-SDD rotations
     wrt selected axis (e.g., for SDD in-plane rotations select 'z' axis).
@@ -216,12 +209,21 @@ def edit_config_for_sdd_plane_inrots(
         yield f"state_{'.'.join(map(str, state))}_{st.value[0]}{st.value[1]}", data_
 
 
+SrcInstrEditor = Callable[[dict[str, Any], SimType], None]
+
+def edit_srcinstr_for_mask_warps(data: dict[str, Any], st: SimType) -> None:
+    """Edits sources and instr. parameters data to account for coded-mask plate warping."""
+    data['simulation']['output']['mask'] = True
+    return
+
+
+
 # -----------   Interface for WM sim editing   -----------
 
 def NotAvailable(*args, **kwargs):
     raise NotImplementedError(kwargs.get('msg', 'Method not available'))
 
-WMSIM_REGISTRY: dict[str, dict[str, ConfigEditor]] = {
+WMSIM_CONFIG_REGISTRY: dict[str, dict[str, ConfigEditor]] = {
     'mask': {
         'rots': edit_config_for_mask_rots,
         'shifts': partial(NotAvailable, msg='Mask shifts TBD...'),
@@ -236,6 +238,9 @@ WMSIM_REGISTRY: dict[str, dict[str, ConfigEditor]] = {
         'plane_inrots': edit_config_for_sdd_plane_inrots,
         'plane_warps': edit_config_for_sdd_plane_warps,
     },
+}
+WMSIM_SRCINSTR_REGISTRY: dict[tuple[str, str], SrcInstrEditor] = {
+    ('mask', 'warps'): edit_srcinstr_for_mask_warps,
 }
 
 def get_dst_path(parent: Path, st: SimType) -> Path:
@@ -263,27 +268,37 @@ def config_wmsim(
     simtype_ = (simtype,) if isinstance(simtype, SimType) else simtype
 
     basepath = parent / ref_to
-    data = load_json(basepath / camfile)
     src_filepath = basepath / srcfile
+    config_data, src_data = map(load_json, (basepath / camfile, src_filepath))
 
     for st in simtype_:
         try:
-            edit_fn = WMSIM_REGISTRY[st.level][st.stype]
+            edit_config_fn = WMSIM_CONFIG_REGISTRY[st.level][st.stype]
         except KeyError:
             print(f"KeyError: missing config for level '{st.level}', stype '{st.stype}'")
             continue
 
-        data_ = deepcopy(data)
+        edit_src_fn = WMSIM_SRCINSTR_REGISTRY.get((st.level, st.stype))
+
+        config_data_ = deepcopy(config_data)
         base_save_to = get_dst_path(parent, st)
 
         try:
-            for suffix, mod_data in edit_fn(data_, st):
+            src_data_ = None
+            if edit_src_fn is not None:
+                src_data_ = deepcopy(src_data)
+                edit_src_fn(src_data_, st)
+
+            for suffix, mod_data in edit_config_fn(config_data_, st):
                 save_to = base_save_to / suffix if suffix else base_save_to
                 save_to.mkdir(parents=True, exist_ok=True)
 
                 save_json(mod_data, save_to / camfile)
-                shutil.copyfile(src_filepath, save_to / srcfile)
-
+                if src_data_ is not None:
+                    save_json(src_data_, save_to / srcfile)
+                else:
+                    shutil.copyfile(src_filepath, save_to / srcfile)
+        
         except Exception as e:
             print(f"{type(e).__name__} on {st.level} {st.stype}: {e}")
             continue
