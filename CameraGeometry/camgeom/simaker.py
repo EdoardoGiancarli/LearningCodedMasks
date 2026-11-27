@@ -100,12 +100,12 @@ def edit_config_for_mask_warps(
     neg_rot = deepcopy(data)
     update_maskRot(neg_rot, AXIS_DMAP[st.axis], -abs(val))
     update_maskOff(neg_rot, AXIS_DMAP['z'], zOff)
-    yield f"neg_{abs(st.value[0])}{st.value[1]}", neg_rot
+    yield f"neg_{st.value[0]}{st.value[1]}", neg_rot
 
     pos_rot = deepcopy(data)
     update_maskRot(pos_rot, AXIS_DMAP[st.axis], abs(val))
     update_maskOff(pos_rot, AXIS_DMAP['z'], zOff)
-    yield f"pos_{abs(st.value[0])}{st.value[1]}", pos_rot
+    yield f"pos_{st.value[0]}{st.value[1]}", pos_rot
 
 def edit_config_for_mask_expans(data: dict[str, Any], st: SimType) -> Iterator[tuple[str, dict]]:
     """
