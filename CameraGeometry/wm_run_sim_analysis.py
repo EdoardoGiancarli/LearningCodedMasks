@@ -12,7 +12,6 @@ from pathlib import Path
 from functools import lru_cache
 import multiprocessing
 from typing import Any, Callable, Optional
-import warnings
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,7 +20,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.signal import convolve
 
 from bloodmoon.mask import CodedMaskCamera, codedmask
-from camgeom.simstudy import analyse_camgeom
+from camgeom.simstudy import select_sims, analyse_camgeom
 
 # ------   helpers ------
 
@@ -42,29 +41,6 @@ def _init_worker_objs(
     _WORKER_STATE_DMAP['log_progress'] = log_progress
     _WORKER_STATE_DMAP['kwargs'] = kwargs
     return
-
-def select_sims(
-    parent: str | Path,
-    pattern: str = '*',
-    exclude: tuple[str | Path, ...] = (),
-) -> tuple[Path, ...]:
-    """
-    Globs WM sims with given pattern in parent dir.
-    """
-    def check_fpath(p: str | Path, matches: set[Path]) -> Path:
-        p = Path(p)
-        p = parent / p if not p.is_absolute() else p
-        if p not in matches:
-            warnings.warn(f"Chosen file (to select/exclude) '{p.name}' not in directory.")
-        return p
-
-    parent = Path(parent)
-    matches = set(parent.glob(pattern))
-    if not exclude:
-        return tuple(matches)
-
-    exclude = tuple(check_fpath(p, matches) for p in exclude)
-    return tuple(matches.difference(exclude))
 
 
 # ------   analysis   ------
@@ -133,15 +109,14 @@ def _psfy_kernel_cached(camera: CodedMaskCamera) -> NDArray:
 
     modsec = 1.0 / np.cosh(np.abs(bins / alpha) ** beta)
     psfy = gaussian_filter(modsec, sigma, **gauss_kws)
-
-    return psfy / np.sum(psfy)
+    psfy = psfy / np.sum(psfy)
+    return psfy.reshape(len(bins), -1)
 
 def psfy_for_crab(camera: CodedMaskCamera, shadowgram: NDArray) -> NDArray:
     """Models SDD spatial resolution correction, calibrated for point-like Crab in [2, 50] keV."""
     kernel = _psfy_kernel_cached(camera)
     return convolve(shadowgram, kernel, mode="same")
     
-
 
 
 
@@ -187,14 +162,14 @@ if __name__ == '__main__':
     exit()
 
     # - PLATE WARPING
-    field = '/'
+    field = 'mask_warps/mask_y_warps'
     simpaths = select_sims(f"{sims_parent}/{field}")
     sims += [
         (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
     ]
 
     # - PLATE DEFORMATIONS
-    field = '/'
+    field = 'mask_expans/mask_x_expans'
     simpaths = select_sims(f"{sims_parent}/{field}")
     sims += [
         (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
@@ -202,18 +177,22 @@ if __name__ == '__main__':
 
     # ---------   DETECTOR PLANE   ---------
     # - DEFORMATIONS
-    field = '/'
-    simpaths = select_sims(f"{sims_parent}/{field}")
-    sims += [
-        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
-    ]
+    vals: list[float] = [25.0, 50.0, 75.0, 100.0]  # [micron]
+    for val in vals:
+        field = f'sdd_plane_deforms/sdd_x_plane_deforms/x_plane_deforms_{val}micron'
+        simpaths = select_sims(f"{sims_parent}/{field}")
+        sims += [
+            (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+        ]
 
     # - IN-PLANE SDD ROTATIONS
-    field = '/'
-    simpaths = select_sims(f"{sims_parent}/{field}")
-    sims += [
-        (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
-    ]
+    vals: list[float] = [1.0, 2.0, 3.0, 4.0]  # [arcmin]
+    for val in vals:
+        field = f'sdd_plane_inrots/sdd_z_plane_inrots/z_plane_inrots_{val}arcmin'
+        simpaths = select_sims(f"{sims_parent}/{field}")
+        sims += [
+            (p, Path(f"{sims_out}/{field}/{p.name}")) for p in simpaths
+        ]
 
 
     # - analyse camera geometry sims ----------------------------------------------------------------
