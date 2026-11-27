@@ -7,6 +7,7 @@ such as mask and/or SDDs (or even whole detector plane) rotations and/or shifts 
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Optional
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
@@ -38,6 +39,29 @@ from .types import OptResult
 
 
 # ------   I/O operations   ------
+
+def select_sims(
+    parent: str | Path,
+    pattern: str = '*',
+    exclude: tuple[str | Path, ...] = (),
+) -> tuple[Path, ...]:
+    """
+    Globs WM sims with given pattern in parent dir.
+    """
+    def check_fpath(p: str | Path, matches: set[Path]) -> Path:
+        p = Path(p)
+        p = parent / p if not p.is_absolute() else p
+        if p not in matches:
+            warnings.warn(f"Chosen file (to select/exclude) '{p.name}' not in directory.")
+        return p
+
+    parent = Path(parent)
+    matches = set(parent.glob(pattern))
+    if not exclude:
+        return tuple(matches)
+
+    exclude = tuple(check_fpath(p, matches) for p in exclude)
+    return tuple(matches.difference(exclude))
 
 def check_and_pick(parent: Path, pattern: str) -> Path:
     matches = tuple(parent.glob(pattern))
