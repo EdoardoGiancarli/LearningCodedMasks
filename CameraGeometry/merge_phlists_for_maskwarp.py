@@ -17,6 +17,8 @@ from tqdm import tqdm
 import darksun as ds
 from darksun.data import DataLoader
 
+from camgeom.simstudy import check_and_pick
+
 def _grep_phIDs(sdl: DataLoader, cond: Callable[[NDArray], NDArray]) -> NDArray:
     """Extracts photon IDs from given list based on mask output X coord condition."""
     mask = cond(sdl.DLdata['X'])
@@ -26,20 +28,6 @@ def _intersect_IDs(all_ids: NDArray, collected_ids: NDArray, uniqueIDs: bool = T
     """Extracts valid photon ID indexes within collected photons list."""
     _, _, idx_b = np.intersect1d(all_ids, collected_ids, assume_unique=uniqueIDs, return_indices=True)
     return idx_b
-
-
-def check_and_pick(parent: Path, pattern: str) -> Path:
-    matches = tuple(parent.glob(pattern))
-    if not matches:
-        raise ValueError(f"A file matching the pattern {str(parent / pattern)} is expected but missing.")
-    f, *extra_matches = matches
-    if extra_matches:
-        raise ValueError(
-            f"Found unexpected extra matches for glob pattern {str(parent / pattern)}."
-            f"File with pattern {pattern} should be unique"
-        )
-    return f
-
 
 def extract_phs(sdl_mask: DataLoader, sdl: DataLoader, cond: Callable[[NDArray], NDArray]) -> fits.FITS_rec:
     """Extracts valid photons from ID intersection between collected photons and selected output from mask."""
@@ -137,44 +125,35 @@ def main(
 
 
 if __name__ == '__main__':
-    DATASET: str = 'detected'
+    DATASET: str = 'reconstructed'
     ID_CAM: str = 'cam1a'
-    DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/CameraGeometry/mask_warps'
-    PYWARP_PATH: str = 'mask_Ywarp/plusYwarp'
-    NYWARP_PATH: str = 'mask_Ywarp/negYwarp'
+    DIRPATH: str = '/mnt/dbb8f47e-da06-47bf-8ef5-038092af70f7/Edos_Magnificent_Manor/PhD_AASS/Coding/IROS_Data/Simulations/CameraGeometry/mask_warps/mask_y_warps'
+
+    pos_y_warp_vals: list[float] = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0]  # [arcmin]
+    neg_y_warp_vals: list[float] = [-4.0, -3.0, -2.0, -1.5, -1.0, -0.5]  # [arcmin]
 
     CASE_STUDY: list[tuple[tuple[str, str], str]] = [
         # - POSITIVE Y MASK WARPING
         # NOTE: positive on the left (X < 0), negative on the right (X >= 0)
-        (
-            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_2arcmin/p2arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_2arcmin/m2arcmin'),
-            f'{DIRPATH}/{PYWARP_PATH}/pYwarp_2arcmin/{ID_CAM}/pYwarp_2arcmin_2-50keV_1ks_{DATASET}.fits',
-        ),
-        (
-            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_4arcmin/p4arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_4arcmin/m4arcmin'),
-            f'{DIRPATH}/{PYWARP_PATH}/pYwarp_4arcmin/{ID_CAM}/pYwarp_4arcmin_2-50keV_1ks_{DATASET}.fits',
-        ),
-        (
-            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_6arcmin/p6arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pYwarp_6arcmin/m6arcmin'),
-            f'{DIRPATH}/{PYWARP_PATH}/pYwarp_6arcmin/{ID_CAM}/pYwarp_6arcmin_2-50keV_1ks_{DATASET}.fits',
+        *tuple(
+            (
+                (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pos_{val}arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/neg_{val}arcmin'),
+                f'{DIRPATH}/y_warps_{val}arcmin/{ID_CAM}/{val}arcmin_2-50keV_1ks_{DATASET}.fits'
+            )
+            for val in pos_y_warp_vals
         ),
         # - NEGATIVE Y MASK WARPING
         # NOTE: negative on the left (X < 0), positive on the right (X >= 0)
-        (
-            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_2arcmin/m2arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_2arcmin/p2arcmin'),
-            f'{DIRPATH}/{NYWARP_PATH}/nYwarp_2arcmin/{ID_CAM}/nYwarp_2arcmin_2-50keV_1ks_{DATASET}.fits',
-        ),
-        (
-            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_4arcmin/m4arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_4arcmin/p4arcmin'),
-            f'{DIRPATH}/{NYWARP_PATH}/nYwarp_4arcmin/{ID_CAM}/nYwarp_4arcmin_2-50keV_1ks_{DATASET}.fits',
-        ),
-        (
-            (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_6arcmin/m6arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/nYwarp_6arcmin/p6arcmin'),
-            f'{DIRPATH}/{NYWARP_PATH}/nYwarp_6arcmin/{ID_CAM}/nYwarp_6arcmin_2-50keV_1ks_{DATASET}.fits',
-        ),
+        *tuple(
+            (
+                (f'{DIRPATH}/SIMS_FOR_MASK_WARPING/neg_{val}arcmin', f'{DIRPATH}/SIMS_FOR_MASK_WARPING/pos_{val}arcmin'),
+                f'{DIRPATH}/y_warps_{val}arcmin/{ID_CAM}/{val}arcmin_2-50keV_1ks_{DATASET}.fits'
+            )
+            for val in neg_y_warp_vals
+        )
     ]
 
-    main(CASE_STUDY, dataset=DATASET, camID=ID_CAM, n_workers=3)
+    main(CASE_STUDY, dataset=DATASET, camID=ID_CAM, n_workers=4)
 
 
 # end
